@@ -75,4 +75,11 @@ else
   fi
 fi
 
+# ── SDDM: Catppuccin Mocha Mauve theme ───────────────────────────────────────
+log "Instalando tema SDDM Catppuccin Mocha Mauve"
+mkdir -p /usr/share/sddm/themes
+curl -L --fail -o "$TMPDIR_ASSETS/catppuccin-sddm.zip" \
+  "https://github.com/catppuccin/sddm/releases/latest/download/catppuccin-mocha-mauve.zip"
+unzip -qo "$TMPDIR_ASSETS/catppuccin-sddm.zip" -d /usr/share/sddm/themes/
+
 log "Assets instalados com sucesso."

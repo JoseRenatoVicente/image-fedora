@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+# setup-user.sh — Configuração de ambiente do usuário (primeira vez)
+# Execute: bash ~/setup-user.sh
+# Instala: NVM/Node.js, Oh My Zsh + Powerlevel10k, eza (cargo), LazyDocker,
+#          Homebrew + terraform/kubectl/flux/talosctl, Flatpaks, aliases
+set -euo pipefail
+
+log()  { printf "\n\033[1;34m==> %s\033[0m\n" "$*"; }
+warn() { printf "\033[1;33mWARN:\033[0m %s\n" "$*" >&2; }
+ok()   { printf "\033[1;32m OK:\033[0m %s\n" "$*"; }
+
+if [[ "${EUID}" -eq 0 ]]; then
+  echo "Não rode como root. Execute como seu usuário normal."
+  exit 1
+fi
+
+STATE_DIR="$HOME/.local/share/fedora-kde-setup"
+mkdir -p "$STATE_DIR"
+
+done_already() { [[ -f "$STATE_DIR/$1" ]]; }
+mark_done()    { touch "$STATE_DIR/$1"; }
+
+# ── Flatpaks ──────────────────────────────────────────────────────────────────
+log "Instalando Flatpaks"
+if ! done_already "flatpaks"; then
+  flatpak remote-add --user --if-not-exists flathub \
+    https://flathub.org/repo/flathub.flatpakrepo
+
+  FLATPAKS=(
+    com.discordapp.Discord
+    org.telegram.desktop
+    md.obsidian.Obsidian
+    io.dbeaver.DBeaverCommunity
+    com.slack.Slack
+    org.qbittorrent.qBittorrent
+    com.github.IsmaelMartinez.teams_for_linux
+    org.torproject.torbrowser-launcher
+  )
+
+  for pkg in "${FLATPAKS[@]}"; do
+    flatpak install --user -y flathub "$pkg" || warn "Falhou: $pkg"
+  done
+  mark_done "flatpaks"
+  ok "Flatpaks instalados"
+else
+  ok "Flatpaks já instalados, pulando"
+fi
+
+# ── NVM + Node.js LTS + npm globals ──────────────────────────────────────────
+log "Instalando NVM"
+if ! done_already "nvm"; then
+  NVM_VERSION="v0.40.3"
+  curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" | bash
+  mark_done "nvm"
+  ok "NVM instalado"
+else
+  ok "NVM já instalado, pulando"
+fi
+
+# Carrega NVM para uso imediato
+export NVM_DIR="$HOME/.nvm"
+# shellcheck source=/dev/null
+[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
+
+log "Instalando Node.js LTS"
+if ! done_already "nodejs"; then
+  nvm install --lts
+  nvm use --lts
+  nvm alias default node
+  mark_done "nodejs"
+  ok "Node.js LTS instalado"
+else
+  ok "Node.js já instalado, pulando"
+fi
+
+log "Instalando pacotes npm globais"
+if ! done_already "npm-globals" && command -v npm &>/dev/null; then
+  npm install -g pnpm
+  npm install -g @github/copilot-cli || warn "@github/copilot-cli falhou (nome pode ter mudado)"
+  npm install -g opencode-ai@latest || warn "opencode-ai falhou"
+  mark_done "npm-globals"
+  ok "npm globals instalados"
+fi
+
+# ── Oh My Zsh + Powerlevel10k + plugins ──────────────────────────────────────
+log "Instalando Oh My Zsh"
+if ! done_already "omz"; then
+  RUNZSH=no CHSH=no sh -c \
+    "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  mark_done "omz"
+  ok "Oh My Zsh instalado"
+else
+  ok "Oh My Zsh já instalado, pulando"
+fi
+
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+log "Instalando Powerlevel10k"
+if ! done_already "p10k"; then
+  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
+    "$ZSH_CUSTOM/themes/powerlevel10k" 2>/dev/null || true
+  mark_done "p10k"
+  ok "Powerlevel10k instalado"
+fi
+
+log "Instalando plugins zsh"
+if ! done_already "zsh-plugins"; then
+  git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions \
+    "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
+  git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting \
+    "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+  git clone --depth=1 https://github.com/zsh-users/zsh-completions \
+    "$ZSH_CUSTOM/plugins/zsh-completions" 2>/dev/null || true
+  mark_done "zsh-plugins"
+  ok "Plugins zsh instalados"
+fi
+
+log "Configurando .zshrc"
+if ! done_already "zshrc"; then
+  ZSHRC="$HOME/.zshrc"
+  # Garante que existe
+  [[ -f "$ZSHRC" ]] || touch "$ZSHRC"
+
+  # Troca tema para powerlevel10k
+  sed -i 's/^ZSH_THEME=.*/ZSH_THEME="powerlevel10k\/powerlevel10k"/' "$ZSHRC"
+
+  # Troca plugins
+  sed -i 's/^plugins=(.*/plugins=(git docker emoji kubectl terraform zsh-autosuggestions zsh-syntax-highlighting zsh-completions)/' "$ZSHRC"
+
+  # Adiciona source do NVM se não existir
+  if ! grep -q 'NVM_DIR' "$ZSHRC"; then
+    cat >> "$ZSHRC" << 'EOF'
+
+# NVM
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+EOF
+  fi
+
+  # Aliases
+  if ! grep -q 'alias docker=' "$ZSHRC"; then
+    cat >> "$ZSHRC" << 'EOF'
+
+# Aliases
+alias docker='podman'
+alias docker-compose='podman-compose'
+alias ls='eza --icons'
+alias ll='eza -la --icons'
+alias lt='eza --tree --icons'
+EOF
+  fi
+
+  mark_done "zshrc"
+  ok ".zshrc configurado"
+fi
+
+log "Mudando shell padrão para zsh"
+if [[ "$SHELL" != "$(command -v zsh)" ]]; then
+  chsh -s "$(command -v zsh)" || warn "Não foi possível mudar o shell. Rode: chsh -s $(command -v zsh)"
+else
+  ok "zsh já é o shell padrão"
+fi
+
+# ── eza via cargo ─────────────────────────────────────────────────────────────
+log "Instalando eza (ls replacement)"
+if ! done_already "eza" && command -v cargo &>/dev/null; then
+  cargo install eza
+  mark_done "eza"
+  ok "eza instalado"
+elif ! command -v cargo &>/dev/null; then
+  warn "cargo não encontrado, pulando eza"
+fi
+
+# ── LazyDocker ────────────────────────────────────────────────────────────────
+log "Instalando LazyDocker"
+if ! done_already "lazydocker"; then
+  mkdir -p "$HOME/bin"
+  curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR="$HOME/bin" bash
+  mark_done "lazydocker"
+  ok "LazyDocker instalado em ~/bin"
+fi
+
+# ── Homebrew + tools de infra ─────────────────────────────────────────────────
+log "Instalando Homebrew"
+if ! done_already "homebrew"; then
+  NONINTERACTIVE=1 /bin/bash -c \
+    "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  mark_done "homebrew"
+  ok "Homebrew instalado"
+else
+  ok "Homebrew já instalado, pulando"
+fi
+
+# Carrega brew para uso imediato
+if [[ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -f "$HOME/.linuxbrew/bin/brew" ]]; then
+  eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+fi
+
+log "Instalando terraform, kubectl, flux, talosctl via Homebrew"
+if ! done_already "brew-tools" && command -v brew &>/dev/null; then
+  brew install terraform kubernetes-cli || warn "terraform/kubectl falharam"
+  brew install fluxcd/tap/flux || warn "flux falhou"
+  brew install siderolabs/tap/talosctl || warn "talosctl falhou"
+
+  # Adiciona brew ao .zshrc se não existir
+  if ! grep -q 'linuxbrew' "$HOME/.zshrc" 2>/dev/null; then
+    cat >> "$HOME/.zshrc" << 'EOF'
+
+# Homebrew
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null || true)"
+EOF
+  fi
+
+  mark_done "brew-tools"
+  ok "Homebrew tools instalados"
+fi
+
+# ── Finalização ───────────────────────────────────────────────────────────────
+log "Setup concluído!"
+echo
+echo "  Próximos passos:"
+echo "  1. Faça logout/login para aplicar o shell zsh"
+echo "  2. Execute 'p10k configure' para configurar o Powerlevel10k"
+echo "  3. Instale o Go manualmente se necessário: https://go.dev/dl/"
+echo
+echo "  Estado salvo em: $STATE_DIR"
+echo "  Para re-executar uma etapa, delete o arquivo correspondente em $STATE_DIR"
