@@ -129,15 +129,9 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-      # ── SBOM generation ─────────────────────────────────────────────────
-      - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.20.0
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        with:
-          image: '/tmp/image-scan.tar'
-          artifact-name: sbom-${{ env.IMAGE_NAME }}.spdx.json
-          output-file: sbom.spdx.json
-          format: spdx-json
+      # Free disk space after scanning
+      - name: Clean up scan artifacts
+        run: rm -f /tmp/image-scan.tar
 
       # ── Push (only on main branch, not PRs) ─────────────────────────────
       - name: Login to GitHub Container Registry
@@ -167,6 +161,17 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
           echo "image_full=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
+
+      # ── SBOM generation (after push, scans remote image) ─────────────────
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.20.0
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        continue-on-error: true
+        with:
+          image: '${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}'
+          artifact-name: sbom-${{ env.IMAGE_NAME }}.spdx.json
+          output-file: sbom.spdx.json
+          format: spdx-json
 
       # ── Cosign image signing ────────────────────────────────────────────
       # To enable signing:
