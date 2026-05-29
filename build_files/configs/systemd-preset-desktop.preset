@@ -1,0 +1,72 @@
+# Preset de segurança desktop: desabilita serviços desnecessários
+
+# Atualizações automáticas
+enable flatpak-system-update.timer
+enable fwupd-refresh.timer
+enable rpm-ostreed-automatic.timer
+enable podman-auto-update.timer
+
+# Desabilitar NFS
+disable gssproxy.service
+disable nfs-blkmap.service
+disable nfs-client.target
+disable nfs-idmapd.service
+disable nfs-mountd.service
+disable nfs-server.service
+disable nfs-utils.service
+disable nfsdcld.service
+disable rpc-gssd.service
+disable rpc-statd-notify.service
+disable rpc-statd.service
+disable rpc_pipefs.target
+disable rpcbind.service
+disable rpcbind.socket
+disable rpcbind.target
+
+# Desabilitar SSH
+disable sshd.service
+disable sshd.socket
+disable sshd-unix-local.socket
+disable sshd-keygen.target
+
+# Desabilitar serviços rootful não confinados
+disable low-memory-monitor.service
+disable thermald.service
+disable uresourced.service
+
+# Desabilitar SSSD
+disable sssd.service
+disable sssd-kcm.service
+disable sssd-kcm.socket
+
+# Desabilitar ALSA state daemon
+disable alsa-state.service
+
+# Desabilitar Avahi (mDNS/DNS-SD discovery)
+disable avahi-daemon.service
+disable avahi-daemon.socket
+
+# Desabilitar serviços de impressão
+disable cups-browsed.service
+disable cups.path
+disable cups.service
+disable cups.socket
+
+# Desabilitar ModemManager
+disable ModemManager.service
+
+# Desabilitar iSCSI
+disable iscsid.service
+disable iscsid.socket
+disable iscsiuio.service
+disable iscsiuio.socket
+
+# Desabilitar geolocalização
+disable geoclue.service
+
+# Desabilitar Fedora repos em flatpak e telemetria
+disable flatpak-add-fedora-repos.service
+disable rpm-ostree-countme.timer
+
+# Desabilitar SSH via vsock
+disable sshd-vsock.socket
