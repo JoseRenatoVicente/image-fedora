@@ -317,3 +317,105 @@ format:
     fi
     # Run shfmt on all Bash scripts
     /usr/bin/find . -iname "*.sh" -type f -exec shfmt --write "{}" ';'
+
+# ── Security Verification ─────────────────────────────────────────────────────
+
+# Verify cosign signature of the published image
+[group('Security')]
+verify-signature $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v cosign &> /dev/null; then
+        echo "cosign not found. Install: go install github.com/sigstore/cosign/v2/cmd/cosign@latest"
+        exit 1
+    fi
+    echo "Verifying signature for ${target_image}:${tag}..."
+    cosign verify \
+        --certificate-identity-regexp=".*" \
+        --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+        "${target_image}:${tag}"
+    echo "Signature verified successfully."
+
+# Scan image for vulnerabilities with Trivy
+[group('Security')]
+scan-vulnerabilities $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v trivy &> /dev/null; then
+        echo "trivy not found. Install: sudo dnf install trivy"
+        exit 1
+    fi
+    echo "Scanning ${target_image}:${tag} for vulnerabilities..."
+    trivy image --severity CRITICAL,HIGH "localhost/${target_image}:${tag}"
+
+# Generate SBOM for the image
+[group('Security')]
+generate-sbom $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v syft &> /dev/null; then
+        echo "syft not found. Install: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s"
+        exit 1
+    fi
+    echo "Generating SBOM for ${target_image}:${tag}..."
+    syft "localhost/${target_image}:${tag}" -o spdx-json > "sbom-${target_image}-${tag}.spdx.json"
+    echo "SBOM saved to sbom-${target_image}-${tag}.spdx.json"
+
+# List all installed RPM packages in the image
+[group('Security')]
+list-packages $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Listing packages in ${target_image}:${tag}..."
+    podman run --rm "localhost/${target_image}:${tag}" rpm -qa --queryformat '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort
+
+# Audit security configuration inside the image
+[group('Security')]
+audit-security $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Security Audit: ${target_image}:${tag} ==="
+    echo ""
+
+    echo "── Sysctl hardening ──"
+    podman run --rm "localhost/${target_image}:${tag}" cat /etc/sysctl.d/60-security-hardening.conf 2>/dev/null | grep -c "=" || echo "MISSING"
+    echo "settings found"
+
+    echo ""
+    echo "── Kernel module blacklist ──"
+    podman run --rm "localhost/${target_image}:${tag}" cat /etc/modprobe.d/security-hardening.conf 2>/dev/null | grep -c "install.*false" || echo "MISSING"
+    echo "modules blacklisted"
+
+    echo ""
+    echo "── Boot parameters (kargs) ──"
+    podman run --rm "localhost/${target_image}:${tag}" cat /usr/lib/bootc/kargs.d/10-hardening.toml 2>/dev/null | grep -c "=" || echo "MISSING"
+    echo "kernel parameters"
+
+    echo ""
+    echo "── Firewalld zone ──"
+    podman run --rm "localhost/${target_image}:${tag}" cat /etc/firewalld/zones/FedoraWorkstation.xml 2>/dev/null || echo "MISSING"
+
+    echo ""
+    echo "── Core dumps disabled ──"
+    podman run --rm "localhost/${target_image}:${tag}" cat /etc/security/limits.d/60-disable-coredump.conf 2>/dev/null || echo "MISSING"
+
+    echo ""
+    echo "── Password policy ──"
+    podman run --rm "localhost/${target_image}:${tag}" cat /etc/security/pwquality.conf 2>/dev/null | head -5 || echo "MISSING"
+
+    echo ""
+    echo "── Ptrace scope ──"
+    podman run --rm "localhost/${target_image}:${tag}" cat /etc/sysctl.d/61-ptrace-scope.conf 2>/dev/null || echo "MISSING"
+
+    echo ""
+    echo "── Chrony NTS ──"
+    podman run --rm "localhost/${target_image}:${tag}" grep -c "nts" /etc/chrony.conf 2>/dev/null || echo "MISSING"
+    echo "NTS-enabled servers"
+
+    echo ""
+    echo "── Systemd preset (disabled services) ──"
+    podman run --rm "localhost/${target_image}:${tag}" grep -c "^disable" /usr/lib/systemd/system-preset/35-security-desktop.preset 2>/dev/null || echo "MISSING"
+    echo "services disabled"
+
+    echo ""
+    echo "=== Audit complete ==="
