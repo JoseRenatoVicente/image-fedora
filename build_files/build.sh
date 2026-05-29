@@ -18,6 +18,12 @@ trap cleanup_coprs EXIT
 log "Garantindo dnf5-plugins"
 dnf5 install -y dnf5-plugins
 
+# ── RPM Fusion (free + nonfree) ───────────────────────────────────────────────
+log "Habilitando RPM Fusion"
+dnf5 install -y \
+  "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
+  "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
+
 # ── COPRs ─────────────────────────────────────────────────────────────────────
 log "Habilitando COPRs"
 dnf5 -y copr enable hazel-bunny/ricing || true
@@ -54,7 +60,7 @@ rpm --import https://dl.google.com/linux/linux_signing_key.pub
 
 # ── Remover pacotes indesejados ───────────────────────────────────────────────
 log "Removendo pacotes indesejados"
-dnf5 remove -y --skip-unavailable \
+rpm -e --nodeps \
   mediawriter \
   ptyxis \
   libreoffice-core \
@@ -65,11 +71,11 @@ dnf5 remove -y --skip-unavailable \
   rhythmbox \
   simple-scan \
   snapshot \
-  || true
+  2>/dev/null || true
 
 # ── Instalação de Pacotes ─────────────────────────────────────────────────────
 log "Instalando pacotes"
-dnf5 install -y --skip-unavailable \
+dnf5 install -y --skip-unavailable --allowerasing \
   `# Dev tools` \
   git curl wget unzip tar jq make gettext \
   gcc-c++ cmake extra-cmake-modules libplasma-devel \
@@ -85,7 +91,7 @@ dnf5 install -y --skip-unavailable \
   `# Terminal` \
   kitty \
   `# Arquivos e fonts` \
-  file-roller inter-fonts glibc-gconv-extra \
+  file-roller glibc-gconv-extra \
   `# Browsers` \
   google-chrome-stable \
   `# Multimídia` \
@@ -282,10 +288,15 @@ kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
   --group "LowBattery" --group "SuspendAndShutdown" --key AutoSuspendIdleTimeoutSec "300"
 
 # ── Serviços do sistema ───────────────────────────────────────────────────────
-log "Habilitando e mascarando serviços"
+log "Habilitando serviços"
 systemctl enable podman.socket
 systemctl enable tuned
 systemctl enable earlyoom
-systemctl mask passim || true
+
+# ── Flatpak: substituir remote Fedora por Flathub ─────────────────────────────
+log "Configurando Flatpak remotes"
+flatpak remote-add --system --if-not-exists flathub \
+  https://flathub.org/repo/flathub.flatpakrepo || true
+flatpak remote-delete --system --force fedora 2>/dev/null || true
 
 log "Build concluído."
