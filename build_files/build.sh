@@ -20,14 +20,13 @@ dnf5 install -y dnf5-plugins
 
 # ── COPRs ─────────────────────────────────────────────────────────────────────
 log "Habilitando COPRs"
-dnf5 -y copr enable hazel-bunny/ricing
+dnf5 -y copr enable hazel-bunny/ricing || true
 COPRS_ENABLED+=("hazel-bunny/ricing")
 
-dnf5 -y copr enable matinlotfali/KDE-Rounded-Corners
+dnf5 -y copr enable matinlotfali/KDE-Rounded-Corners || true
 COPRS_ENABLED+=("matinlotfali/KDE-Rounded-Corners")
 
-dnf5 -y copr enable heroic-games-launcher/heroic-games-launcher
-COPRS_ENABLED+=("heroic-games-launcher/heroic-games-launcher")
+# heroic-games-launcher COPR não suporta Fedora 44+; instalado via Flatpak no setup-user.sh
 
 # ── Repositório VS Code (Microsoft) ──────────────────────────────────────────
 log "Adicionando repositório VS Code"
@@ -99,7 +98,6 @@ dnf5 install -y --skip-unavailable \
   `# Gaming` \
   steam \
   lutris \
-  heroic-games-launcher \
   wine winetricks \
   gamemode gamescope \
   `# Backups e sistema` \

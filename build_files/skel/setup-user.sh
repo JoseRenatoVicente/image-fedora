@@ -35,6 +35,7 @@ if ! done_already "flatpaks"; then
     org.qbittorrent.qBittorrent
     com.github.IsmaelMartinez.teams_for_linux
     org.torproject.torbrowser-launcher
+    com.heroicgameslauncher.hgl
   )
 
   for pkg in "${FLATPAKS[@]}"; do
