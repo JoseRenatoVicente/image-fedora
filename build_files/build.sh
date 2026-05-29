@@ -46,18 +46,6 @@ gpgcheck=1
 gpgkey=https://packages.microsoft.com/keys/microsoft.asc
 EOF
 
-# ── Repositório Google Chrome ─────────────────────────────────────────────────
-log "Adicionando repositório Google Chrome"
-cat > /etc/yum.repos.d/google-chrome.repo << 'EOF'
-[google-chrome]
-name=google-chrome
-baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64
-enabled=1
-gpgcheck=1
-gpgkey=https://dl.google.com/linux/linux_signing_key.pub
-EOF
-rpm --import https://dl.google.com/linux/linux_signing_key.pub
-
 # ── Remover pacotes indesejados ───────────────────────────────────────────────
 log "Removendo pacotes indesejados"
 rpm -e --nodeps \
@@ -71,52 +59,58 @@ rpm -e --nodeps \
   rhythmbox \
   simple-scan \
   snapshot \
+  firefox \
+  kmahjongg \
+  kpat \
+  kmines \
+  kolourpaint \
+  krdc \
+  krfb \
+  kmouth \
+  kmousetool \
+  konversation \
+  kaddressbook \
+  korganizer \
+  kmail \
+  kontact \
+  akregator \
+  elisa-player \
+  dragon \
+  kamoso \
   2>/dev/null || true
 
 # ── Instalação de Pacotes ─────────────────────────────────────────────────────
 log "Instalando pacotes"
 dnf5 install -y --skip-unavailable --allowerasing \
   `# Dev tools` \
-  git curl wget unzip tar jq make gettext \
+  git curl unzip tar jq make gettext \
   gcc-c++ cmake extra-cmake-modules libplasma-devel \
   kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel \
   code \
   `# CLI tools` \
-  bat btop fd-find gdu ripgrep \
+  bat btop fd-find ripgrep \
   neovim luarocks tree-sitter-cli \
   python3-pip python3-virtualenv \
-  protobuf protobuf-compiler \
   inotify-tools xsel numlockx \
   util-linux-user zsh \
   `# Terminal` \
   kitty \
   `# Arquivos e fonts` \
   file-roller glibc-gconv-extra \
-  `# Browsers` \
-  google-chrome-stable \
-  `# Multimídia` \
+  `# Multimídia (codecs essenciais)` \
   ffmpeg \
   gstreamer1-plugins-base gstreamer1-plugins-good \
-  gstreamer1-plugins-bad-free gstreamer1-plugins-ugly \
-  gstreamer1-plugin-openh264 gstreamer1-plugin-libav \
-  lame \
-  vlc \
+  gstreamer1-plugin-openh264 \
   pipewire-codec-aptx \
-  `# Gaming (steam via Flatpak em setup-user.sh)` \
-  lutris \
-  wine winetricks \
-  gamemode gamescope \
+  `# Gaming (Steam, Lutris, Heroic via Flatpak no setup-user.sh)` \
+  gamemode \
   `# Backups e sistema` \
-  timeshift \
   earlyoom \
   tuned tuned-ppd \
-  sqlite \
   `# KDE / Tema Mokka` \
-  kvantum qt6ct qt5ct \
-  spectacle \
+  kvantum qt6ct \
   flameshot \
-  papirus-icon-theme \
-  `# Build deps para Panel Colorizer e assets` \
+  `# Build deps para Panel Colorizer e assets (removidos após uso)` \
   rsync libsass sassc
 
 # ── kwin-effect-roundcorners (passo separado para evitar skip silencioso) ─────
@@ -137,15 +131,23 @@ cp /ctx/configs/dnf-performance.conf /etc/dnf/conf.d/performance.conf
 # ── Configs de sistema ────────────────────────────────────────────────────────
 log "Aplicando configurações de sistema"
 
-# Sysctl
+# Sysctl - hardening
 install -Dm644 /ctx/configs/sysctl-hardening.conf \
   /etc/sysctl.d/60-security-hardening.conf
+install -Dm644 /ctx/configs/sysctl-ptrace.conf \
+  /etc/sysctl.d/61-ptrace-scope.conf
 install -Dm644 /ctx/configs/sysctl-performance.conf \
   /etc/sysctl.d/99-performance.conf
 
-# Modprobe
+# Modprobe - hardening
 install -Dm644 /ctx/configs/modprobe-hardening.conf \
   /etc/modprobe.d/security-hardening.conf
+install -Dm644 /ctx/configs/modprobe-framebuffer-blacklist.conf \
+  /etc/modprobe.d/blacklist-framebuffer.conf
+
+# Kernel boot parameters (bootc kargs)
+install -Dm644 /ctx/configs/bootc-kargs.toml \
+  /usr/lib/bootc/kargs.d/10-hardening.toml
 
 # Core dumps
 install -Dm644 /ctx/configs/limits-coredump.conf \
@@ -158,6 +160,44 @@ install -Dm644 /ctx/configs/systemd-coredump-user.conf \
 # DNS-over-TLS + DNSSEC
 install -Dm644 /ctx/configs/resolved-dns.conf \
   /etc/systemd/resolved.conf.d/60-security-dns.conf
+install -Dm644 /ctx/configs/resolved-disable-llmnr.conf \
+  /etc/systemd/resolved.conf.d/10-disable-llmnr.conf
+
+# Chrony com NTS (Network Time Security)
+install -Dm644 /ctx/configs/chrony-nts.conf \
+  /etc/chrony.conf
+
+# Firewalld - zona sem serviços expostos
+install -Dm644 /ctx/configs/firewalld-workstation.xml \
+  /etc/firewalld/zones/FedoraWorkstation.xml
+
+# Password policy e account lockout
+install -Dm644 /ctx/configs/pwquality.conf \
+  /etc/security/pwquality.conf
+install -Dm644 /ctx/configs/faillock.conf \
+  /etc/security/faillock.conf
+
+# NetworkManager hardening (IPv6 privacy)
+install -Dm644 /ctx/configs/networkmanager-hardening.conf \
+  /usr/lib/NetworkManager/conf.d/40-hardening.conf
+
+# Dracut - omitir firewire/thunderbolt do initramfs
+install -Dm644 /ctx/configs/dracut-omit-firewire.conf \
+  /etc/dracut.conf.d/99-omit-firewire.conf
+install -Dm644 /ctx/configs/dracut-omit-thunderbolt.conf \
+  /etc/dracut.conf.d/99-omit-thunderbolt.conf
+
+# Udev rules - desabilitar binfmt_misc
+install -Dm644 /ctx/configs/udev-hardening.rules \
+  /usr/lib/udev/rules.d/99-hardening.rules
+
+# Systemd preset - desabilitar serviços desnecessários
+install -Dm644 /ctx/configs/systemd-preset-desktop.preset \
+  /usr/lib/systemd/system-preset/35-security-desktop.preset
+
+# KDE: prevenir Xwayland eavesdropping
+install -Dm644 /ctx/configs/kwinrc-xwayland.conf \
+  /etc/xdg/kwinrc
 
 # Journal
 install -Dm644 /ctx/configs/journald-size.conf \
@@ -186,6 +226,28 @@ bash /ctx/panel-colorizer.sh
 # ── Rebuild cache de fontes ───────────────────────────────────────────────────
 log "Rebuild cache de fontes"
 fc-cache -f /usr/share/fonts/
+
+# ── Remoção de dependências de build ──────────────────────────────────────────
+log "Removendo dependências de build"
+dnf5 remove -y --skip-unavailable \
+  gcc-c++ cpp gcc \
+  cmake extra-cmake-modules \
+  libplasma-devel \
+  kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel \
+  libsass sassc \
+  2>/dev/null || true
+
+# ── Limpeza final ─────────────────────────────────────────────────────────────
+log "Limpeza final do image"
+dnf5 clean all
+# Remover caches e arquivos temporários
+rm -rf /var/cache/dnf /var/log/dnf* /var/log/hawkey*
+# Remover docs/man pages desnecessários (economia ~50-100MB)
+rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
+# Remover locales não usados (manter apenas pt_BR e en_US)
+find /usr/share/locale -mindepth 1 -maxdepth 1 \
+  ! -name 'pt_BR' ! -name 'en_US' ! -name 'locale.alias' \
+  -exec rm -rf {} + 2>/dev/null || true
 
 # ── Skel: setup-user.sh ───────────────────────────────────────────────────────
 log "Instalando setup-user.sh no skel"
@@ -292,6 +354,8 @@ log "Habilitando serviços"
 systemctl enable podman.socket
 systemctl enable tuned
 systemctl enable earlyoom
+systemctl enable firewalld
+systemctl enable chronyd
 
 # ── Flatpak: substituir remote Fedora por Flathub ─────────────────────────────
 log "Configurando Flatpak remotes"

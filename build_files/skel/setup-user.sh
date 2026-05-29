@@ -37,6 +37,9 @@ if ! done_already "flatpaks"; then
     org.torproject.torbrowser-launcher
     com.heroicgameslauncher.hgl
     com.valvesoftware.Steam
+    com.google.Chrome
+    org.videolan.VLC
+    net.lutris.Lutris
   )
 
   for pkg in "${FLATPAKS[@]}"; do
