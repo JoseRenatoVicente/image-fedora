@@ -36,6 +36,7 @@ if ! done_already "flatpaks"; then
     com.github.IsmaelMartinez.teams_for_linux
     org.torproject.torbrowser-launcher
     com.heroicgameslauncher.hgl
+    com.valvesoftware.Steam
   )
 
   for pkg in "${FLATPAKS[@]}"; do

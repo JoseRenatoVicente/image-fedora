@@ -73,6 +73,7 @@ dnf5 install -y --skip-unavailable \
   `# Dev tools` \
   git curl wget unzip tar jq make gettext \
   gcc-c++ cmake extra-cmake-modules libplasma-devel \
+  kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel \
   code \
   `# CLI tools` \
   bat btop fd-find gdu ripgrep \
@@ -95,8 +96,7 @@ dnf5 install -y --skip-unavailable \
   lame \
   vlc \
   pipewire-codec-aptx \
-  `# Gaming` \
-  steam \
+  `# Gaming (steam via Flatpak em setup-user.sh)` \
   lutris \
   wine winetricks \
   gamemode gamescope \
@@ -110,10 +110,13 @@ dnf5 install -y --skip-unavailable \
   spectacle \
   flameshot \
   papirus-icon-theme \
-  kwin-effects-forceblur kwin-effects-forceblur-x11 \
-  kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
   `# Build deps para Panel Colorizer e assets` \
   rsync libsass sassc
+
+# ── kwin-effect-roundcorners (passo separado para evitar skip silencioso) ─────
+log "Instalando kwin-effect-roundcorners do COPR"
+dnf5 install -y kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
+  || echo "WARN: kwin-effect-roundcorners não instalado"
 
 # ── Desabilitar COPRs ─────────────────────────────────────────────────────────
 log "Desabilitando COPRs"
@@ -216,13 +219,7 @@ kwriteconfig6 --file /etc/skel/.config/kcminputrc \
 
 # ── KWin: blur / efeitos ──────────────────────────────────────────────────────
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
-  --group Plugins --key blurEnabled "false"
-
-kwriteconfig6 --file /etc/skel/.config/kwinrc \
-  --group Plugins --key forceblurEnabled "true"
-
-kwriteconfig6 --file /etc/skel/.config/kwinrc \
-  --group Plugins --key kwin4_effect_forceblurEnabled "true"
+  --group Plugins --key blurEnabled "true"
 
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
   --group Plugins --key roundcornersEnabled "true"
