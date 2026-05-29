@@ -51,11 +51,13 @@ jobs:
         run: |
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
-          # Reproducibility: set SOURCE_DATE_EPOCH to last commit timestamp
-          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct 2>/dev/null || date +%s)" >> ${GITHUB_ENV}
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set SOURCE_DATE_EPOCH
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> ${GITHUB_ENV}
 
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
@@ -109,7 +111,7 @@ jobs:
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@a]18f2fc0468218b050bea028e5208530fdecf446 # v0.32.0
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
         with:
           image-ref: 'localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}'
           format: 'sarif'
@@ -118,7 +120,7 @@ jobs:
           timeout: '10m'
 
       - name: Upload Trivy scan results to GitHub Security
-        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
+        uses: github/codeql-action/upload-sarif@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
