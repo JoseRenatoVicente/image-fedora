@@ -110,10 +110,13 @@ jobs:
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
+      - name: Export image for scanning
+        run: buildah push localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }} oci-archive:/tmp/image-scan.tar
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: 'localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}'
+          input: '/tmp/image-scan.tar'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -130,7 +133,7 @@ jobs:
         uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.20.0
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         with:
-          image: 'localhost/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}'
+          image: '/tmp/image-scan.tar'
           artifact-name: sbom-${{ env.IMAGE_NAME }}.spdx.json
           output-file: sbom.spdx.json
           format: spdx-json
