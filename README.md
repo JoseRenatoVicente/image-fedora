@@ -140,6 +140,35 @@ claude
 
 The tool is installed system-wide via the official Anthropic install script (`https://claude.ai/install.sh`), ensuring you always have the latest version compatible with your system. For more information, visit the [Claude Code documentation](https://code.claude.com/docs).
 
+## Initial User Setup (First Login)
+
+On first login, the image will prompt you to run an interactive setup script that installs additional developer tools:
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║                 🚀 Fedora KDE Initial Setup                    ║
+║                                                                ║
+║  Instala: NVM/Node.js, Oh My Zsh, Powerlevel10k, LazyDocker,  ║
+║           Homebrew, terraform, kubectl, flux, talosctl        ║
+║           Flatpaks (Discord, Telegram, Steam, Chrome, etc)   ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+  Executar setup agora? [S/n]
+```
+
+**Options:**
+- **S (default)**: Runs the setup interactively. You can accept/skip each section with prompts
+- **n**: Skips setup. You can run it manually later with `bash ~/setup-user.sh`
+
+The setup runs via a systemd user service (`fedora-setup.service`) and asks only once. If you skip, you can always run the setup manually:
+
+```bash
+bash ~/setup-user.sh
+```
+
+State is tracked in `~/.local/share/fedora-kde-setup/`, so you can re-run individual sections by deleting the corresponding state file.
+
 # Repository Contents
 
 ## Containerfile

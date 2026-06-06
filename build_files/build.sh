@@ -282,6 +282,11 @@ find /usr/share/locale -mindepth 1 -maxdepth 1 \
 log "Instalando setup-user.sh no skel"
 install -Dm755 /ctx/skel/setup-user.sh /etc/skel/setup-user.sh
 
+# ── Skel: Initial setup wrapper + systemd service ────────────────────────────
+log "Instalando fedora-initial-setup wrapper e systemd service"
+install -Dm755 /ctx/skel/.local/bin/fedora-initial-setup /etc/skel/.local/bin/fedora-initial-setup
+install -Dm644 /ctx/skel/.config/systemd/user/fedora-setup.service /etc/skel/.config/systemd/user/fedora-setup.service
+
 # ── Config KDE defaults via kwriteconfig6 ────────────────────────────────────
 mkdir -p /etc/skel/.config
 
