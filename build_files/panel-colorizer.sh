@@ -20,7 +20,10 @@ log "Instalando Panel Colorizer (HOME temporário)"
   export HOME="$FAKE_HOME"
   # install.sh usa kpackagetool6 ou cópia direta dependendo da versão
   if [[ -f install.sh ]]; then
-    bash ./install.sh || true
+    bash ./install.sh
+  else
+    echo "ERRO: install.sh não encontrado no repositório do Panel Colorizer" >&2
+    exit 1
   fi
 )
 

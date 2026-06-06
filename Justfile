@@ -58,7 +58,7 @@ sudoif command *args:
     function sudoif(){
         if [[ "${UID}" -eq 0 ]]; then
             "$@"
-        elif [[ "$(command -v sudo)" && -n "${SSH_ASKPASS:-}" ]] && [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+        elif [[ "$(command -v sudo)" && -n "${SUDO_ASKPASS:-}" ]] && [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
             /usr/bin/sudo --askpass "$@" || exit 1
         elif [[ "$(command -v sudo)" ]]; then
             /usr/bin/sudo "$@" || exit 1
@@ -123,8 +123,33 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
 
     # Check if already running as root or under sudo
     if [[ -n "${SUDO_USER:-}" || "${UID}" -eq "0" ]]; then
-        echo "Already root or running under sudo, no need to load image from user podman."
-        exit 0
+        # Verify the image actually exists in root podman storage
+        if podman image exists "${target_image}:${tag}" 2>/dev/null; then
+            echo "Already root/sudo and image exists in root storage."
+            exit 0
+        fi
+
+        # Image not in root storage; try to copy from the calling user's storage
+        if [[ -n "${SUDO_USER:-}" ]]; then
+            SUDO_UID=$(id -u "${SUDO_USER}")
+            set +e
+            sudo -u "${SUDO_USER}" podman image exists "${target_image}:${tag}" 2>/dev/null
+            user_has_image=$?
+            set -e
+            if [[ $user_has_image -eq 0 ]]; then
+                echo "Copying image from ${SUDO_USER}'s podman storage to root storage..."
+                COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
+                chmod 1777 "${COPYTMP}"
+                TMPDIR=${COPYTMP} podman image scp ${SUDO_UID}@localhost::"${target_image}:${tag}" root@localhost::"${target_image}:${tag}"
+                rm -rf "${COPYTMP}"
+                exit 0
+            fi
+        fi
+
+        echo "Error: Image '${target_image}:${tag}' not found in root podman storage."
+        echo "Build it first with: just build"
+        echo "Then re-run: sudo just build-qcow2"
+        exit 1
     fi
 
     # Try to resolve the image tag using podman inspect
@@ -141,6 +166,7 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
         if [[ "$ID" != "$USER_IMG_ID" ]]; then
             # If the image ID is not found or different from user, copy the image from user podman to root podman
             COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
+            chmod 1777 "${COPYTMP}"
             just sudoif TMPDIR=${COPYTMP} podman image scp ${UID}@localhost::"${target_image}:${tag}" root@localhost::"${target_image}:${tag}"
             rm -rf "${COPYTMP}"
         fi
@@ -253,14 +279,19 @@ _run-vm $target_image $tag $type $config:
     run_args+=(--env "CPU_CORES=4")
     run_args+=(--env "RAM_SIZE=8G")
     run_args+=(--env "DISK_SIZE=64G")
+    run_args+=(--env "BOOT_MODE=uefi")
     run_args+=(--env "TPM=Y")
-    run_args+=(--env "GPU=Y")
+    run_args+=(--env "GPU=N")
     run_args+=(--device=/dev/kvm)
     run_args+=(--volume "${PWD}/${image_file}":"/boot.${type}")
     run_args+=(docker.io/qemux/qemu)
 
-    # Run the VM and open the browser to connect
-    (sleep 30 && xdg-open http://localhost:"$port") &
+    # Run the VM and open the browser to connect (como usuário real se via sudo)
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      (sleep 30 && sudo -u "${SUDO_USER}" xdg-open http://localhost:"$port") &
+    else
+      (sleep 30 && xdg-open http://localhost:"$port") &
+    fi
     podman run "${run_args[@]}"
 
 # Run a virtual machine from a QCOW2 image
@@ -366,56 +397,163 @@ generate-sbom $target_image=image_name $tag=default_tag:
 list-packages $target_image=image_name $tag=default_tag:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "Listing packages in ${target_image}:${tag}..."
-    podman run --rm "localhost/${target_image}:${tag}" rpm -qa --queryformat '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort
+    local_ref="${target_image}:${tag}"
+    if ! podman image exists "${local_ref}" 2>/dev/null; then
+        local_ref="localhost/${target_image}:${tag}"
+    fi
+    echo "Listing packages in ${local_ref}..."
+    podman run --rm "${local_ref}" rpm -qa --queryformat '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort
 
 # Audit security configuration inside the image
 [group('Security')]
 audit-security $target_image=image_name $tag=default_tag:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "=== Security Audit: ${target_image}:${tag} ==="
+    local_ref="${target_image}:${tag}"
+    if ! podman image exists "${local_ref}" 2>/dev/null; then
+        local_ref="localhost/${target_image}:${tag}"
+    fi
+    if ! podman image exists "${local_ref}" 2>/dev/null; then
+        echo "Image not found in local storage: ${target_image}:${tag}"
+        exit 1
+    fi
+
+    check() {
+        local name=$1
+        shift
+        echo "── ${name} ──"
+        "$@"
+        echo "ok"
+        echo ""
+    }
+
+    echo "=== Security Audit: ${local_ref} ==="
     echo ""
 
-    echo "── Sysctl hardening ──"
-    podman run --rm "localhost/${target_image}:${tag}" cat /etc/sysctl.d/60-security-hardening.conf 2>/dev/null | grep -c "=" || echo "MISSING"
-    echo "settings found"
+    check "SELinux enforcing config" \
+        podman run --rm "${local_ref}" bash -lc "grep -qx 'SELINUX=enforcing' /etc/selinux/config"
+    check "FIPS package" \
+        podman run --rm "${local_ref}" bash -lc "rpm -q dracut-fips >/dev/null"
+    check "FIPS kernel arg" \
+        podman run --rm "${local_ref}" bash -lc "grep -Fq '\"fips=1\"' /usr/lib/bootc/kargs.d/10-hardening.toml"
+    check "Crypto policy FUTURE" \
+        podman run --rm "${local_ref}" bash -lc "grep -qx 'FUTURE' /etc/crypto-policies/config"
+    check "Sysctl hardening" \
+        podman run --rm "${local_ref}" bash -lc "test \$(grep -c '=' /etc/sysctl.d/60-security-hardening.conf 2>/dev/null) -gt 0"
+    check "Kernel module blacklist" \
+        podman run --rm "${local_ref}" bash -lc "test \$(grep -c 'install.*false' /etc/modprobe.d/security-hardening.conf 2>/dev/null) -gt 0"
+    check "Boot parameters" \
+        podman run --rm "${local_ref}" bash -lc "test \$(grep -c '=' /usr/lib/bootc/kargs.d/10-hardening.toml 2>/dev/null) -gt 0"
+    check "Firewalld zone" \
+        podman run --rm "${local_ref}" bash -lc "test -s /etc/firewalld/zones/FedoraWorkstation.xml"
+    check "Core dumps disabled" \
+        podman run --rm "${local_ref}" bash -lc "test -s /etc/security/limits.d/60-disable-coredump.conf"
+    check "Password policy" \
+        podman run --rm "${local_ref}" bash -lc "test -s /etc/security/pwquality.conf"
+    check "Ptrace scope" \
+        podman run --rm "${local_ref}" bash -lc "test -s /etc/sysctl.d/61-ptrace-scope.conf"
+    check "Chrony NTS" \
+        podman run --rm "${local_ref}" bash -lc "grep -q 'nts' /etc/chrony.conf"
+    check "Systemd preset" \
+        podman run --rm "${local_ref}" bash -lc "grep -q '^disable' /usr/lib/systemd/system-preset/35-security-desktop.preset"
 
-    echo ""
-    echo "── Kernel module blacklist ──"
-    podman run --rm "localhost/${target_image}:${tag}" cat /etc/modprobe.d/security-hardening.conf 2>/dev/null | grep -c "install.*false" || echo "MISSING"
-    echo "modules blacklisted"
-
-    echo ""
-    echo "── Boot parameters (kargs) ──"
-    podman run --rm "localhost/${target_image}:${tag}" cat /usr/lib/bootc/kargs.d/10-hardening.toml 2>/dev/null | grep -c "=" || echo "MISSING"
-    echo "kernel parameters"
-
-    echo ""
-    echo "── Firewalld zone ──"
-    podman run --rm "localhost/${target_image}:${tag}" cat /etc/firewalld/zones/FedoraWorkstation.xml 2>/dev/null || echo "MISSING"
-
-    echo ""
-    echo "── Core dumps disabled ──"
-    podman run --rm "localhost/${target_image}:${tag}" cat /etc/security/limits.d/60-disable-coredump.conf 2>/dev/null || echo "MISSING"
-
-    echo ""
-    echo "── Password policy ──"
-    podman run --rm "localhost/${target_image}:${tag}" cat /etc/security/pwquality.conf 2>/dev/null | head -5 || echo "MISSING"
-
-    echo ""
-    echo "── Ptrace scope ──"
-    podman run --rm "localhost/${target_image}:${tag}" cat /etc/sysctl.d/61-ptrace-scope.conf 2>/dev/null || echo "MISSING"
-
-    echo ""
-    echo "── Chrony NTS ──"
-    podman run --rm "localhost/${target_image}:${tag}" grep -c "nts" /etc/chrony.conf 2>/dev/null || echo "MISSING"
-    echo "NTS-enabled servers"
-
-    echo ""
-    echo "── Systemd preset (disabled services) ──"
-    podman run --rm "localhost/${target_image}:${tag}" grep -c "^disable" /usr/lib/systemd/system-preset/35-security-desktop.preset 2>/dev/null || echo "MISSING"
-    echo "services disabled"
-
-    echo ""
     echo "=== Audit complete ==="
+
+# Audit package surface inside the image
+[group('Security')]
+audit-package-surface $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    local_ref="${target_image}:${tag}"
+    if ! podman image exists "${local_ref}" 2>/dev/null; then
+        local_ref="localhost/${target_image}:${tag}"
+    fi
+    if ! podman image exists "${local_ref}" 2>/dev/null; then
+        echo "Image not found in local storage: ${target_image}:${tag}"
+        exit 1
+    fi
+
+    forbidden=(firefox mediawriter krfb kmail)
+    for pkg in "${forbidden[@]}"; do
+        if podman run --rm "${local_ref}" rpm -q "${pkg}" >/dev/null 2>&1; then
+            echo "Forbidden package present: ${pkg}"
+            exit 1
+        fi
+    done
+
+    echo "Package surface audit passed for ${local_ref}"
+
+# Push a local image to the target registry
+[group('Security')]
+push-local $source_image=image_name $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    local_ref="${source_image}:${tag}"
+    if ! podman image exists "${local_ref}" 2>/dev/null; then
+        local_ref="localhost/${source_image}:${tag}"
+    fi
+    if ! podman image exists "${local_ref}" 2>/dev/null; then
+        echo "Local image not found: ${source_image}:${tag}"
+        echo "Build it first with: just build"
+        exit 1
+    fi
+
+    digest_dir="output/signing"
+    mkdir -p "${digest_dir}"
+    ref_key=${target_image//\//_}
+    ref_key=${ref_key//:/_}
+    digest_file="${digest_dir}/${ref_key}-${tag}.digest"
+
+    podman tag "${local_ref}" "${target_image}:${tag}"
+    podman push --digestfile "${digest_file}" "${target_image}:${tag}"
+
+# Sign a pushed image using local cosign keys
+[group('Security')]
+sign-local $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v cosign &> /dev/null; then
+        echo "cosign not found. Install: go install github.com/sigstore/cosign/v2/cmd/cosign@latest"
+        exit 1
+    fi
+    [[ -f cosign.key ]] || { echo "Missing cosign.key"; exit 1; }
+    [[ -f cosign.pub ]] || { echo "Missing cosign.pub"; exit 1; }
+
+    ref_key=${target_image//\//_}
+    ref_key=${ref_key//:/_}
+    digest_file="output/signing/${ref_key}-${tag}.digest"
+    if [[ ! -f "${digest_file}" ]]; then
+        echo "No digest file found for ${target_image}:${tag}"
+        echo "Push it first with: just push-local ${image_name} ${target_image} ${tag}"
+        exit 1
+    fi
+    digest_ref="${target_image}@$(<"${digest_file}")"
+
+    cosign sign --key cosign.key -y "${digest_ref}"
+
+# Verify a pushed image signature using the local public key
+[group('Security')]
+verify-local-signature $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v cosign &> /dev/null; then
+        echo "cosign not found. Install: go install github.com/sigstore/cosign/v2/cmd/cosign@latest"
+        exit 1
+    fi
+    [[ -f cosign.pub ]] || { echo "Missing cosign.pub"; exit 1; }
+    ref_key=${target_image//\//_}
+    ref_key=${ref_key//:/_}
+    digest_file="output/signing/${ref_key}-${tag}.digest"
+    [[ -f "${digest_file}" ]] || { echo "Missing digest file for ${target_image}:${tag}"; exit 1; }
+    digest_ref="${target_image}@$(<"${digest_file}")"
+    cosign verify --key cosign.pub "${digest_ref}"
+
+# Build, audit, push, sign, and verify locally
+[group('Security')]
+promote-local $source_image=image_name $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    just build "{{ source_image }}" "{{ tag }}"
+    just audit-security "{{ source_image }}" "{{ tag }}"
+    just audit-package-surface "{{ source_image }}" "{{ tag }}"
+    just push-local "{{ source_image }}" "{{ target_image }}" "{{ tag }}"
+    just sign-local "{{ target_image }}" "{{ tag }}"
+    just verify-local-signature "{{ target_image }}" "{{ tag }}"

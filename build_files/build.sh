@@ -46,46 +46,35 @@ gpgcheck=1
 gpgkey=https://packages.microsoft.com/keys/microsoft.asc
 EOF
 
-# ── Remover pacotes indesejados ───────────────────────────────────────────────
+# ── Remover pacotes indesejados (apenas pacotes presentes no Kinoite) ─────────
 log "Removendo pacotes indesejados"
-rpm -e --nodeps \
-  mediawriter \
-  ptyxis \
-  libreoffice-core \
-  gnome-terminal \
-  gnome-tour \
-  gnome-weather \
-  cheese \
-  rhythmbox \
-  simple-scan \
-  snapshot \
-  firefox \
-  kmahjongg \
-  kpat \
-  kmines \
-  kolourpaint \
-  krdc \
-  krfb \
-  kmouth \
-  kmousetool \
-  konversation \
-  kaddressbook \
-  korganizer \
-  kmail \
-  kontact \
-  akregator \
-  elisa-player \
-  dragon \
-  kamoso \
-  2>/dev/null || true
+REMOVE_PKGS=(
+  # KDE bloat
+  kmahjongg kpat kmines kolourpaint
+  krdc krfb kmouth kmousetool
+  konversation kaddressbook korganizer kmail kontact
+  akregator elisa-player dragon kamoso
+  # Outros
+  mediawriter ptyxis firefox
+)
+FOUND_PKGS=()
+for pkg in "${REMOVE_PKGS[@]}"; do
+  if rpm -q "$pkg" &>/dev/null; then
+    FOUND_PKGS+=("$pkg")
+  fi
+done
+if [[ ${#FOUND_PKGS[@]} -gt 0 ]]; then
+  dnf5 remove -y "${FOUND_PKGS[@]}"
+  log "Removidos: ${FOUND_PKGS[*]}"
+else
+  log "Nenhum pacote indesejado encontrado para remover"
+fi
 
 # ── Instalação de Pacotes ─────────────────────────────────────────────────────
 log "Instalando pacotes"
-dnf5 install -y --skip-unavailable --allowerasing \
+dnf5 install -y --allowerasing \
   `# Dev tools` \
   git curl unzip tar jq make gettext \
-  gcc-c++ cmake extra-cmake-modules libplasma-devel \
-  kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel \
   code \
   `# CLI tools` \
   bat btop fd-find ripgrep \
@@ -105,12 +94,17 @@ dnf5 install -y --skip-unavailable --allowerasing \
   `# Gaming (Steam, Lutris, Heroic via Flatpak no setup-user.sh)` \
   gamemode \
   `# Backups e sistema` \
+  dracut-fips \
   earlyoom \
   tuned tuned-ppd \
+  `# Containers` \
+  podman-docker \
   `# KDE / Tema Mokka` \
   kvantum qt6ct \
   flameshot \
   `# Build deps para Panel Colorizer e assets (removidos após uso)` \
+  gcc-c++ cmake extra-cmake-modules libplasma-devel \
+  kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel \
   rsync libsass sassc
 
 # ── kwin-effect-roundcorners (passo separado para evitar skip silencioso) ─────
@@ -123,13 +117,30 @@ log "Desabilitando COPRs"
 cleanup_coprs
 trap - EXIT
 
+# ── Claude Code (Anthropic) ───────────────────────────────────────────────────
+log "Instalando Claude Code via script oficial"
+NONINTERACTIVE=1 curl -fsSL https://claude.ai/install.sh | bash
+if command -v claude &>/dev/null; then
+  ok "Claude Code instalado com sucesso"
+else
+  echo "WARN: Claude Code pode não estar no PATH, verifique a instalação" >&2
+fi
+
 # ── DNF performance ───────────────────────────────────────────────────────────
 log "Configurando DNF performance"
 mkdir -p /etc/dnf/conf.d
 cp /ctx/configs/dnf-performance.conf /etc/dnf/conf.d/performance.conf
 
+# ── Crypto policy obrigatória ─────────────────────────────────────────────────
+log "Configurando crypto policy"
+update-crypto-policies --set FUTURE
+
 # ── Configs de sistema ────────────────────────────────────────────────────────
 log "Aplicando configurações de sistema"
+
+# SELinux
+install -Dm644 /ctx/configs/selinux-enforcing.conf \
+  /etc/selinux/config
 
 # Sysctl - hardening
 install -Dm644 /ctx/configs/sysctl-hardening.conf \
@@ -191,6 +202,12 @@ install -Dm644 /ctx/configs/dracut-omit-thunderbolt.conf \
 install -Dm644 /ctx/configs/udev-hardening.rules \
   /usr/lib/udev/rules.d/99-hardening.rules
 
+# Validações obrigatórias de hardening
+grep -qx 'SELINUX=enforcing' /etc/selinux/config
+grep -qx 'FUTURE' /etc/crypto-policies/config
+rpm -q dracut-fips >/dev/null
+grep -Fq '"fips=1"' /usr/lib/bootc/kargs.d/10-hardening.toml
+
 # Systemd preset - desabilitar serviços desnecessários
 install -Dm644 /ctx/configs/systemd-preset-desktop.preset \
   /usr/lib/systemd/system-preset/35-security-desktop.preset
@@ -229,13 +246,25 @@ fc-cache -f /usr/share/fonts/
 
 # ── Remoção de dependências de build ──────────────────────────────────────────
 log "Removendo dependências de build"
-dnf5 remove -y --skip-unavailable \
-  gcc-c++ cpp gcc \
-  cmake extra-cmake-modules \
-  libplasma-devel \
-  kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel \
-  libsass sassc \
-  2>/dev/null || true
+BUILD_DEPS=(
+  # Compiladores e headers
+  gcc-c++ cpp gcc
+  cmake extra-cmake-modules
+  libplasma-devel
+  kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel
+  libsass sassc
+  # Ferramentas usadas apenas no build
+  make gettext rsync unzip
+)
+FOUND_BUILD_DEPS=()
+for pkg in "${BUILD_DEPS[@]}"; do
+  if rpm -q "$pkg" &>/dev/null; then
+    FOUND_BUILD_DEPS+=("$pkg")
+  fi
+done
+if [[ ${#FOUND_BUILD_DEPS[@]} -gt 0 ]]; then
+  dnf5 remove -y "${FOUND_BUILD_DEPS[@]}"
+fi
 
 # ── Limpeza final ─────────────────────────────────────────────────────────────
 log "Limpeza final do image"

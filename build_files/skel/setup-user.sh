@@ -9,6 +9,29 @@ log()  { printf "\n\033[1;34m==> %s\033[0m\n" "$*"; }
 warn() { printf "\033[1;33mWARN:\033[0m %s\n" "$*" >&2; }
 ok()   { printf "\033[1;32m OK:\033[0m %s\n" "$*"; }
 
+# ── Função segura para baixar e executar scripts ──────────────────────────────
+# Baixa o script, exibe hash para auditoria, e pede confirmação antes de executar
+safe_curl_sh() {
+  local url="$1" desc="$2"
+  shift 2
+  local tmpscript
+  tmpscript="$(mktemp)"
+  trap "rm -f '$tmpscript'" RETURN
+  curl -fsSL "$url" -o "$tmpscript"
+  local hash
+  hash="$(sha256sum "$tmpscript" | cut -d' ' -f1)"
+  echo "  Script: $desc"
+  echo "  URL:    $url"
+  echo "  SHA256: $hash"
+  echo ""
+  read -rp "  Executar? [S/n] " resp
+  if [[ "${resp,,}" == "n" ]]; then
+    warn "Instalação de $desc cancelada pelo usuário"
+    return 1
+  fi
+  bash "$tmpscript" "$@"
+}
+
 if [[ "${EUID}" -eq 0 ]]; then
   echo "Não rode como root. Execute como seu usuário normal."
   exit 1
@@ -55,7 +78,7 @@ fi
 log "Instalando NVM"
 if ! done_already "nvm"; then
   NVM_VERSION="v0.40.3"
-  curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" | bash
+  safe_curl_sh "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" "NVM ${NVM_VERSION}"
   mark_done "nvm"
   ok "NVM instalado"
 else
@@ -90,8 +113,8 @@ fi
 # ── Oh My Zsh + Powerlevel10k + plugins ──────────────────────────────────────
 log "Instalando Oh My Zsh"
 if ! done_already "omz"; then
-  RUNZSH=no CHSH=no sh -c \
-    "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  RUNZSH=no CHSH=no safe_curl_sh \
+    "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh" "Oh My Zsh"
   mark_done "omz"
   ok "Oh My Zsh instalado"
 else
@@ -181,7 +204,7 @@ fi
 log "Instalando LazyDocker"
 if ! done_already "lazydocker"; then
   mkdir -p "$HOME/bin"
-  curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR="$HOME/bin" bash
+  safe_curl_sh "https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh" "LazyDocker"
   mark_done "lazydocker"
   ok "LazyDocker instalado em ~/bin"
 fi
@@ -189,8 +212,8 @@ fi
 # ── Homebrew + tools de infra ─────────────────────────────────────────────────
 log "Instalando Homebrew"
 if ! done_already "homebrew"; then
-  NONINTERACTIVE=1 /bin/bash -c \
-    "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  NONINTERACTIVE=1 safe_curl_sh \
+    "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh" "Homebrew"
   mark_done "homebrew"
   ok "Homebrew instalado"
 else

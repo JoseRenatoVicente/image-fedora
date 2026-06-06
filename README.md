@@ -120,6 +120,26 @@ sudo bootc switch ghcr.io/<username>/<image_name>
 ```
 This should queue your image for the next reboot, which you can do immediately after the command finishes. You have officially set up your custom image! See the following section for an explanation of the important parts of the template for customization.
 
+# Pre-installed Tools
+
+## Claude Code
+
+This image comes with **Claude Code** pre-installed and ready to use. Claude Code is Anthropic's agentic CLI tool that brings Claude's capabilities to your terminal.
+
+Once you boot the image, you can use Claude Code immediately:
+
+```bash
+claude --help
+```
+
+To authenticate and start using Claude Code:
+
+```bash
+claude
+```
+
+The tool is installed system-wide via the official Anthropic install script (`https://claude.ai/install.sh`), ensuring you always have the latest version compatible with your system. For more information, visit the [Claude Code documentation](https://code.claude.com/docs).
+
 # Repository Contents
 
 ## Containerfile
@@ -190,6 +210,35 @@ just build $target_image $tag
 Arguments:
 - `$target_image`: The tag you want to apply to the image (default: `$image_name`).
 - `$tag`: The tag for the image (default: `$default_tag`).
+
+## Secure Local Workflow
+
+This repository supports a local-first hardening and release flow. The intended secure path is:
+
+```bash
+just build
+just audit-security
+just audit-package-surface
+just push-local
+just sign-local
+just verify-local-signature
+just promote-local
+just run-vm-qcow2
+```
+
+Notes:
+
+- `just audit-security` checks image-side hardening markers such as SELinux config, FIPS package and karg, crypto policy `FUTURE`, and the existing hardening files.
+- `just audit-package-surface` fails if forbidden packages reappear in the final image.
+- `just sign-local` uses `cosign.key` and signs the pushed image by digest.
+- `just verify-local-signature` verifies the pushed image with `cosign.pub`.
+- `just promote-local` chains build -> audit -> push -> sign -> verify.
+
+Runtime validation remains separate from image inspection:
+
+- confirm `SELinux=enforcing` from the booted VM
+- confirm FIPS is active from the booted VM
+- use `just run-vm-qcow2` for the final runtime check
 
 ## Building and Running Virtual Machines and ISOs
 
