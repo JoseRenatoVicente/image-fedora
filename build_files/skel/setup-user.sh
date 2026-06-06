@@ -125,7 +125,7 @@ ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
 log "Instalando Powerlevel10k"
 if ! done_already "p10k"; then
-  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
+  git clone --depth=1 --branch v1.20.0 https://github.com/romkatv/powerlevel10k.git \
     "$ZSH_CUSTOM/themes/powerlevel10k" 2>/dev/null || true
   mark_done "p10k"
   ok "Powerlevel10k instalado"
@@ -133,11 +133,11 @@ fi
 
 log "Instalando plugins zsh"
 if ! done_already "zsh-plugins"; then
-  git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions \
+  git clone --depth=1 --branch v0.7.1 https://github.com/zsh-users/zsh-autosuggestions \
     "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
-  git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting \
+  git clone --depth=1 --branch 0.8.0 https://github.com/zsh-users/zsh-syntax-highlighting \
     "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
-  git clone --depth=1 https://github.com/zsh-users/zsh-completions \
+  git clone --depth=1 --branch 0.36.0 https://github.com/zsh-users/zsh-completions \
     "$ZSH_CUSTOM/plugins/zsh-completions" 2>/dev/null || true
   mark_done "zsh-plugins"
   ok "Plugins zsh instalados"

@@ -12,7 +12,7 @@ log "Instalando JetBrainsMono Nerd Font"
 FONT_DIR="/usr/share/fonts/JetBrainsMonoNerdFont"
 mkdir -p "$FONT_DIR"
 curl -L --fail -o "$TMPDIR_ASSETS/JetBrainsMono.zip" \
-  "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
+  "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip"
 unzip -qo "$TMPDIR_ASSETS/JetBrainsMono.zip" -d "$FONT_DIR"
 # Remove arquivos desnecessários (Windows, etc)
 find "$FONT_DIR" -name "*.ttf" ! -name "*NerdFont*" -delete 2>/dev/null || true
@@ -21,12 +21,12 @@ fc-cache -f "$FONT_DIR"
 # ── Cursores: Catppuccin Mocha Mauve ─────────────────────────────────────────
 log "Instalando cursores Catppuccin Mocha Mauve"
 curl -L --fail -o "$TMPDIR_ASSETS/catppuccin-cursors.zip" \
-  "https://github.com/catppuccin/cursors/releases/latest/download/catppuccin-mocha-mauve-cursors.zip"
+  "https://github.com/catppuccin/cursors/releases/download/v2.0.0/catppuccin-mocha-mauve-cursors.zip"
 unzip -qo "$TMPDIR_ASSETS/catppuccin-cursors.zip" -d /usr/share/icons/
 
 # ── Ícones: Tela Circle Dracula ───────────────────────────────────────────────
 log "Instalando ícones Tela Circle Dracula"
-git clone --depth=1 https://github.com/vinceliuice/Tela-circle-icon-theme \
+git clone --depth=1 --branch 2025-02-10 https://github.com/vinceliuice/Tela-circle-icon-theme \
   "$TMPDIR_ASSETS/Tela-circle-icon-theme"
 bash "$TMPDIR_ASSETS/Tela-circle-icon-theme/install.sh" \
   -d /usr/share/icons \
@@ -79,7 +79,7 @@ fi
 log "Instalando tema SDDM Catppuccin Mocha Mauve"
 mkdir -p /usr/share/sddm/themes
 curl -L --fail -o "$TMPDIR_ASSETS/catppuccin-sddm.zip" \
-  "https://github.com/catppuccin/sddm/releases/latest/download/catppuccin-mocha-mauve-sddm.zip"
+  "https://github.com/catppuccin/sddm/releases/download/v1.1.2/catppuccin-mocha-mauve-sddm.zip"
 unzip -qo "$TMPDIR_ASSETS/catppuccin-sddm.zip" -d /usr/share/sddm/themes/
 
 log "Assets instalados com sucesso."

@@ -3,7 +3,7 @@ FROM scratch AS ctx
 COPY build_files /
 
 # Base Image
-FROM quay.io/fedora-ostree-desktops/kinoite:44
+FROM quay.io/fedora-ostree-desktops/kinoite:44@sha256:fc312687c799938cdea45683109a15374164cfd088f24756ee639efcd0a08752
 
 ## Other possible base images include:
 # FROM ghcr.io/ublue-os/bazzite:latest
@@ -23,7 +23,6 @@ FROM quay.io/fedora-ostree-desktops/kinoite:44
 ## Uncomment the following line if one desires to make /opt immutable and be able to be used
 ## by the package manager.
 
-# RUN rm /opt && mkdir /opt
 RUN rm /opt && mkdir /opt
 
 ### MODIFICATIONS

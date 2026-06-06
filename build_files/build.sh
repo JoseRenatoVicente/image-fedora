@@ -3,6 +3,9 @@ set -euo pipefail
 
 log() { printf "\n\033[1;34m==> %s\033[0m\n" "$*"; }
 
+# ── DNF performance (aplicar antes de qualquer dnf5) ─────────────────────────
+install -Dm644 /ctx/configs/dnf-performance.conf /etc/dnf/conf.d/performance.conf
+
 # ── Trap para garantir limpeza de COPRs mesmo em caso de erro ────────────────
 COPRS_ENABLED=()
 cleanup_coprs() {
@@ -98,7 +101,7 @@ dnf5 install -y --allowerasing \
   earlyoom \
   tuned tuned-ppd \
   `# Containers` \
-  podman-docker \
+  podman-docker podman-compose \
   `# KDE / Tema Mokka` \
   kvantum qt6ct \
   flameshot \
@@ -116,20 +119,6 @@ dnf5 install -y kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
 log "Desabilitando COPRs"
 cleanup_coprs
 trap - EXIT
-
-# ── Claude Code (Anthropic) ───────────────────────────────────────────────────
-log "Instalando Claude Code via script oficial"
-NONINTERACTIVE=1 curl -fsSL https://claude.ai/install.sh | bash
-if command -v claude &>/dev/null; then
-  ok "Claude Code instalado com sucesso"
-else
-  echo "WARN: Claude Code pode não estar no PATH, verifique a instalação" >&2
-fi
-
-# ── DNF performance ───────────────────────────────────────────────────────────
-log "Configurando DNF performance"
-mkdir -p /etc/dnf/conf.d
-cp /ctx/configs/dnf-performance.conf /etc/dnf/conf.d/performance.conf
 
 # ── Crypto policy obrigatória ─────────────────────────────────────────────────
 log "Configurando crypto policy"
@@ -254,7 +243,7 @@ BUILD_DEPS=(
   kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel
   libsass sassc
   # Ferramentas usadas apenas no build
-  make gettext rsync unzip
+  rsync
 )
 FOUND_BUILD_DEPS=()
 for pkg in "${BUILD_DEPS[@]}"; do

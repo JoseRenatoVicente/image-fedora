@@ -7,7 +7,7 @@ TMPDIR_PC="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_PC"' EXIT
 
 log "Clonando Panel Colorizer"
-git clone --depth=1 https://github.com/luisbocanegra/plasma-panel-colorizer \
+git clone --depth=1 --branch v7.2.0 https://github.com/luisbocanegra/plasma-panel-colorizer \
   "$TMPDIR_PC/plasma-panel-colorizer"
 
 # Cria HOME falso para o install.sh instalar sem sessão de usuário
