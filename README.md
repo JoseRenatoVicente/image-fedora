@@ -41,41 +41,41 @@ Once you have the repository on your local drive, proceed to the next step.
 
 ## Step 2: Initial Setup
 
-### Step 2a: Creating a Cosign Key
+### Step 2a: Cosign Setup
 
-Container signing is important for end-user security and is enabled on all Universal Blue images. By default the image builds *will fail* if you don't.
+This repository signs published images in GitHub Actions using keyless Sigstore identities tied to the workflow OIDC token. No `SIGNING_SECRET` is required for the default CI path.
 
-First, install the [cosign CLI tool](https://edu.chainguard.dev/open-source/sigstore/cosign/how-to-install-cosign/#installing-cosign-with-the-cosign-binary)
-With the cosign tool installed, run inside your repo folder:
+Install the [cosign CLI tool](https://edu.chainguard.dev/open-source/sigstore/cosign/how-to-install-cosign/#installing-cosign-with-the-cosign-binary) if you want to verify the published image locally or use the optional local key-based signing flow.
+
+For optional local signing only, generate a key pair inside your repo folder:
 
 ```bash
 COSIGN_PASSWORD="" cosign generate-key-pair
 ```
 
-The signing key will be used in GitHub Actions and will not work if it is password protected.
+The local key pair is only used by `just sign-local` and `just verify-local-signature`. It will not be used by the default GitHub Actions release path.
 
 > [!WARNING]
 > Be careful to *never* accidentally commit `cosign.key` into your git repo. If this key goes out to the public, the security of your repository is compromised.
 
-Next, you need to add the key to GitHub. This makes use of GitHub's secret signing system.
+You do not need to add this key to GitHub for the default CI flow. Keep the key pair only if you want local signing by digest.
 
-<details>
-    <summary>Using the Github Web Interface (preferred)</summary>
-
-Go to your repository settings, under `Secrets and Variables` -> `Actions`
-![image](https://user-images.githubusercontent.com/1264109/216735595-0ecf1b66-b9ee-439e-87d7-c8cc43c2110a.png)
-Add a new secret and name it `SIGNING_SECRET`, then paste the contents of `cosign.key` into the secret and save it. Make sure it's the .key file and not the .pub file. Once done, it should look like this:
-![image](https://user-images.githubusercontent.com/1264109/216735690-2d19271f-cee2-45ac-a039-23e6a4c16b34.png)
-</details>
-<details>
-<summary>Using the Github CLI</summary>
-
-If you have the `github-cli` installed, run:
+To verify a published image after CI:
 
 ```bash
-gh secret set SIGNING_SECRET < cosign.key
+cosign verify ghcr.io/<username>/<image_name>:latest \
+  --certificate-identity-regexp 'https://github.com/.+' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ```
-</details>
+
+To verify provenance:
+
+```bash
+cosign verify-attestation ghcr.io/<username>/<image_name>:latest \
+  --certificate-identity-regexp 'https://github.com/.+' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  --type slsaprovenance
+```
 
 ### Step 2b: Choosing Your Base Image
 
@@ -248,6 +248,8 @@ This repository supports a local-first hardening and release flow. The intended 
 just build
 just audit-security
 just audit-package-surface
+just audit-supply-chain
+just verify-remote-image
 just push-local
 just sign-local
 just verify-local-signature
@@ -259,9 +261,34 @@ Notes:
 
 - `just audit-security` checks image-side hardening markers such as SELinux config, FIPS package and karg, crypto policy `FUTURE`, and the existing hardening files.
 - `just audit-package-surface` fails if forbidden packages reappear in the final image.
+- `just audit-supply-chain` verifies the published image signature, provenance attestation, and attached SBOM.
+- `just verify-remote-image` is the downstream-consumer verification shortcut for the published image.
 - `just sign-local` uses `cosign.key` and signs the pushed image by digest.
 - `just verify-local-signature` verifies the pushed image with `cosign.pub`.
-- `just promote-local` chains build -> audit -> push -> sign -> verify.
+- `just promote-local` chains build -> audit -> push -> sign -> verify and then verifies the remote published image.
+
+## Verifying Published Images
+
+The CI pipeline publishes a signed image, SLSA provenance, and an attached SBOM. Consumers can verify the published image with:
+
+```bash
+just verify-remote-image
+```
+
+Or directly with `cosign`:
+
+```bash
+cosign verify ghcr.io/<username>/<image_name>:latest \
+  --certificate-identity-regexp 'https://github.com/.+' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+
+cosign verify-attestation ghcr.io/<username>/<image_name>:latest \
+  --certificate-identity-regexp 'https://github.com/.+' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  --type slsaprovenance
+
+cosign download sbom ghcr.io/<username>/<image_name>:latest > published-sbom.spdx.json
+```
 
 Runtime validation remains separate from image inspection:
 

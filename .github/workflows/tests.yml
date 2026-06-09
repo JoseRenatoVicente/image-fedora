@@ -25,6 +25,9 @@ jobs:
       - name: Security hardening source checks
         run: ./tests/security_hardening_test.sh
 
+      - name: Workflow policy checks
+        run: ./tests/workflow_policy_test.sh
+
       - name: Justfile sudoif check
         run: ./tests/justfile_sudoif_test.sh
 
@@ -84,3 +87,25 @@ jobs:
 
       - name: Check Justfile formatting
         run: just --fmt --check --unstable Justfile
+
+  shellcheck:
+    name: Shell script lint
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          find build_files tests -type f -name "*.sh" -print0 | xargs -0 shellcheck

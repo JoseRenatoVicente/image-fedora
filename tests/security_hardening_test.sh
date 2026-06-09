@@ -30,5 +30,12 @@ assert_contains "${repo_root}/build_files/configs/dracut-luks.conf" 'add_dracutm
 # Image signing
 assert_contains "${repo_root}/Justfile" 'cosign sign'
 assert_contains "${repo_root}/Justfile" 'cosign verify'
+assert_contains "${repo_root}/Justfile" 'verify-remote-image'
+assert_contains "${repo_root}/Justfile" 'verify-attestation'
+
+# Workflow verification gates
+assert_contains "${repo_root}/.github/workflows/build.yml" 'cosign verify'
+assert_contains "${repo_root}/.github/workflows/build.yml" 'cosign verify-attestation'
+assert_contains "${repo_root}/.github/workflows/integration_tests.yml" 'cosign verify'
 
 echo "ok: security hardening requirements are present"

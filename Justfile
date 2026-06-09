@@ -455,10 +455,56 @@ verify-signature $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env(
     fi
     echo "Verifying signature for ${target_image}:${tag}..."
     cosign verify \
-        --certificate-identity-regexp=".*" \
+        --certificate-identity-regexp='https://github.com/.+' \
         --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
         "${target_image}:${tag}"
     echo "Signature verified successfully."
+
+# Verify provenance attestation of the published image
+[group('Security')]
+verify-provenance $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v cosign &> /dev/null; then
+        echo "cosign not found. Install: go install github.com/sigstore/cosign/v2/cmd/cosign@latest"
+        exit 1
+    fi
+    echo "Verifying provenance for ${target_image}:${tag}..."
+    cosign verify-attestation \
+        --certificate-identity-regexp='https://github.com/.+' \
+        --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \
+        --type slsaprovenance \
+        "${target_image}:${tag}"
+    echo "Provenance verified successfully."
+
+# Verify the published SBOM attachment
+[group('Security')]
+verify-sbom $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v cosign &> /dev/null; then
+        echo "cosign not found. Install: go install github.com/sigstore/cosign/v2/cmd/cosign@latest"
+        exit 1
+    fi
+    tmpfile=$(mktemp)
+    trap 'rm -f "$tmpfile"' EXIT
+    echo "Downloading SBOM for ${target_image}:${tag}..."
+    cosign download sbom "${target_image}:${tag}" > "$tmpfile"
+    test -s "$tmpfile"
+    grep -q '"spdxVersion"' "$tmpfile"
+    echo "SBOM attachment verified successfully."
+
+# Verify remote supply-chain artifacts together
+[group('Security')]
+audit-supply-chain $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    just verify-signature "{{ target_image }}" "{{ tag }}"
+    just verify-provenance "{{ target_image }}" "{{ tag }}"
+    just verify-sbom "{{ target_image }}" "{{ tag }}"
+
+# Alias for downstream image verification
+[group('Security')]
+verify-remote-image $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/" + image_name) $tag=default_tag:
+    just audit-supply-chain "{{ target_image }}" "{{ tag }}"
 
 # Scan image for vulnerabilities with Trivy
 [group('Security')]
@@ -650,6 +696,7 @@ promote-local $source_image=image_name $target_image=("ghcr.io/" + env("GITHUB_R
     just push-local "{{ source_image }}" "{{ target_image }}" "{{ tag }}"
     just sign-local "{{ target_image }}" "{{ tag }}"
     just verify-local-signature "{{ target_image }}" "{{ tag }}"
+    just verify-remote-image "{{ target_image }}" "{{ tag }}"
 
 # ── Testes automatizados ──────────────────────────────────────────────────────
 

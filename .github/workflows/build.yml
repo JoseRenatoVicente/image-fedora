@@ -54,6 +54,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Set SOURCE_DATE_EPOCH
         run: |
@@ -120,6 +122,8 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          ignore-unfixed: true
           timeout: '10m'
 
       - name: Upload Trivy scan results to GitHub Security
@@ -131,6 +135,7 @@ jobs:
 
       # Free disk space after scanning
       - name: Clean up scan artifacts
+        if: always()
         run: rm -f /tmp/image-scan.tar
 
       # ── Push (only on main branch, not PRs) ─────────────────────────────
@@ -199,8 +204,8 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
           if [[ -f sbom.spdx.json ]]; then
-            IMAGE_FULL="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}"
-            cosign attach sbom --sbom sbom.spdx.json "${IMAGE_FULL}:${{ env.DEFAULT_TAG }}"
+            IMAGE_REF="${{ steps.push.outputs.registry-path }}@${{ steps.push.outputs.digest }}"
+            cosign attach sbom --sbom sbom.spdx.json "${IMAGE_REF}"
           fi
 
   # ── SLSA Provenance (Level 3) ─────────────────────────────────────────────
@@ -218,3 +223,49 @@ jobs:
     secrets:
       registry-username: ${{ github.actor }}
       registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  verify-published:
+    name: Verify published image
+    needs: [build_push, provenance]
+    if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        with:
+          egress-policy: audit
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
+        with:
+          cosign-release: 'v2.6.3'
+
+      - name: Verify published image signature
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+          IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
+        run: |
+          cosign verify "${IMAGE_REF}" \
+            --certificate-identity-regexp 'https://github.com/.+' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+
+      - name: Verify published provenance attestation
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+          IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
+        run: |
+          cosign verify-attestation "${IMAGE_REF}" \
+            --certificate-identity-regexp 'https://github.com/.+' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            --type slsaprovenance
+
+      - name: Verify published SBOM attachment
+        env:
+          IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
+        run: |
+          cosign download sbom "${IMAGE_REF}" > /tmp/published-sbom.spdx.json
+          test -s /tmp/published-sbom.spdx.json
