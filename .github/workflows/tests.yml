@@ -1,0 +1,86 @@
+---
+name: Tests
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  source-tests:
+    name: Source tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Security hardening source checks
+        run: ./tests/security_hardening_test.sh
+
+      - name: Justfile sudoif check
+        run: ./tests/justfile_sudoif_test.sh
+
+  exec-bits:
+    name: Validate executable bits
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Check executable bits on scripts
+        run: |
+          FAILED=0
+          check_exec() {
+            local f="$1"
+            if [[ ! -x "$f" ]]; then
+              echo "FAIL: missing +x on $f"
+              FAILED=1
+            fi
+          }
+          # build scripts
+          while IFS= read -r -d '' f; do
+            check_exec "$f"
+          done < <(find build_files -name "*.sh" -print0)
+          # config wrappers (scripts without .sh extension installed as binaries)
+          check_exec build_files/configs/dnf-wrapper
+          check_exec build_files/configs/wpctl-steam-wrapper
+          # test scripts
+          while IFS= read -r -d '' f; do
+            check_exec "$f"
+          done < <(find tests -name "*.sh" -print0)
+          [[ $FAILED -eq 0 ]] || exit 1
+          echo "All executable bits OK"
+
+  just-lint:
+    name: Justfile lint
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install just
+        run: |
+          curl -sSfL https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
+      - name: Check Justfile formatting
+        run: just --fmt --check --unstable Justfile

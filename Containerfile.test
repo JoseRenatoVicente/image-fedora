@@ -1,6 +1,8 @@
 # Imagem de teste — estende a imagem de produção com infraestrutura de boot test.
 # NÃO usar em produção. Construída por: just test-build
-FROM localhost/fedora-kde-custom:latest
+# BASE pode ser sobreposto no CI: --build-arg BASE=ghcr.io/owner/image:latest
+ARG BASE=localhost/fedora-kde-custom:latest
+FROM ${BASE}
 
 # Console serial para o health check escrever resultados capturáveis pelo QEMU
 COPY build_files/test/test-kargs.toml /usr/lib/bootc/kargs.d/20-test-console.toml

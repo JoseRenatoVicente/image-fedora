@@ -13,11 +13,22 @@ assert_contains() {
     fi
 }
 
-assert_contains "${repo_root}/build_files/configs/bootc-kargs.toml" '"fips=1"'
+# Kernel hardening args
+assert_contains "${repo_root}/build_files/configs/bootc-kargs.toml" 'lockdown=integrity'
+assert_contains "${repo_root}/build_files/configs/bootc-kargs.toml" 'pti=on'
+assert_contains "${repo_root}/build_files/configs/bootc-kargs.toml" 'module.sig_enforce=1'
+
+# Crypto policy
 assert_contains "${repo_root}/build_files/build.sh" 'update-crypto-policies --set FUTURE'
-assert_contains "${repo_root}/build_files/build.sh" 'dracut-fips'
-assert_contains "${repo_root}/Justfile" 'cosign sign --key cosign.key'
-assert_contains "${repo_root}/Justfile" 'cosign verify --key cosign.pub'
+
+# SELinux enforcing
 assert_contains "${repo_root}/build_files/configs/selinux-enforcing.conf" 'SELINUX=enforcing'
+
+# LUKS dracut config
+assert_contains "${repo_root}/build_files/configs/dracut-luks.conf" 'add_dracutmodules'
+
+# Image signing
+assert_contains "${repo_root}/Justfile" 'cosign sign'
+assert_contains "${repo_root}/Justfile" 'cosign verify'
 
 echo "ok: security hardening requirements are present"

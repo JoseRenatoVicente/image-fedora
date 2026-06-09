@@ -1,0 +1,36 @@
+---
+name: Zizmor (GHA security)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  zizmor:
+    name: Analyse GitHub Actions workflows
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@85100c34f4a9f26f1c31b98e5be91b51f8fc5b69 # v0.5.6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,76 @@
+---
+name: Integration tests
+on:
+  workflow_run:
+    workflows: ["Build container image"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '0 12 * * *'  # Daily at 12:00 UTC (after build at 10:05)
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: "${{ github.event.repository.name }}"
+  IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
+  DEFAULT_TAG: "latest"
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  container-tests:
+    name: Container tests
+    runs-on: ubuntu-24.04
+    # Skip if triggered by a failed build
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Prepare environment
+        run: |
+          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+
+      - name: Login to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull published image
+        run: |
+          podman pull "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
+
+      - name: Run static container tests
+        run: |
+          podman run --rm \
+            --security-opt label=disable \
+            -v "$(pwd)/build_files/shared/tests.sh:/run/tests.sh:ro" \
+            "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}" \
+            bash /run/tests.sh
+
+      - name: Build test image (Containerfile.test)
+        run: |
+          podman build \
+            -f Containerfile.test \
+            --build-arg BASE="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}" \
+            --tag fedora-kde-test:ci \
+            .
+
+      - name: bootc container lint
+        run: |
+          podman run --rm \
+            --security-opt label=disable \
+            fedora-kde-test:ci \
+            bootc container lint
