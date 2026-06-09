@@ -1,0 +1,18 @@
+[Unit]
+Description=Remove Fedora flatpak repositories
+Before=flatpak-preinstall.service
+Before=flatpak-system-helper.service
+Before=flatpak-add-fedora-repos.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/flatpak remote-delete --system fedora
+ExecStart=/usr/bin/flatpak remote-delete --system fedora-testing
+# Sentinel file prevents flatpak-add-fedora-repos.service from re-creating the remotes
+ExecStart=/usr/bin/touch /var/lib/flatpak/.fedora-initialized
+# Exit code 1 means the remote didn't exist — that's fine
+SuccessExitStatus=1
+
+[Install]
+WantedBy=multi-user.target

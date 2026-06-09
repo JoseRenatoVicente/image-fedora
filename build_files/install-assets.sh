@@ -63,6 +63,10 @@ else
     /usr/share/wallpapers
   copy_dir_if_exists "$GARUDA_DIR/usr/share/konsole" \
     /usr/share/konsole
+  copy_dir_if_exists "$GARUDA_DIR/usr/share/Kvantum" \
+    /usr/share/Kvantum
+  copy_dir_if_exists "$GARUDA_DIR/usr/share/sddm" \
+    /usr/share/sddm
 
   # Skel do Garuda Mokka (configs KDE defaults)
   SKEL_SRC=""
@@ -74,6 +78,13 @@ else
     warn "Skel não encontrado no tarball do Garuda Mokka."
   fi
 fi
+
+# ── Aurorae: Catppuccin Mocha Classic ────────────────────────────────────────
+log "Instalando Aurorae CatppuccinMocha-Classic"
+mkdir -p /usr/share/aurorae/themes
+curl -L --fail -o "$TMPDIR_ASSETS/catppuccin-aurorae.tar.gz" \
+  "https://github.com/catppuccin/kde/releases/download/v0.2.6/Classic-Aurorae-Theme.tar.gz"
+tar -xzf "$TMPDIR_ASSETS/catppuccin-aurorae.tar.gz" -C /usr/share/aurorae/themes/
 
 # ── SDDM: Catppuccin Mocha Mauve theme ───────────────────────────────────────
 log "Instalando tema SDDM Catppuccin Mocha Mauve"

@@ -1,0 +1,20 @@
+[Unit]
+Description=Boot Health Check (imagem de teste)
+# Só existe na imagem de teste; nunca presente na imagem de produção.
+# Corre após multi-user.target para não depender de SDDM/KDE:
+# sem GPU real, o KWin Wayland não inicializa em VM headless com -display none.
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+# Aguarda os serviços estabilizarem após o boot
+ExecStartPre=/bin/sleep 5
+ExecStart=/usr/lib/bootc-test/boot-health-check.sh
+# Desliga a VM após o relatório (o QEMU captura o serial e termina)
+ExecStartPost=/usr/bin/systemctl poweroff --force
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

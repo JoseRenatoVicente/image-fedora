@@ -1,0 +1,3 @@
+# Adiciona console serial para capturar output do health check via QEMU -serial
+# Aplicado apenas na imagem de teste (Containerfile.test), não na produção
+kargs = ["console=ttyS0,115200n8"]

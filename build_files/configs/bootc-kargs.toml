@@ -2,7 +2,6 @@
 # Instalado em /usr/lib/bootc/kargs.d/10-hardening.toml
 
 kargs = [
-  "fips=1",
   "hash_pointers=always",
   "init_on_alloc=1",
   "intel_iommu=on",
@@ -21,8 +20,6 @@ kargs = [
   "random.trust_bootloader=off",
   "random.trust_cpu=off",
   "randomize_kstack_offset=on",
-  "rd.emergency=halt",
-  "rd.shell=0",
   "slab_nomerge",
   "spec_store_bypass_disable=on",
   "spectre_v2=on",

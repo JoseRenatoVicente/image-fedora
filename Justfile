@@ -1,10 +1,12 @@
 export image_name := env("IMAGE_NAME", "fedora-kde-custom") # output image name, usually same as repo name, change as needed
+export image_vendor := env("IMAGE_VENDOR", env("GITHUB_REPOSITORY_OWNER", "")) # ghcr.io owner; auto-detected in CI
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2
 alias run-vm := run-vm-qcow2
+alias test := test-container
 
 [private]
 default:
@@ -92,6 +94,9 @@ build $target_image=image_name $tag=default_tag:
     BUILD_ARGS=()
     if [[ -z "$(git status -s)" ]]; then
         BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
+    fi
+    if [[ -n "${image_vendor:-}" ]]; then
+        BUILD_ARGS+=("--build-arg" "IMAGE_VENDOR=${image_vendor}")
     fi
 
     podman build \
@@ -277,12 +282,24 @@ _run-vm $target_image $tag $type $config:
     run_args+=(--pull=newer)
     run_args+=(--publish "127.0.0.1:${port}:8006")
     run_args+=(--env "CPU_CORES=4")
-    run_args+=(--env "RAM_SIZE=8G")
+    run_args+=(--env "RAM_SIZE=6G")
     run_args+=(--env "DISK_SIZE=64G")
     run_args+=(--env "BOOT_MODE=uefi")
     run_args+=(--env "TPM=Y")
-    run_args+=(--env "GPU=N")
+    run_args+=(--env "WIDTH=1920")
+    run_args+=(--env "HEIGHT=1080")
     run_args+=(--device=/dev/kvm)
+
+    # Passa dispositivos DRI do host para habilitar aceleração GPU (VirtGL)
+    # Sem estes devices o qemux não consegue criar /dev/dri/card0 e cai em CPU rendering
+    if [[ -d /dev/dri ]]; then
+        run_args+=(--device=/dev/dri)
+        run_args+=(--env "GPU=Y")
+    else
+        run_args+=(--env "GPU=N")
+        echo "WARN: /dev/dri não encontrado, GPU desabilitada"
+    fi
+
     run_args+=(--volume "${PWD}/${image_file}":"/boot.${type}")
     run_args+=(docker.io/qemux/qemu)
 
@@ -305,6 +322,83 @@ run-vm-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-
 # Run a virtual machine from an ISO
 [group('Run Virtal Machine')]
 run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-vm target_image tag "iso" "disk_config/iso.toml")
+
+# Run a virtual machine with native QEMU + virtio-vga-gl (OpenGL real, janela SDL)
+# Requer: qemu-system-x86_64, edk2-ovmf  →  sudo dnf install -y qemu-kvm edk2-ovmf
+# Melhor opção para testar desktop KDE: sem overhead de browser/VNC, aceleração OpenGL
+[group('Run Virtal Machine')]
+run-vm-gl type="qcow2" ram="8G" cpus="4":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    image_file="output/{{ type }}/disk.{{ type }}"
+    if [[ ! -f "${image_file}" ]]; then
+        echo "Imagem não encontrada: ${image_file}"
+        echo "Execute primeiro: just build-{{ type }}"
+        exit 1
+    fi
+
+    # Verificar dependências
+    if ! command -v qemu-system-x86_64 &>/dev/null; then
+        echo "qemu-system-x86_64 não encontrado. Instale com:"
+        echo "  sudo dnf install -y qemu-kvm edk2-ovmf"
+        exit 1
+    fi
+
+    # Localizar firmware UEFI
+    OVMF_CODE=""
+    OVMF_VARS_SRC=""
+    for candidate in \
+        /usr/share/edk2/ovmf/OVMF_CODE.fd \
+        /usr/share/OVMF/OVMF_CODE.fd \
+        /usr/share/qemu/OVMF_CODE.fd; do
+        if [[ -f "$candidate" ]]; then
+            OVMF_CODE="$candidate"
+            OVMF_VARS_SRC="${candidate/CODE/VARS}"
+            break
+        fi
+    done
+    if [[ -z "$OVMF_CODE" ]]; then
+        echo "OVMF não encontrado. Instale: sudo dnf install -y edk2-ovmf"
+        exit 1
+    fi
+
+    # VARS precisa de uma cópia gravável por sessão
+    # Usa XDG_RUNTIME_DIR (/run/user/UID) que tem espaço garantido; /tmp pode ter quota
+    _tmpdir="${XDG_RUNTIME_DIR:-${HOME}/.cache}"
+    OVMF_VARS_TMP=$(mktemp "${_tmpdir}/OVMF_VARS_XXXXXXXXXX.fd")
+    cp "${OVMF_VARS_SRC:-${OVMF_CODE/CODE/VARS}}" "$OVMF_VARS_TMP"
+    trap "rm -f '$OVMF_VARS_TMP'" EXIT
+
+    RAM_BYTES=$(echo "{{ ram }}" | numfmt --from=iec)
+    RAM_MB=$(( RAM_BYTES / 1024 / 1024 ))
+
+    echo "Iniciando VM KDE — janela SDL com OpenGL"
+    echo "  Imagem : ${image_file}"
+    echo "  RAM    : ${RAM_MB}M  CPUs: {{ cpus }}"
+    echo "  GPU    : virtio-vga-gl (OpenGL via host)"
+
+    qemu-system-x86_64 \
+        -enable-kvm \
+        -machine q35 \
+        -cpu host \
+        -smp "{{ cpus }}" \
+        -m "${RAM_MB}M" \
+        -device virtio-vga-gl,xres=1920,yres=1080 \
+        -display sdl,gl=on \
+        -drive "if=pflash,format=raw,readonly=on,file=${OVMF_CODE}" \
+        -drive "if=pflash,format=raw,file=${OVMF_VARS_TMP}" \
+        -drive "file=${image_file},format={{ type }},if=virtio,cache=writeback,discard=unmap" \
+        -netdev user,id=net0 \
+        -device virtio-net-pci,netdev=net0 \
+        -device virtio-balloon-pci \
+        -device virtio-rng-pci \
+        -usb -device usb-tablet \
+        -audiodev pa,id=snd0 \
+        -device ich9-intel-hda \
+        -device hda-duplex,audiodev=snd0 \
+        -rtc base=localtime \
+        -boot menu=on
 
 # Run a virtual machine using systemd-vmspawn
 [group('Run Virtal Machine')]
@@ -437,7 +531,7 @@ audit-security $target_image=image_name $tag=default_tag:
     check "FIPS kernel arg" \
         podman run --rm "${local_ref}" bash -lc "grep -Fq '\"fips=1\"' /usr/lib/bootc/kargs.d/10-hardening.toml"
     check "Crypto policy FUTURE" \
-        podman run --rm "${local_ref}" bash -lc "grep -qx 'FUTURE' /etc/crypto-policies/config"
+        podman run --rm "${local_ref}" bash -lc "grep -qE '^FUTURE' /etc/crypto-policies/config"
     check "Sysctl hardening" \
         podman run --rm "${local_ref}" bash -lc "test \$(grep -c '=' /etc/sysctl.d/60-security-hardening.conf 2>/dev/null) -gt 0"
     check "Kernel module blacklist" \
@@ -557,3 +651,172 @@ promote-local $source_image=image_name $target_image=("ghcr.io/" + env("GITHUB_R
     just push-local "{{ source_image }}" "{{ target_image }}" "{{ tag }}"
     just sign-local "{{ target_image }}" "{{ tag }}"
     just verify-local-signature "{{ target_image }}" "{{ tag }}"
+
+# ── Testes automatizados ──────────────────────────────────────────────────────
+
+# Corre os testes estáticos contra a imagem de container já construída (sem boot).
+# Rápido (~30s). Equivalente ao que corre no final do build, mas invocável a qualquer momento.
+# Requer: just build (ou just rebuild-qcow2 — a imagem container deve existir)
+[group('Testing')]
+test-container $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    local_ref="${target_image}:${tag}"
+    podman image exists "${local_ref}" 2>/dev/null || local_ref="localhost/${target_image}:${tag}"
+    if ! podman image exists "${local_ref}" 2>/dev/null; then
+        echo "Imagem não encontrada. Execute primeiro: just build"
+        exit 1
+    fi
+    echo "A correr testes estáticos em: ${local_ref}"
+    # O tests.sh corre dentro do container com bind-mount do host — não precisa de estar na imagem
+    podman run --rm \
+        --security-opt label=disable \
+        -v "$(pwd)/build_files/shared/tests.sh:/run/tests.sh:ro,z" \
+        "${local_ref}" \
+        bash /run/tests.sh
+
+# Constrói a imagem de teste (extensão da produção com health check de boot)
+# A imagem de produção deve existir localmente antes: just build
+[group('Testing')]
+test-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! podman image exists "localhost/{{ image_name }}:{{ default_tag }}" 2>/dev/null && \
+       ! podman image exists "{{ image_name }}:{{ default_tag }}" 2>/dev/null; then
+        echo "Imagem de produção não encontrada. Execute primeiro: just build"
+        exit 1
+    fi
+    echo "A construir imagem de teste..."
+    podman build \
+        -f Containerfile.test \
+        --tag "fedora-kde-test:latest" \
+        .
+    echo "Imagem de teste pronta: fedora-kde-test:latest"
+
+# Boot test headless: constrói QCOW2 de teste, arranca em QEMU sem display,
+# aguarda o health check e reporta PASS/FAIL. Requer: just test-build
+# Dependências: qemu-kvm edk2-ovmf  →  sudo dnf install -y qemu-kvm edk2-ovmf
+[group('Testing')]
+test-boot timeout="300":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Garante que a imagem de teste está construída (constrói se necessário)
+    just test-build
+
+    if ! command -v qemu-system-x86_64 &>/dev/null; then
+        echo "qemu-system-x86_64 não encontrado. Instale: sudo dnf install -y qemu-kvm edk2-ovmf"
+        exit 1
+    fi
+
+    # Localizar OVMF
+    OVMF_CODE=""
+    for candidate in \
+        /usr/share/edk2/ovmf/OVMF_CODE.fd \
+        /usr/share/OVMF/OVMF_CODE.fd \
+        /usr/share/qemu/OVMF_CODE.fd; do
+        [[ -f "$candidate" ]] && OVMF_CODE="$candidate" && break
+    done
+    [[ -z "$OVMF_CODE" ]] && { echo "OVMF não encontrado. Instale: sudo dnf install -y edk2-ovmf"; exit 1; }
+
+    _tmpdir="${XDG_RUNTIME_DIR:-${HOME}/.cache}"
+    OVMF_VARS=$(mktemp "${_tmpdir}/OVMF_VARS_XXXXXX.fd")
+    cp "${OVMF_CODE/CODE/VARS}" "$OVMF_VARS"
+    trap "rm -f '$OVMF_VARS'" EXIT
+
+    # Construir QCOW2 de teste via bootc-image-builder
+    echo "A converter imagem de teste para QCOW2..."
+    just _rootful_load_image localhost/fedora-kde-test latest
+    TEST_BUILDTMP=$(mktemp -d -p "${PWD}" _build-test.XXXXXX)
+    sudo podman run --rm -it --privileged --pull=newer \
+        --net=host \
+        --security-opt label=type:unconfined_t \
+        -v "$(pwd)/disk_config/disk.toml":/config.toml:ro \
+        -v "${TEST_BUILDTMP}":/output \
+        -v /var/lib/containers/storage:/var/lib/containers/storage \
+        "${bib_image}" \
+        --type qcow2 --use-librepo=True --rootfs=btrfs \
+        localhost/fedora-kde-test:latest
+    sudo mv -f "${TEST_BUILDTMP}"/* output/ 2>/dev/null || true
+    sudo rmdir "${TEST_BUILDTMP}" 2>/dev/null || true
+    sudo chown -R "$USER:$USER" output/qcow2/ 2>/dev/null || true
+
+    TEST_QCOW="output/qcow2/disk.qcow2"
+    [[ -f "$TEST_QCOW" ]] || { echo "QCOW2 de teste não encontrado em $TEST_QCOW"; exit 1; }
+
+    RESULTS_LOG=$(mktemp "${_tmpdir}/boot-test-results.XXXXXX")
+    trap "rm -f '$OVMF_VARS' '$RESULTS_LOG'" EXIT
+
+    echo ""
+    echo "A iniciar boot test headless (timeout: {{ timeout }}s)..."
+    echo "QCOW2 : $TEST_QCOW"
+    echo "Log   : $RESULTS_LOG"
+    echo ""
+
+    # Boot headless:
+    #   -display none       → descarta output VGA (sem janela)
+    #   -device virtio-vga  → VGA existe (SDDM/KDE precisa de um device)
+    #   -serial mon:stdio   → serial (ttyS0) capturado em stdout → log
+    # NÃO usar -nographic aqui: implica sem VGA device e redirects serial
+    # de forma diferente — conflita com -display none + -serial explícito.
+    qemu-system-x86_64 \
+        -enable-kvm \
+        -machine q35 \
+        -cpu host \
+        -smp 4 \
+        -m 4G \
+        -display none \
+        -device virtio-vga \
+        -serial mon:stdio \
+        -no-reboot \
+        -drive "if=pflash,format=raw,readonly=on,file=${OVMF_CODE}" \
+        -drive "if=pflash,format=raw,file=${OVMF_VARS}" \
+        -drive "file=${TEST_QCOW},format=qcow2,if=virtio,cache=writeback" \
+        -netdev user,id=net0 \
+        -device virtio-net-pci,netdev=net0 \
+        -device virtio-rng-pci \
+        -device virtio-balloon-pci \
+        >"$RESULTS_LOG" 2>&1 &
+    QEMU_PID=$!
+
+    echo "QEMU PID: $QEMU_PID — aguardando marcadores BOOT- (timeout: {{ timeout }}s)..."
+    echo "─────────────────────────────────────────────────"
+
+    # Mostra linhas BOOT- em tempo real enquanto espera
+    tail -n 0 -f "$RESULTS_LOG" 2>/dev/null | grep --line-buffered "BOOT-" &
+    TAIL_PID=$!
+
+    # Poll por BOOT-DONE ou até timeout
+    DEADLINE=$(( SECONDS + {{ timeout }} ))
+    while [[ $SECONDS -lt $DEADLINE ]] && kill -0 "$QEMU_PID" 2>/dev/null; do
+        grep -q "BOOT-DONE:" "$RESULTS_LOG" 2>/dev/null && break
+        sleep 5
+    done
+
+    kill "$TAIL_PID" 2>/dev/null || true
+    kill "$QEMU_PID" 2>/dev/null || true
+    wait "$QEMU_PID" 2>/dev/null || true
+
+    echo ""
+    echo "═══════════════════════════════════════"
+
+    # Analisar resultados
+    FAILS=$(grep "^BOOT-FAIL" "$RESULTS_LOG" 2>/dev/null || true)
+    DONE=$(grep "^BOOT-DONE:" "$RESULTS_LOG" 2>/dev/null || true)
+
+    if [[ -z "$DONE" ]]; then
+        echo "RESULTADO: INCONCLUSIVO (timeout sem BOOT-DONE)"
+        echo ""
+        echo "Últimas linhas do log:"
+        tail -20 "$RESULTS_LOG"
+        exit 1
+    elif [[ -n "$FAILS" ]]; then
+        echo "RESULTADO: FALHOU"
+        echo ""
+        echo "$FAILS"
+        exit 1
+    else
+        echo "RESULTADO: PASSOU ✓"
+        grep "^BOOT-PASS\|^BOOT-INFO" "$RESULTS_LOG" 2>/dev/null || true
+    fi
+    echo "═══════════════════════════════════════"

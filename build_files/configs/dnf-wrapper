@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+# DNF wrapper for immutable systems.
+# Redirects package install/remove commands to the correct tool (rpm-ostree),
+# and passes everything else through to dnf5.
+
+# In a container or unlocked overlay: call dnf5 directly
+if systemd-detect-virt -cq 2>/dev/null || \
+   [[ -e /run/.containerenv || -e /.dockerenv ]] || \
+   [[ "$(rpm-ostree status --json --booted 2>/dev/null | \
+        python3 -c 'import sys,json; print(json.load(sys.stdin)["deployments"][0].get("unlocked",""))' \
+        2>/dev/null)" == "development" ]]; then
+    exec /usr/bin/dnf5 "$@"
+fi
+
+# Block mutating commands on an immutable base
+for arg in "$@"; do
+    if [[ "$arg" == "install" || "$arg" == "in" || \
+          "$arg" == "remove"  || "$arg" == "rm" || \
+          "$arg" == "erase"   || "$arg" == "autoremove" ]]; then
+        echo -e "ERRO: Esta imagem usa rpm-ostree — não use dnf para instalar/remover pacotes." >&2
+        echo -e "  Instalar:  rpm-ostree install <pacote>" >&2
+        echo -e "  Remover:   rpm-ostree override remove <pacote>" >&2
+        echo -e "  Temporário (container): distrobox-enter" >&2
+        exit 1
+    fi
+done
+
+exec /usr/bin/dnf5 "$@"

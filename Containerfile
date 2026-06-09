@@ -2,8 +2,19 @@
 FROM scratch AS ctx
 COPY build_files /
 
+# Build-time metadata (passável via --build-arg)
+ARG IMAGE_NAME="fedora"
+ARG IMAGE_PRETTY_NAME="Fedora"
+ARG IMAGE_VENDOR=""
+ARG SHA_HEAD_SHORT=""
+
 # Base Image
 FROM quay.io/fedora-ostree-desktops/kinoite:44@sha256:fc312687c799938cdea45683109a15374164cfd088f24756ee639efcd0a08752
+
+ARG IMAGE_NAME="fedora"
+ARG IMAGE_PRETTY_NAME="Fedora"
+ARG IMAGE_VENDOR=""
+ARG SHA_HEAD_SHORT=""
 
 ## Other possible base images include:
 # FROM ghcr.io/ublue-os/bazzite:latest
@@ -33,6 +44,10 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
+    IMAGE_NAME="${IMAGE_NAME}" \
+    IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME}" \
+    IMAGE_VENDOR="${IMAGE_VENDOR}" \
+    SHA_HEAD_SHORT="${SHA_HEAD_SHORT}" \
     /ctx/build.sh
     
 ### LINTING

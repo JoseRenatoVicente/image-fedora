@@ -1,0 +1,25 @@
+# Imagem de teste — estende a imagem de produção com infraestrutura de boot test.
+# NÃO usar em produção. Construída por: just test-build
+FROM localhost/fedora-kde-custom:latest
+
+# Console serial para o health check escrever resultados capturáveis pelo QEMU
+COPY build_files/test/test-kargs.toml /usr/lib/bootc/kargs.d/20-test-console.toml
+
+# Auto-login SDDM: inicia sessão KDE sem interação humana
+COPY build_files/test/sddm-autologin.conf /etc/sddm.conf.d/20-autologin.conf
+
+# Utilizador de teste para a sessão gráfica
+RUN useradd -m -G wheel testuser && \
+    echo "testuser:testpass" | chpasswd && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/testuser
+
+# Health check
+COPY build_files/test/boot-health-check.sh /usr/lib/bootc-test/boot-health-check.sh
+COPY build_files/test/boot-health-check.service /usr/lib/systemd/system/boot-health-check.service
+
+RUN chmod +x /usr/lib/bootc-test/boot-health-check.sh && \
+    mkdir -p /usr/lib/systemd/system/multi-user.target.wants && \
+    ln -sf ../boot-health-check.service \
+        /usr/lib/systemd/system/multi-user.target.wants/boot-health-check.service
+
+RUN bootc container lint

@@ -1,0 +1,5 @@
+# Kill the process that caused a GPU crash (if the PID is known)
+ACTION=="change", ENV{DEVNAME}=="/dev/dri/card0", ENV{RESET}=="1", ENV{PID}!="0", RUN+="/sbin/kill -9 %E{PID}"
+
+# Restart SDDM if the GPU crashes and VRAM is lost (FLAGS==1)
+ACTION=="change", ENV{DEVNAME}=="/dev/dri/card0", ENV{RESET}=="1", ENV{FLAGS}=="1", RUN+="/usr/sbin/systemctl restart sddm"
