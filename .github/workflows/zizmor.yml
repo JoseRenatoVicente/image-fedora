@@ -36,3 +36,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           advanced-security: false
           min-severity: high
+          min-confidence: high
