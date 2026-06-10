@@ -439,12 +439,16 @@ systemctl enable earlyoom
 systemctl enable firewalld
 systemctl enable chronyd
 systemctl enable bluetooth.service bluetooth.target
-systemctl list-unit-files dconf-update.service &>/dev/null \
-    && systemctl enable dconf-update.service \
-    || echo "INFO: dconf-update.service não existe nesta base, ignorando"
+if systemctl list-unit-files dconf-update.service &>/dev/null; then
+    systemctl enable dconf-update.service
+else
+    echo "INFO: dconf-update.service não existe nesta base, ignorando"
+fi
 systemctl enable flatpak-nuke-fedora.service
 systemctl enable input-remapper.service
-rpm -q scx-scheds &>/dev/null && systemctl enable scx.service || true
+if rpm -q scx-scheds &>/dev/null; then
+    systemctl enable scx.service
+fi
 
 flatpak remote-add --system --if-not-exists flathub \
     https://flathub.org/repo/flathub.flatpakrepo || true

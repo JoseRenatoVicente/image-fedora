@@ -16,7 +16,7 @@ safe_curl_sh() {
   shift 2
   local tmpscript
   tmpscript="$(mktemp)"
-  trap "rm -f '$tmpscript'" RETURN
+  trap 'rm -f -- "$tmpscript"' RETURN
   curl -fsSL "$url" -o "$tmpscript"
   local hash
   hash="$(sha256sum "$tmpscript" | cut -d' ' -f1)"
