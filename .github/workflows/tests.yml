@@ -89,7 +89,7 @@ jobs:
 
       - name: Install just
         run: |
-          curl -sSfL https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          sudo apt-get update && sudo apt-get install -y just
 
       - name: Check Justfile formatting
         run: just --unstable --fmt --check -f Justfile
