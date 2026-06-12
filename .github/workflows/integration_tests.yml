@@ -60,8 +60,6 @@ jobs:
           podman pull "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
 
       - name: Verify published image signature
-        env:
-          COSIGN_EXPERIMENTAL: "true"
         run: |
           IMAGE_REF="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
           cosign verify "${IMAGE_REF}" \
@@ -69,8 +67,6 @@ jobs:
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 
       - name: Verify published provenance attestation
-        env:
-          COSIGN_EXPERIMENTAL: "true"
         run: |
           IMAGE_REF="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
           cosign verify-attestation "${IMAGE_REF}" \

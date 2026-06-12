@@ -11,6 +11,7 @@ on:
       - main
     paths-ignore:
       - '**/README.md'
+      - 'docs/**'
   workflow_dispatch:
 
 env:
@@ -60,9 +61,26 @@ jobs:
       - name: Set SOURCE_DATE_EPOCH
         run: |
           echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> ${GITHUB_ENV}
+          echo "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)" >> ${GITHUB_ENV}
 
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
+        with:
+          cosign-release: 'v2.6.3'
+
+      - name: Verify base image signature
+        run: |
+          BASE_IMAGE=$(awk '$1=="FROM" {for(i=2;i<=NF;i++) if($i!~/^--/) {print $i; exit}}' ./Containerfile)
+          [[ -n "$BASE_IMAGE" ]] || { echo "ERROR: imagem base não encontrada no Containerfile"; exit 1; }
+          echo "Verifying base image: ${BASE_IMAGE}"
+          curl -sL --fail --retry 3 --retry-delay 5 -o /tmp/fedora-ostree.pub \
+            "https://gitlab.com/fedora/ostree/ci-test/-/raw/main/quay.io-fedora-ostree-desktops.pub"
+          cosign verify --key /tmp/fedora-ostree.pub "${BASE_IMAGE}"
+          rm -f /tmp/fedora-ostree.pub
+          echo "Base image signature verified."
 
       - name: Get current date
         id: date
@@ -110,6 +128,8 @@ jobs:
           oci: false
           build-args: |
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+            IMAGE_VENDOR=${{ github.repository_owner }}
+            SHA_HEAD_SHORT=${{ env.SHA_HEAD_SHORT }}
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
       - name: Export image for scanning
@@ -192,16 +212,6 @@ jobs:
           format: spdx-json
 
       # ── Cosign image signing ────────────────────────────────────────────
-      # To enable signing:
-      # 1. Run: cosign generate-key-pair
-      # 2. Add the private key (cosign.key) as a GitHub secret named SIGNING_SECRET
-      # 3. Commit cosign.pub to the repo root
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        with:
-          cosign-release: 'v2.6.3'
-
       - name: Sign container image (keyless)
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
@@ -209,8 +219,6 @@ jobs:
           for tag in ${{ steps.metadata.outputs.tags }}; do
             cosign sign -y --recursive "${IMAGE_FULL}:${tag}"
           done
-        env:
-          COSIGN_EXPERIMENTAL: "true"
 
       # ── Attach SBOM to signed image ─────────────────────────────────────
       - name: Attach SBOM to image
@@ -259,7 +267,6 @@ jobs:
 
       - name: Verify published image signature
         env:
-          COSIGN_EXPERIMENTAL: "true"
           IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
         run: |
           cosign verify "${IMAGE_REF}" \
@@ -268,7 +275,6 @@ jobs:
 
       - name: Verify published provenance attestation
         env:
-          COSIGN_EXPERIMENTAL: "true"
           IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
         run: |
           cosign verify-attestation "${IMAGE_REF}" \

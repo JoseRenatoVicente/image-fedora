@@ -259,7 +259,7 @@ just run-vm-qcow2
 
 Notes:
 
-- `just audit-security` checks image-side hardening markers such as SELinux config, FIPS package and karg, crypto policy `FUTURE`, and the existing hardening files.
+- `just audit-security` checks image-side hardening markers such as SELinux config, crypto policy `FUTURE`, and the existing hardening files.
 - `just audit-package-surface` fails if forbidden packages reappear in the final image.
 - `just audit-supply-chain` verifies the published image signature, provenance attestation, and attached SBOM.
 - `just verify-remote-image` is the downstream-consumer verification shortcut for the published image.
@@ -357,6 +357,160 @@ Runs shfmt on all Bash scripts.
 ## Additional resources
 
 For additional driver support, ublue maintains a set of scripts and container images available at [ublue-akmod](https://github.com/ublue-os/akmods). These images include the necessary scripts to install multiple kernel drivers within the container (Nvidia, OpenRazer, Framework...). The documentation provides guidance on how to properly integrate these drivers into your container image.
+
+# Hardening: What Is Disabled and How to Re-enable
+
+This image ships with aggressive security hardening derived from [secureblue](https://github.com/secureblue/secureblue). Below is a summary of what is restricted and how to restore functionality if needed.
+
+## Printing (CUPS)
+
+**Disabled:** `cups.service`, `cups.socket`, `cups.path`, `cups-browsed.service`
+
+Printing is completely non-functional by default.
+
+```bash
+sudo systemctl enable --now cups.socket cups.path
+# For network printer auto-discovery:
+sudo systemctl enable --now cups-browsed.service
+```
+
+## Network Discovery (Avahi / mDNS)
+
+**Disabled:** `avahi-daemon.service`, `avahi-daemon.socket`, LLMNR (`resolved`)
+
+Automatic discovery of network printers, Chromecasts, AirPlay devices, and `.local` hostnames will not work.
+
+```bash
+sudo systemctl enable --now avahi-daemon.socket
+# For LLMNR (Windows-centric networks), edit:
+#   /etc/systemd/resolved.conf.d/10-disable-llmnr.conf
+# and set LLMNR=resolve or LLMNR=yes
+```
+
+## SSH Server
+
+**Disabled:** `sshd.service`, `sshd.socket`, kernel arg `systemd.ssh_auto=no`
+
+The machine cannot be accessed remotely via SSH. Outbound SSH connections (client) work normally.
+
+```bash
+sudo systemctl enable --now sshd.socket
+```
+
+## Network File Shares (NFS / CIFS / Samba)
+
+**Blocked:** Kernel modules `nfs`, `nfsv3`, `nfsv4`, `cifs`, `ksmbd` via `modprobe -d`
+
+Cannot mount NFS or Samba shares. To re-enable:
+
+```bash
+# Create override for the specific module you need:
+echo 'install cifs /sbin/modprobe --ignore-install cifs' | sudo tee /etc/modprobe.d/allow-cifs.conf
+echo 'install nfsv4 /sbin/modprobe --ignore-install nfsv4' | sudo tee /etc/modprobe.d/allow-nfs.conf
+sudo depmod -a
+```
+
+## Thunderbolt
+
+**Blocked:** Kernel module `thunderbolt` via `modprobe -d`
+
+Thunderbolt docks, eGPUs, displays, and storage devices will not work. IOMMU is also set to strict mode.
+
+```bash
+echo 'install thunderbolt /sbin/modprobe --ignore-install thunderbolt' | sudo tee /etc/modprobe.d/allow-thunderbolt.conf
+sudo depmod -a
+```
+
+## VPN (IPSec) -- Optional Restriction
+
+**NOT blocked by default.** An optional blacklist is available at `/usr/share/fedora-hardening/modprobe-ipsec-blacklist.conf`. If you activated it and need to revert:
+
+```bash
+sudo rm /etc/modprobe.d/modprobe-ipsec-blacklist.conf
+sudo reboot
+```
+
+## Firewall (All Inbound Blocked)
+
+The default firewall zone has **zero allowed inbound services** (standard Fedora allows `dhcpv6-client`, `mdns`, `sshd`). This blocks KDE Connect, Syncthing, local dev servers, etc.
+
+```bash
+# Allow specific services:
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --permanent --add-service=mdns
+sudo firewall-cmd --permanent --add-service=kdeconnect
+sudo firewall-cmd --reload
+```
+
+## DVD / Blu-ray (UDF Filesystem)
+
+**Blocked:** Kernel module `udf` via `modprobe -d`
+
+UDF-formatted media (most DVDs and Blu-ray discs) cannot be read.
+
+```bash
+echo 'install udf /sbin/modprobe --ignore-install udf' | sudo tee /etc/modprobe.d/allow-udf.conf
+sudo depmod -a
+```
+
+## Mobile Broadband (ModemManager)
+
+**Disabled:** `ModemManager.service`
+
+4G/5G USB dongles and built-in WWAN cards will not be managed.
+
+```bash
+sudo systemctl enable --now ModemManager.service
+```
+
+## Geolocation
+
+**Disabled:** `geoclue.service`
+
+Automatic timezone detection and location-based Night Color scheduling will not work.
+
+```bash
+sudo systemctl enable --now geoclue.service
+```
+
+## FIPS Mode (Not Enabled)
+
+FIPS mode (`fips=1` kernel arg + `dracut-fips` package) is **not enabled** in this image. Enabling FIPS requires careful integration with dracut, kernel HMAC validation, and testing. The `crypto-policies FUTURE` policy already enforces strong cryptographic standards without the boot-time complexity of FIPS.
+
+## Kernel Module Signing (`module.sig_enforce=1`)
+
+Only signed kernel modules can load. Fedora-packaged drivers (including `kmod-nvidia`) work normally. Custom DKMS modules will be rejected. This is expected behavior for an atomic/immutable system -- use `rpm-ostree install` for signed driver packages.
+
+## Kernel Lockdown (`lockdown=integrity`)
+
+Prevents modification of the running kernel. Blocks `/dev/mem` access, hibernation with unsigned images, and some hardware diagnostic tools.
+
+## Xwayland Input Isolation
+
+**Set:** `XwaylandEavesdrops=None` in kwinrc
+
+X11 applications cannot intercept input events from other windows. This blocks X11 keyloggers but also breaks global hotkeys, push-to-talk overlays (Discord, TeamSpeak), and some accessibility tools running under Xwayland. Native Wayland apps are unaffected.
+
+## Other Disabled Services
+
+| Service | Impact | Re-enable |
+|---------|--------|-----------|
+| `thermald` | Intel thermal management | `sudo systemctl enable --now thermald` |
+| `alsa-state` | ALSA mixer volume persistence | `sudo systemctl enable --now alsa-state` |
+| `sssd` | AD/LDAP/FreeIPA authentication | `sudo systemctl enable --now sssd` |
+| `iscsid` | iSCSI storage targets | `sudo systemctl enable --now iscsid.socket` |
+| `low-memory-monitor` | OOM warnings to desktop | `sudo systemctl enable --now low-memory-monitor` |
+
+## Sysctl Restrictions (Non-Exhaustive)
+
+| Setting | Impact |
+|---------|--------|
+| `kernel.dmesg_restrict=1` | Non-root users cannot read `dmesg` |
+| `kernel.perf_event_paranoid=3` | `perf` profiling blocked for non-root |
+| `kernel.io_uring_disabled=2` | io_uring disabled for unprivileged users |
+| `kernel.core_pattern=\|/bin/false` | Core dumps discarded |
+| `fs.binfmt_misc.status=0` | Cannot run foreign-arch binaries via QEMU user-mode |
+| `vdso32=0`, `vsyscall=none` | Some legacy 32-bit binaries may break |
 
 ## Community Examples
 

@@ -1,38 +1,19 @@
-// Patched for Fedora: removed Garuda-specific loadTemplate calls
-// (org.garuda.desktop.defaultPanel / defaultDock don't exist on Fedora and
-// cause "error when loading applet """ when Plasma executes this script).
-// Panel layout is defined by plasma-org.kde.plasma.desktop-appletsrc in skel.
-// Also removed a2n.blur wallpaper plugin (not installed on Fedora).
+// Patched for Fedora: all Garuda-specific calls removed.
+//
+// loadTemplate call for org.garuda.desktop.defaultPanel was removed because
+// that template does not exist on Fedora — calling a missing template
+// creates an empty containment (plugin="") → "error when loading applet """.
+//
+// a2n.blur wallpaper plugin call was removed (not installed on Fedora).
+//
+// All ConfigFile writes removed:
+//   - kcminputrc RepeatDelay already set in skel/.config/kcminputrc via build.sh
+//   - krunnerrc FreeFloating set in skel/.config/krunnerrc via build.sh
+//   - appletsrc ActionPlugins writes created an invalid KConfig state: writing
+//     [ActionPlugins][0][RightButton;NoModifier] (nested subgroup) while the skel
+//     already has [ActionPlugins][0] RightButton;NoModifier as a flat key — this
+//     same-name key+subgroup collision causes Plasma to generate a ghost containment
+//     with empty plugin, producing "error when loading applet """.
+//
+// Panel layout and ActionPlugins come entirely from the skel appletsrc.
 var plasma = getApiVersion(1)
-
-// Center Krunner on screen
-const krunner = ConfigFile('krunnerrc')
-krunner.group = 'General'
-krunner.writeEntry('FreeFloating', true)
-
-// Keyboard repeat delay 250ms (default 600ms is too slow)
-const kbd = ConfigFile('kcminputrc')
-kbd.group = 'Keyboard'
-kbd.writeEntry('RepeatDelay', 250)
-
-// Desktop context menu actions
-const desktoprc = ConfigFile('plasma-org.kde.plasma.desktop-appletsrc')
-desktoprc.group = "ActionPlugins\x1d0\x1dRightButton;NoModifier"
-desktoprc.writeEntry('_run_command', true)
-desktoprc.writeEntry('_lock_screen', true)
-desktoprc.writeEntry('_logout', true)
-desktoprc.writeEntry('_open_terminal', true)
-desktoprc.writeEntry('_context', true)
-desktoprc.writeEntry('_display_settings', true)
-desktoprc.writeEntry('_wallpaper', true)
-desktoprc.writeEntry('add widgets', true)
-desktoprc.writeEntry('_add panel', true)
-desktoprc.writeEntry('configure', true)
-desktoprc.writeEntry('configure shortcuts', false)
-desktoprc.writeEntry('desktop edit mode', true)
-desktoprc.writeEntry('manage activities', true)
-desktoprc.writeEntry('remove', true)
-desktoprc.writeEntry('_sep1', true)
-desktoprc.writeEntry('_sep2', true)
-desktoprc.writeEntry('_sep3', true)
-desktoprc.writeEntry('_sep4', true)

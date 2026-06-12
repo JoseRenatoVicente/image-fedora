@@ -9,7 +9,7 @@ ARG IMAGE_VENDOR=""
 ARG SHA_HEAD_SHORT=""
 
 # Base Image
-FROM quay.io/fedora-ostree-desktops/kinoite:44@sha256:fc312687c799938cdea45683109a15374164cfd088f24756ee639efcd0a08752
+FROM quay.io/fedora-ostree-desktops/kinoite:44@sha256:61fcd0a1752050c93692d91a663e13681e45eb489aa095783d2880275cbf5406
 
 ARG IMAGE_NAME="fedora"
 ARG IMAGE_PRETTY_NAME="Fedora"
@@ -34,7 +34,7 @@ ARG SHA_HEAD_SHORT=""
 ## Uncomment the following line if one desires to make /opt immutable and be able to be used
 ## by the package manager.
 
-RUN rm /opt && mkdir /opt
+RUN [[ -L /opt ]] && rm /opt && mkdir /opt || true
 
 ### MODIFICATIONS
 ## make modifications desired in your image and install packages by modifying the build.sh script

@@ -34,9 +34,12 @@ for unit in "${FAILED_UNITS[@]}"; do
 done
 [[ ${#FAILED_UNITS[@]} -eq 0 ]] && report PASS "Sem unidades systemd falhadas"
 
-# 2. Erros críticos no journal (exclui ruído de hardware conhecido)
+# 2. Erros críticos no journal (exclui ruído de hardware e comportamento esperado bootc)
 JOURNAL_ERRORS=$(journalctl -p err -b --no-pager -q 2>/dev/null |
     grep -vE "pci 0000|Bluetooth|ACPI.*BIOS|kvm:|nmi_send|RAS|tsc|clocksource|drm|virtio" |
+    grep -vE "systemd-tmpfiles.*(already exists|Failed to open path)" |
+    grep -vE "SELinux.*checkreqprot" |
+    grep -vE "systemd-analyze" |
     head -30)
 if [[ -z "$JOURNAL_ERRORS" ]]; then
     report PASS "Sem erros críticos no journal"

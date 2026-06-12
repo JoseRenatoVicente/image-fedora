@@ -29,11 +29,6 @@ for repo in "$REPOS_DIR"/_copr:copr.fedorainfracloud.org:*.repo; do
     [[ -f "$repo" ]] && check_repo_file "$repo"
 done
 
-echo "--- RPM Fusion ---"
-for repo in "$REPOS_DIR"/rpmfusion-*.repo; do
-    [[ -f "$repo" ]] && check_repo_file "$repo"
-done
-
 echo "--- Terceiros ---"
 for name in vscode.repo tailscale.repo docker-ce.repo; do
     [[ -f "$REPOS_DIR/$name" ]] && check_repo_file "$REPOS_DIR/$name"

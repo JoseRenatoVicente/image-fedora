@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup-user.sh — Configuração de ambiente do usuário (primeira vez)
 # Execute: bash ~/setup-user.sh
-# Instala: NVM/Node.js, Oh My Zsh + Powerlevel10k, eza (cargo), LazyDocker,
+# Instala: NVM/Node.js, Oh My Zsh + Powerlevel10k, LazyDocker,
 #          Homebrew + terraform/kubectl/flux/talosctl, Flatpaks, aliases
 set -euo pipefail
 
@@ -12,8 +12,8 @@ ok()   { printf "\033[1;32m OK:\033[0m %s\n" "$*"; }
 # ── Função segura para baixar e executar scripts ──────────────────────────────
 # Baixa o script, exibe hash para auditoria, e pede confirmação antes de executar
 safe_curl_sh() {
-  local url="$1" desc="$2"
-  shift 2
+  local url="$1" desc="$2" expected_sha="${3:-}"
+  shift 2; [[ -n "$expected_sha" ]] && shift || true
   local tmpscript
   tmpscript="$(mktemp)"
   trap 'rm -f -- "$tmpscript"' RETURN
@@ -23,6 +23,18 @@ safe_curl_sh() {
   echo "  Script: $desc"
   echo "  URL:    $url"
   echo "  SHA256: $hash"
+  if [[ -n "$expected_sha" ]]; then
+    if [[ "$hash" != "$expected_sha" ]]; then
+      warn "Checksum mismatch para $desc!"
+      echo "  Esperado: $expected_sha"
+      echo "  Obtido:   $hash"
+      warn "Isto pode indicar um compromisso do script. Abortando."
+      return 1
+    fi
+    ok "Checksum verificado"
+  else
+    echo "  (sem checksum esperado — verificação manual)"
+  fi
   echo ""
   read -rp "  Executar? [S/n] " resp
   if [[ "${resp,,}" == "n" ]]; then
@@ -31,6 +43,16 @@ safe_curl_sh() {
   fi
   bash "$tmpscript" "$@"
 }
+
+# ── Versões e checksums dos scripts curl-to-bash ─────────────────────────────
+# Atualizar ao mudar versões. Para obter o SHA256:
+#   curl -fsSL <url> | sha256sum
+OMZ_COMMIT="c954bbb168fc645592c50017de0d0e138db8df5f"
+OMZ_SHA256="21043aec5b791ce4835479dc33ba2f92155946aeafd54604a8c83522627cc803"
+BREW_COMMIT="93a25fd2d2fdb86422303c292b9223f84ef23eaf"
+BREW_SHA256="17f204b128869ec71e6b650051f1e65ef5b74cf994c2ff8b919103241554dd2f"
+LAZYDOCKER_COMMIT="7e7aadc2071d58031bf2daafca1fbd4093efc23f"
+LAZYDOCKER_SHA256="57a1a5ca34097da604e19d3b5d0689a47037604d1ab9f8c1bcd0a63bab427359"
 
 if [[ "${EUID}" -eq 0 ]]; then
   echo "Não rode como root. Execute como seu usuário normal."
@@ -114,7 +136,7 @@ fi
 log "Instalando Oh My Zsh"
 if ! done_already "omz"; then
   RUNZSH=no CHSH=no safe_curl_sh \
-    "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh" "Oh My Zsh"
+    "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/${OMZ_COMMIT}/tools/install.sh" "Oh My Zsh (${OMZ_COMMIT:0:8})" "$OMZ_SHA256"
   mark_done "omz"
   ok "Oh My Zsh instalado"
 else
@@ -190,21 +212,18 @@ else
   ok "zsh já é o shell padrão"
 fi
 
-# ── eza via cargo ─────────────────────────────────────────────────────────────
-log "Instalando eza (ls replacement)"
-if ! done_already "eza" && command -v cargo &>/dev/null; then
-  cargo install eza
-  mark_done "eza"
-  ok "eza instalado"
-elif ! command -v cargo &>/dev/null; then
-  warn "cargo não encontrado, pulando eza"
+# ── eza (pré-instalado na imagem base via dnf) ───────────────────────────────
+if command -v eza &>/dev/null; then
+  ok "eza já disponível (instalado na imagem base)"
+else
+  warn "eza não encontrado — deveria estar na imagem base (dnf install eza)"
 fi
 
 # ── LazyDocker ────────────────────────────────────────────────────────────────
 log "Instalando LazyDocker"
 if ! done_already "lazydocker"; then
   mkdir -p "$HOME/bin"
-  safe_curl_sh "https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh" "LazyDocker"
+  safe_curl_sh "https://raw.githubusercontent.com/jesseduffield/lazydocker/${LAZYDOCKER_COMMIT}/scripts/install_update_linux.sh" "LazyDocker (${LAZYDOCKER_COMMIT:0:8})" "$LAZYDOCKER_SHA256"
   mark_done "lazydocker"
   ok "LazyDocker instalado em ~/bin"
 fi
@@ -213,7 +232,7 @@ fi
 log "Instalando Homebrew"
 if ! done_already "homebrew"; then
   NONINTERACTIVE=1 safe_curl_sh \
-    "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh" "Homebrew"
+    "https://raw.githubusercontent.com/Homebrew/install/${BREW_COMMIT}/install.sh" "Homebrew (${BREW_COMMIT:0:8})" "$BREW_SHA256"
   mark_done "homebrew"
   ok "Homebrew instalado"
 else

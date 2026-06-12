@@ -1,5 +1,5 @@
 [ActionPlugins][0]
-MidButton;NoModifier=org.kde.paste
+MiddleButton;NoModifier=org.kde.paste
 RightButton;NoModifier=org.kde.contextmenu
 
 [ActionPlugins][1]
@@ -15,7 +15,7 @@ plugin=org.kde.plasma.desktop
 wallpaperplugin=org.kde.image
 
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/wallpapers/garuda-mokka/Mokka-tree.jpg
+Image=file:///usr/share/wallpapers/Mokka-tree/
 
 [Containments][1][General]
 ToolBoxButtonState=topcenter

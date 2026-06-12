@@ -10,10 +10,15 @@ COPY build_files/test/test-kargs.toml /usr/lib/bootc/kargs.d/20-test-console.tom
 # Auto-login SDDM: inicia sessão KDE sem interação humana
 COPY build_files/test/sddm-autologin.conf /etc/sddm.conf.d/20-autologin.conf
 
-# Utilizador de teste para a sessão gráfica
-RUN useradd -m -G wheel testuser && \
+# Utilizador de teste — padrão correto para imagem atómica bootc:
+#   sysusers.d declara o utilizador; tmpfiles.d cria o home a partir do skel no primeiro boot
+COPY build_files/test/sysusers-testuser.conf /usr/lib/sysusers.d/testuser.conf
+COPY build_files/test/tmpfiles-testuser.conf /usr/lib/tmpfiles.d/testuser-home.conf
+
+RUN systemd-sysusers /usr/lib/sysusers.d/testuser.conf && \
     echo "testuser:testpass" | chpasswd && \
-    echo "testuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/testuser
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/testuser && \
+    rm -rf /run/dnf
 
 # Health check
 COPY build_files/test/boot-health-check.sh /usr/lib/bootc-test/boot-health-check.sh

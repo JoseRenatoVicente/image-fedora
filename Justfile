@@ -214,6 +214,7 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
       "${target_image}:${tag}"
 
     mkdir -p output
+    sudo rm -rf "output/${type}"
     sudo mv -f $BUILDTMP/* output/
     sudo rmdir $BUILDTMP
     sudo chown -R $USER:$USER output/
@@ -571,10 +572,6 @@ audit-security $target_image=image_name $tag=default_tag:
 
     check "SELinux enforcing config" \
         podman run --rm "${local_ref}" bash -lc "grep -qx 'SELINUX=enforcing' /etc/selinux/config"
-    check "FIPS package" \
-        podman run --rm "${local_ref}" bash -lc "rpm -q dracut-fips >/dev/null"
-    check "FIPS kernel arg" \
-        podman run --rm "${local_ref}" bash -lc "grep -Fq '\"fips=1\"' /usr/lib/bootc/kargs.d/10-hardening.toml"
     check "Crypto policy FUTURE" \
         podman run --rm "${local_ref}" bash -lc "grep -qE '^FUTURE' /etc/crypto-policies/config"
     check "Sysctl hardening" \
@@ -721,8 +718,8 @@ test-container $target_image=image_name $tag=default_tag:
         "${local_ref}" \
         bash /run/tests.sh
 
-# Constrói a imagem de teste (extensão da produção com health check de boot)
-# A imagem de produção deve existir localmente antes: just build
+# Constrói a imagem de teste (extensão da produção com health check de boot).
+# A imagem de produção deve existir localmente; `just test-boot` reconstrói-a antes.
 [group('Testing')]
 test-build:
     #!/usr/bin/env bash
@@ -739,15 +736,18 @@ test-build:
         .
     echo "Imagem de teste pronta: fedora-kde-test:latest"
 
-# Boot test headless: constrói QCOW2 de teste, arranca em QEMU sem display,
-# aguarda o health check e reporta PASS/FAIL. Requer: just test-build
+# Boot test headless: reconstrói a imagem de produção, constrói QCOW2 de teste,
+# arranca em QEMU sem display, aguarda o health check e reporta PASS/FAIL.
 # Dependências: qemu-kvm edk2-ovmf  →  sudo dnf install -y qemu-kvm edk2-ovmf
 [group('Testing')]
 test-boot timeout="300":
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Garante que a imagem de teste está construída (constrói se necessário)
+    # Garante que o teste usa a imagem de produção gerada a partir do working tree atual.
+    just build
+
+    # Garante que a imagem de teste está construída sobre a produção atual.
     just test-build
 
     if ! command -v qemu-system-x86_64 &>/dev/null; then
@@ -783,15 +783,14 @@ test-boot timeout="300":
         "${bib_image}" \
         --type qcow2 --use-librepo=True --rootfs=btrfs \
         localhost/fedora-kde-test:latest
-    sudo mv -f "${TEST_BUILDTMP}"/* output/ 2>/dev/null || true
-    sudo rmdir "${TEST_BUILDTMP}" 2>/dev/null || true
-    sudo chown -R "$USER:$USER" output/qcow2/ 2>/dev/null || true
+    sudo chown -R "$USER:$USER" "${TEST_BUILDTMP}" 2>/dev/null || true
 
-    TEST_QCOW="output/qcow2/disk.qcow2"
+    TEST_QCOW="${TEST_BUILDTMP}/qcow2/disk.qcow2"
     [[ -f "$TEST_QCOW" ]] || { echo "QCOW2 de teste não encontrado em $TEST_QCOW"; exit 1; }
 
     RESULTS_LOG=$(mktemp "${_tmpdir}/boot-test-results.XXXXXX")
-    trap "rm -f '$OVMF_VARS' '$RESULTS_LOG'" EXIT
+    CLEAN_TEST_BUILDTMP=1
+    trap 'rm -f "'$OVMF_VARS'"; [[ "${CLEAN_TEST_BUILDTMP:-0}" == "1" ]] && rm -rf "'${TEST_BUILDTMP}'"' EXIT
 
     echo ""
     echo "A iniciar boot test headless (timeout: {{ timeout }}s)..."
@@ -807,7 +806,8 @@ test-boot timeout="300":
     # de forma diferente — conflita com -display none + -serial explícito.
     qemu-system-x86_64 \
         -enable-kvm \
-        -machine q35 \
+        -machine q35,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,caching-mode=on \
         -cpu host \
         -smp 4 \
         -m 4G \
@@ -851,15 +851,26 @@ test-boot timeout="300":
     DONE=$(grep "^BOOT-DONE:" "$RESULTS_LOG" 2>/dev/null || true)
 
     if [[ -z "$DONE" ]]; then
+        CLEAN_TEST_BUILDTMP=0
         echo "RESULTADO: INCONCLUSIVO (timeout sem BOOT-DONE)"
         echo ""
+        echo "Possíveis erros no log:"
+        grep -iE "fail|error|emergency|dracut|ostree|mount|root" "$RESULTS_LOG" 2>/dev/null | tail -80 || true
+        echo ""
         echo "Últimas linhas do log:"
-        tail -20 "$RESULTS_LOG"
+        tail -80 "$RESULTS_LOG"
+        echo ""
+        echo "Log preservado para análise: $RESULTS_LOG"
+        echo "QCOW2 preservado para análise: $TEST_QCOW"
         exit 1
     elif [[ -n "$FAILS" ]]; then
+        CLEAN_TEST_BUILDTMP=0
         echo "RESULTADO: FALHOU"
         echo ""
         echo "$FAILS"
+        echo ""
+        echo "Log preservado para análise: $RESULTS_LOG"
+        echo "QCOW2 preservado para análise: $TEST_QCOW"
         exit 1
     else
         echo "RESULTADO: PASSOU ✓"

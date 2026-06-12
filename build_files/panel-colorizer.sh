@@ -1,14 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
+trap '[[ $BASH_COMMAND != log* ]] && echo "+ $BASH_COMMAND"' DEBUG
+
 log() { printf "\n\033[1;34m==> %s\033[0m\n" "$*"; }
 
 TMPDIR_PC="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_PC"' EXIT
 
-log "Clonando Panel Colorizer v7.2.0"
-git clone --depth=1 --branch v7.2.0 https://github.com/luisbocanegra/plasma-panel-colorizer \
-  "$TMPDIR_PC/plasma-panel-colorizer"
+log "Baixando Panel Colorizer v7.2.0"
+curl -L --fail --retry 3 --retry-delay 5 \
+  -o "$TMPDIR_PC/panel-colorizer.tar.gz" \
+  "https://github.com/luisbocanegra/plasma-panel-colorizer/archive/refs/tags/v7.2.0.tar.gz"
+tar -xzf "$TMPDIR_PC/panel-colorizer.tar.gz" -C "$TMPDIR_PC"
+PC_SRC="$(find "$TMPDIR_PC" -maxdepth 1 -type d -name 'plasma-panel-colorizer-*' | head -n1)"
+[[ -n "$PC_SRC" ]] || { echo "ERROR: diretório plasma-panel-colorizer não encontrado em $TMPDIR_PC"; exit 1; }
+mv "$PC_SRC" "$TMPDIR_PC/plasma-panel-colorizer"
 
 cd "$TMPDIR_PC/plasma-panel-colorizer"
 

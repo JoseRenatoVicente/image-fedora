@@ -2,3 +2,7 @@ cosign.key
 _build_*
 output
 _build-*/**
+
+# Artefactos de tooling (superpowers/opencode)
+docs/superpowers/plans/
+docs/superpowers/specs/

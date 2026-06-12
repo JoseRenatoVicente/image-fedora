@@ -11,7 +11,6 @@ REQUIRED_PACKAGES=(
     distrobox
     earlyoom
     fastfetch
-    ffmpeg
     firewalld
     gamemode
     git-credential-libsecret
@@ -31,7 +30,13 @@ REQUIRED_PACKAGES=(
     zsh
 )
 for pkg in "${REQUIRED_PACKAGES[@]}"; do
-    rpm -q "$pkg" > /dev/null 2>&1 || fail "Pacote ausente: $pkg"
+    if [[ "$pkg" == "ffmpeg" ]]; then
+        # Fedora repos ship 'ffmpeg-free'; RPM Fusion ships 'ffmpeg'. Accept either.
+        rpm -q ffmpeg &>/dev/null || rpm -q ffmpeg-free &>/dev/null \
+            || fail "Pacote ausente: ffmpeg (nem ffmpeg nem ffmpeg-free instalado)"
+    else
+        rpm -q "$pkg" > /dev/null 2>&1 || fail "Pacote ausente: $pkg"
+    fi
 done
 
 echo "=== Pacotes indesejados ==="
@@ -58,11 +63,18 @@ REQUIRED_UNITS=(
     chronyd.service
     flatpak-nuke-fedora.service
     input-remapper.service
+    rpm-ostreed-automatic.timer
+    podman-auto-update.timer
 )
 for unit in "${REQUIRED_UNITS[@]}"; do
     systemctl is-enabled "$unit" 2>/dev/null | grep -q "^enabled$" \
         || fail "Serviço não habilitado: $unit"
 done
+# flatpak-system-update.timer é opcional: não existe em todas as versões do Kinoite
+if systemctl list-unit-files flatpak-system-update.timer &>/dev/null; then
+    systemctl is-enabled flatpak-system-update.timer 2>/dev/null | grep -q "^enabled$" \
+        || fail "Serviço não habilitado: flatpak-system-update.timer"
+fi
 # dconf-update.service é opcional: não existe em todas as versões do Kinoite
 if systemctl list-unit-files dconf-update.service &>/dev/null; then
     systemctl is-enabled dconf-update.service 2>/dev/null | grep -q "^enabled$" \
@@ -74,6 +86,7 @@ REQUIRED_FILES=(
     /etc/sysctl.d/60-security-hardening.conf
     /etc/sysctl.d/99-performance.conf
     /usr/lib/bootc/kargs.d/10-hardening.toml
+    /etc/dracut.conf.d/01-ostree-required.conf
     /etc/dracut.conf.d/99-omit-firewire.conf
     /etc/dracut.conf.d/99-omit-thunderbolt.conf
     /etc/dracut.conf.d/90-luks-security.conf
@@ -99,10 +112,31 @@ REQUIRED_FILES=(
     /usr/share/qt6/qtlogging.ini
     /usr/share/wireplumber/wireplumber.conf.d/51-disable-suspension.conf
     /usr/bin/dnf
+    /usr/lib/tmpfiles.d/fedora-kde-root-theme.conf
+    /usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg
 )
 for f in "${REQUIRED_FILES[@]}"; do
     [[ -e "$f" ]] || fail "Ficheiro/directório ausente: $f"
 done
+# initramfs: determined dynamically from installed kernel version
+KVER=$(ls /usr/lib/modules 2>/dev/null | sort -V | tail -1)
+if [[ -n "$KVER" ]]; then
+    INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
+    [[ -s "$INITRAMFS" ]] || fail "Initramfs ausente ou vazio: $INITRAMFS (bib não consegue gerar disco de arranque)"
+    # build.sh verifies the actual initramfs content immediately after dracut.
+    # Here we verify the dracut config that guarantees ostree is always included.
+fi
+
+echo "=== Boot: GRUB timeout e kargs ==="
+GRUB_TIMEOUT_CFG="/usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg"
+grep -q 'set timeout=0' "$GRUB_TIMEOUT_CFG" \
+    || fail "GRUB: timeout não é 0 em $GRUB_TIMEOUT_CFG"
+grep -q 'timeout_style=hidden' "$GRUB_TIMEOUT_CFG" \
+    || fail "GRUB: timeout_style não é hidden"
+grep -q '"quiet"' /usr/lib/bootc/kargs.d/10-hardening.toml \
+    || fail "kargs: 'quiet' ausente (necessário para boot silencioso)"
+grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml \
+    || fail "kargs: 'splash' ausente (necessário para Plymouth)"
 
 echo "=== Hardening ==="
 grep -qx 'SELINUX=enforcing' /etc/selinux/config \
@@ -142,6 +176,71 @@ if [[ -f "$APPLETSRC" ]]; then
 else
     fail "appletsrc de skel ausente: $APPLETSRC"
 fi
+
+echo "=== SDDM tema ==="
+SDDM_CONF="/etc/sddm.conf.d/10-theme.conf"
+[[ -f "$SDDM_CONF" ]] || fail "SDDM: ficheiro de config ausente: $SDDM_CONF"
+grep -q '^Current=Catppuccin-Mocha-Mauve$' "$SDDM_CONF" \
+    || fail "SDDM: tema não é Catppuccin-Mocha-Mauve ($(grep '^Current=' "$SDDM_CONF" || echo 'não definido'))"
+[[ -d "/usr/share/sddm/themes/Catppuccin-Mocha-Mauve" ]] \
+    || fail "SDDM: directório do tema Catppuccin-Mocha-Mauve ausente"
+
+echo "=== Lock screen ==="
+LOCK_CFG="/etc/skel/.config/kscreenlockerrc"
+if [[ -f "$LOCK_CFG" ]]; then
+    grep -q '^Theme=Mokka' "$LOCK_CFG" \
+        && fail "kscreenlockerrc: Theme=Mokka inválido (Mokka não tem QML de lockscreen)"
+    LOCK_WALL=$(sed -n '/^\[Greeter\]\[Wallpaper\]\[org.kde.image\]\[General\]$/,/^\[/{s/^Image=//p}' \
+        "$LOCK_CFG" 2>/dev/null | head -1)
+    if [[ -n "$LOCK_WALL" ]]; then
+        LOCK_WALL_PATH="${LOCK_WALL#file://}"
+        [[ -e "$LOCK_WALL_PATH" ]] || fail "Lock screen: wallpaper não existe: $LOCK_WALL_PATH"
+    fi
+fi
+
+echo "=== GTK tema ==="
+GTK3_CONF="/etc/skel/.config/gtk-3.0/settings.ini"
+if [[ -f "$GTK3_CONF" ]]; then
+    GTK_THEME=$(sed -n 's/^gtk-theme-name=//p' "$GTK3_CONF" | head -1)
+    if [[ -n "$GTK_THEME" ]]; then
+        [[ -d "/usr/share/themes/$GTK_THEME" ]] \
+            || fail "GTK: tema '$GTK_THEME' referenciado no skel mas não instalado"
+    fi
+fi
+
+echo "=== Tema Mokka ==="
+MOKKA_DIR="/usr/share/plasma/look-and-feel/Mokka"
+[[ -d "$MOKKA_DIR" ]] || fail "Mokka: look-and-feel ausente: $MOKKA_DIR"
+
+SPLASH_QML="$MOKKA_DIR/contents/splash/Splash.qml"
+[[ -f "$SPLASH_QML" ]] || fail "Mokka: Splash.qml ausente"
+grep -wq 'sizes' "$SPLASH_QML" && fail "Mokka Splash.qml: variável 'sizes' não corrigida (patch não aplicado)"
+
+MOKKA_DEFAULTS="$MOKKA_DIR/contents/defaults"
+[[ -f "$MOKKA_DEFAULTS" ]] || fail "Mokka: ficheiro defaults ausente"
+grep -q 'Catppuccin-Mocha-Mauve-splash' "$MOKKA_DEFAULTS" && \
+    fail "Mokka defaults: KSplash ainda referencia 'Catppuccin-Mocha-Mauve-splash' (patch não aplicado)"
+grep -q 'garuda-mokka' "$MOKKA_DEFAULTS" && \
+    fail "Mokka defaults: ainda referencia path 'garuda-mokka' (wallpaper lock screen não corrigido)"
+
+LAYOUT_JS="$MOKKA_DIR/contents/layouts/org.kde.plasma.desktop-layout.js"
+[[ -f "$LAYOUT_JS" ]] || fail "Mokka: layout.js ausente"
+grep -qE 'loadTemplate\s*\(|a2n\.blur\s*\(' "$LAYOUT_JS" && \
+    fail "Mokka layout.js: ainda contém chamadas Garuda-específicas (patch não aplicado)"
+# ConfigFile writes to appletsrc create key+subgroup collision → ghost containment → empty applet error
+grep -qE 'ConfigFile\s*\(\s*['"'"'"]plasma-org\.kde\.plasma\.desktop-appletsrc' "$LAYOUT_JS" && \
+    fail "Mokka layout.js: ainda escreve em appletsrc via ConfigFile (causa 'error when loading applet \"\"')"
+
+[[ -f "/usr/share/color-schemes/Mokka.colors" ]] || fail "Mokka: color scheme ausente"
+[[ -d "/usr/share/plasma/desktoptheme/Mokka" ]]  || fail "Mokka: desktop theme ausente"
+
+APPLETSRC_WALL=$(grep '^Image=' /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null | head -1 | sed 's|^Image=file://||')
+if [[ -n "$APPLETSRC_WALL" ]]; then
+    [[ -e "$APPLETSRC_WALL" ]] || fail "Mokka: wallpaper referenciado no skel não existe: $APPLETSRC_WALL"
+fi
+
+ICON_THEME=$(sed -n '/^\[Icons\]/,/^\[/{s/^Theme=//p}' /etc/skel/.config/kdeglobals 2>/dev/null | head -1)
+[[ -n "$ICON_THEME" ]] && { [[ -d "/usr/share/icons/$ICON_THEME" ]] || fail "Mokka: tema de ícones ausente: $ICON_THEME"; }
 
 echo "=== Plasma: Panel Colorizer (se instalado) ==="
 PC_DIR="/usr/share/plasma/plasmoids/luisbocanegra.panelcolorizer"

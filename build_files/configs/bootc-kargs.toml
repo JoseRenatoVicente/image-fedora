@@ -2,6 +2,9 @@
 # Instalado em /usr/lib/bootc/kargs.d/10-hardening.toml
 
 kargs = [
+  # Boot appearance: quiet suppresses kernel/initrd text; splash shows Plymouth graphical screen
+  "quiet",
+  "splash",
   "hash_pointers=always",
   "init_on_alloc=1",
   "intel_iommu=on",
@@ -13,6 +16,10 @@ kargs = [
   "lockdown=integrity",
   "loglevel=0",
   "mitigations=auto",
+  # module.sig_enforce=1: rejeita módulos de kernel não assinados.
+  # Drivers NVIDIA via rpm-ostree install (kmod-nvidia) são assinados pelo
+  # Fedora e funcionam normalmente. Módulos compilados localmente via DKMS
+  # NÃO são suportados em sistemas atômicos e seriam rejeitados.
   "module.sig_enforce=1",
   "page_alloc.shuffle=1",
   "proc_mem.force_override=ptrace",

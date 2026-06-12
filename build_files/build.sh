@@ -16,14 +16,12 @@ source /ctx/shared/copr-helpers.sh
 # ─── Setup ────────────────────────────────────────────────────────────────────
 echo "::group:: Setup"
 install -Dm644 /ctx/configs/dnf-performance.conf /etc/dnf/conf.d/performance.conf
+# Ensure the ostree dracut module is always included in any initramfs generated
+# during this build — including those triggered by dnf package scripts before
+# our explicit dracut step.  Without this, initrd-switch-root.service fails
+# because ostree-prepare-root.service is absent from the initrd.
+echo 'add_dracutmodules+=" ostree "' > /etc/dracut.conf.d/01-ostree-required.conf
 dnf5 install -y dnf5-plugins
-echo "::endgroup::"
-
-# ─── RPM Fusion ───────────────────────────────────────────────────────────────
-echo "::group:: RPM Fusion"
-dnf5 install -y \
-    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
-    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
 echo "::endgroup::"
 
 # ─── Versionlock KDE/Qt ───────────────────────────────────────────────────────
@@ -60,9 +58,8 @@ PACKAGES=(
     # Dev tools
     git curl unzip tar jq make gettext
     # CLI tools
-    bat btop fd-find ripgrep fastfetch
-    neovim luarocks tree-sitter-cli
-    python3-pip python3-virtualenv
+    bat btop fd-find ripgrep fastfetch eza
+    neovim
     inotify-tools xsel numlockx
     util-linux-user zsh
     # Terminal
@@ -73,7 +70,6 @@ PACKAGES=(
     ffmpeg
     gstreamer1-plugins-base gstreamer1-plugins-good
     gstreamer1-plugin-openh264
-    pipewire-codec-aptx
     # Gaming
     gamemode
     # Sistema
@@ -99,17 +95,11 @@ PACKAGES=(
     rsync libsass sassc
 )
 dnf5 install -y --allowerasing "${PACKAGES[@]}"
-
-# Desabilitar RPM Fusion imediatamente após instalar os pacotes
-for repo in rpmfusion-free rpmfusion-free-updates rpmfusion-nonfree rpmfusion-nonfree-updates; do
-    [[ -f "/etc/yum.repos.d/${repo}.repo" ]] && \
-        sed -i 's@enabled=1@enabled=0@g' "/etc/yum.repos.d/${repo}.repo"
-done
 echo "::endgroup::"
 
 # ─── VS Code (isolado) ────────────────────────────────────────────────────────
 echo "::group:: VS Code"
-rpm --import https://packages.microsoft.com/keys/microsoft.asc
+curl -sL --fail --retry 3 --retry-delay 5 https://packages.microsoft.com/keys/microsoft.asc | rpm --import -
 cat > /etc/yum.repos.d/vscode.repo << 'EOF'
 [code]
 name=Visual Studio Code
@@ -150,9 +140,19 @@ install -Dm644 /ctx/configs/modprobe-hardening.conf \
     /etc/modprobe.d/security-hardening.conf
 install -Dm644 /ctx/configs/modprobe-framebuffer-blacklist.conf \
     /etc/modprobe.d/blacklist-framebuffer.conf
+# IPSec blacklist opcional — não ativo por defeito (quebraria VPNs).
+# O utilizador pode copiar para /etc/modprobe.d/ se não usar VPN.
+install -Dm644 /ctx/configs/modprobe-ipsec-blacklist.conf \
+    /usr/share/fedora-hardening/modprobe-ipsec-blacklist.conf
 
 install -Dm644 /ctx/configs/bootc-kargs.toml \
     /usr/lib/bootc/kargs.d/10-hardening.toml
+
+# GRUB: hide the boot menu and boot immediately.
+# Overrides the 1-second menu in grub-static-pre.cfg (shipped by bootupd).
+# The user can still reach the GRUB menu by holding Shift/Escape at power-on.
+install -Dm644 /ctx/configs/grub-timeout.cfg \
+    /usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg
 
 install -Dm644 /ctx/configs/limits-coredump.conf \
     /etc/security/limits.d/60-disable-coredump.conf
@@ -305,11 +305,24 @@ install -Dm644 /ctx/skel/.config/autostart/kwin-vm-compat.desktop \
 install -Dm644 /ctx/skel/.config/plasma-org.kde.plasma.desktop-appletsrc \
     /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc
 
-# Patch Mokka layout.js: remove Garuda-specific loadTemplate calls and a2n.blur.
-# Without this, if Plasma runs the script on look-and-feel change, it creates
-# containments with empty plugin IDs → "error when loading applet """.
+# Root user KDE config: /root is /var/roothome (mutable, empty at boot).
+# tmpfiles.d C entries copy skel config to root on first boot if files don't exist.
+install -Dm644 /ctx/configs/tmpfiles-root-kde.conf \
+    /usr/lib/tmpfiles.d/fedora-kde-root-theme.conf
+
+# Patch Mokka layout.js: remove Garuda-specific loadTemplate / a2n.blur calls and
+# all ConfigFile writes to plasma-org.kde.plasma.desktop-appletsrc.
+# Writing [ActionPlugins][0][RightButton;NoModifier] (nested subgroup) while the
+# skel already has [ActionPlugins][0] with RightButton;NoModifier as a flat key
+# creates an invalid KConfig state → Plasma generates a ghost containment with
+# empty plugin → "error when loading applet """.
 install -Dm644 /ctx/configs/mokka-layout.js \
     /usr/share/plasma/look-and-feel/Mokka/contents/layouts/org.kde.plasma.desktop-layout.js
+
+# KRunner: float KRunner in the center of the screen (moved here from layout.js
+# to avoid ConfigFile writes that conflict with the skel appletsrc).
+kwriteconfig6 --file /etc/skel/.config/krunnerrc \
+    --group General --key FreeFloating "true"
 
 # Fix Mokka Splash.qml: 'sizes' is not defined — typo in the Garuda package (should be 'size')
 # Replace all word-bounded occurrences; 'sizes' appears in multiple lines (width, height, etc.)
@@ -319,6 +332,11 @@ sed -i 's/\bsizes\b/size/g' \
 # Fix KSplash theme: Mokka defaults reference 'Catppuccin-Mocha-Mauve-splash' which
 # is not installed. Use 'Mokka' (the look-and-feel's own splash screen, now fixed above).
 sed -i 's/^Theme=Catppuccin-Mocha-Mauve-splash$/Theme=Mokka/' \
+    /usr/share/plasma/look-and-feel/Mokka/contents/defaults
+
+# Fix lock screen wallpaper: Mokka defaults reference garuda-mokka/ path which does not
+# exist on Fedora. Wallpaper is installed as a KDE package at Mokka-tree/.
+sed -i 's|^Image=file:///usr/share/wallpapers/garuda-mokka/Mokka-tree\.jpg$|Image=file:///usr/share/wallpapers/Mokka-tree/|' \
     /usr/share/plasma/look-and-feel/Mokka/contents/defaults
 
 # KSplash skel config
@@ -411,6 +429,34 @@ kwriteconfig6 --file /etc/skel/.config/kwinrc \
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group NightColor --key TransitionTime "30"
 
+# ── Ecrã de bloqueio (lock screen) ───────────────────────────────────────────
+# O Garuda skel instala kscreenlockerrc com Theme=Mokka (inválido: Mokka não tem
+# QML de lockscreen) e com wallpaper a apontar para o background do SDDM em vez
+# do Mokka-tree. Sobrescrever ambos os valores problemáticos.
+kwriteconfig6 --file /etc/skel/.config/kscreenlockerrc \
+    --group Greeter --key Theme --delete 2>/dev/null || true
+kwriteconfig6 --file /etc/skel/.config/kscreenlockerrc \
+    --group Greeter --key WallpaperPlugin "org.kde.image"
+kwriteconfig6 --file /etc/skel/.config/kscreenlockerrc \
+    --group Greeter --group Wallpaper --group "org.kde.image" --group General \
+    --key Image "file:///usr/share/wallpapers/Mokka-tree/"
+
+# ── GTK themes ────────────────────────────────────────────────────────────────
+# O Garuda skel tem gtk-theme-name=Catppuccin-Purple-Dark-Catppuccin (não instalado)
+# e ícones/fontes errados. Sobrescrever com os nossos valores correctos.
+kwriteconfig6 --file /etc/skel/.config/gtk-3.0/settings.ini \
+    --group Settings --key gtk-theme-name "catppuccin-mocha-mauve-standard+default"
+kwriteconfig6 --file /etc/skel/.config/gtk-3.0/settings.ini \
+    --group Settings --key gtk-icon-theme-name "Tela-circle-dracula-dark"
+kwriteconfig6 --file /etc/skel/.config/gtk-3.0/settings.ini \
+    --group Settings --key gtk-font-name "JetBrains Mono, 10"
+kwriteconfig6 --file /etc/skel/.config/gtk-4.0/settings.ini \
+    --group Settings --key gtk-theme-name "catppuccin-mocha-mauve-standard+default"
+kwriteconfig6 --file /etc/skel/.config/gtk-4.0/settings.ini \
+    --group Settings --key gtk-icon-theme-name "Tela-circle-dracula-dark"
+kwriteconfig6 --file /etc/skel/.config/gtk-4.0/settings.ini \
+    --group Settings --key gtk-font-name "JetBrains Mono, 10"
+
 # ── Power management ──────────────────────────────────────────────────────────
 kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
     --group "AC" --group "Performance" --key PowerProfile "performance"
@@ -439,6 +485,12 @@ systemctl enable earlyoom
 systemctl enable firewalld
 systemctl enable chronyd
 systemctl enable bluetooth.service bluetooth.target
+# Auto-updates: manter o sistema instalado actualizado automaticamente
+systemctl enable rpm-ostreed-automatic.timer
+systemctl enable podman-auto-update.timer
+systemctl list-unit-files flatpak-system-update.timer &>/dev/null \
+    && systemctl enable flatpak-system-update.timer \
+    || echo "INFO: flatpak-system-update.timer não existe nesta base, ignorando"
 if systemctl list-unit-files dconf-update.service &>/dev/null; then
     systemctl enable dconf-update.service
 else
@@ -469,7 +521,29 @@ FOUND_BUILD_DEPS=()
 for pkg in "${BUILD_DEPS[@]}"; do
     rpm -q "$pkg" &>/dev/null && FOUND_BUILD_DEPS+=("$pkg")
 done
-[[ ${#FOUND_BUILD_DEPS[@]} -gt 0 ]] && dnf5 remove -y "${FOUND_BUILD_DEPS[@]}"
+[[ ${#FOUND_BUILD_DEPS[@]} -gt 0 ]] && dnf5 remove -y --setopt=clean_requirements_on_remove=True "${FOUND_BUILD_DEPS[@]}"
+echo "::endgroup::"
+
+# ─── Validate initramfs ───────────────────────────────────────────────────────
+# The base Kinoite image ships a known-good initramfs.img.  Do not overwrite it
+# in a container build: dracut can generate an initramfs that lacks bootc/ostree
+# assumptions and drops the VM into dracut emergency mode before root is mounted.
+# bootc-image-builder only needs the file to exist at /usr/lib/modules/<kver>/.
+echo "::group:: Initramfs"
+KVER=$(ls /usr/lib/modules | sort -V | tail -1)
+INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
+[[ -s "$INITRAMFS" ]] || {
+    echo "FATAL: initramfs ausente ou vazio: $INITRAMFS"
+    echo "A base bootc deve fornecer este ficheiro; não regenerar via dracut no build."
+    exit 1
+}
+INITRD_MODS=$(lsinitrd --mod "$INITRAMFS" 2>/dev/null)
+echo "Módulos dracut no initramfs:"
+printf '%s\n' "$INITRD_MODS" | \
+    grep -v '^$\|^Image\|^====\|Early CPIO\|^drw\|-rw-\|microcode\|^kernel\|^Version'
+printf '%s\n' "$INITRD_MODS" | grep -qE '^[[:space:]]*(50)?ostree[[:space:]]*$' \
+    || { echo "FATAL: módulo ostree ausente no initramfs da base!"; exit 1; }
+echo "✓ ostree presente no initramfs"
 echo "::endgroup::"
 
 # ─── Cleanup final ────────────────────────────────────────────────────────────
@@ -478,9 +552,13 @@ dnf5 versionlock clear
 dnf5 clean all
 rm -rf /var/cache/dnf /var/log/dnf* /var/log/hawkey*
 rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
-find /usr/share/locale -mindepth 1 -maxdepth 1 \
+LOCALE_REMOVED=0
+while IFS= read -r -d '' dir; do
+    rm -rf "$dir" && ((++LOCALE_REMOVED))
+done < <(find /usr/share/locale -mindepth 1 -maxdepth 1 \
     ! -name 'pt_BR' ! -name 'en_US' ! -name 'locale.alias' \
-    -exec rm -rf {} + 2>/dev/null || true
+    -print0)
+echo "Locales removidos: $LOCALE_REMOVED (mantidos: pt_BR, en_US)"
 echo "::endgroup::"
 
 # ─── Validate repos ───────────────────────────────────────────────────────────

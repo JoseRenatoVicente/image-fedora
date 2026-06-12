@@ -1,3 +1,9 @@
 # Adiciona console serial para capturar output do health check via QEMU -serial
 # Aplicado apenas na imagem de teste (Containerfile.test), não na produção
-kargs = ["console=ttyS0,115200n8"]
+kargs = [
+  "console=ttyS0,115200n8",
+  # Override loglevel=0 da imagem de produção para capturar erros de boot no serial.
+  # 20-test-console.toml ordena-se depois de 10-hardening.toml, portanto o kernel
+  # usa este valor (último parâmetro duplicado vence na cmdline Linux).
+  "loglevel=4",
+]
