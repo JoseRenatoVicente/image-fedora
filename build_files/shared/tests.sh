@@ -7,10 +7,10 @@ fail() { echo "FAIL: $*" >&2; FAILED=1; }
 
 echo "=== Pacotes obrigatórios ==="
 REQUIRED_PACKAGES=(
-    code
     distrobox
     earlyoom
     fastfetch
+    ffmpeg
     firewalld
     gamemode
     git-credential-libsecret
@@ -41,6 +41,7 @@ done
 
 echo "=== Pacotes indesejados ==="
 UNWANTED_PACKAGES=(
+    code
     firefox
     kmahjongg
     kpat
@@ -53,6 +54,20 @@ for pkg in "${UNWANTED_PACKAGES[@]}"; do
         fail "Pacote indesejado presente: $pkg"
     fi
 done
+[[ ! -e /etc/yum.repos.d/vscode.repo ]] \
+    || fail "Repo VS Code não deve existir na imagem base: /etc/yum.repos.d/vscode.repo"
+
+echo "=== sudo → run0 (alias) ==="
+# Nota: o pacote sudo NÃO é removido — plasma-workspace exige kdesu→sudo. Apenas
+# adicionamos run0 + alias interativo.
+[[ -x /usr/bin/run0 ]] || fail "run0 ausente (deveria vir com o systemd)"
+grep -q "alias sudo='run0'" /etc/profile.d/run0-alias.sh \
+    || fail "alias sudo→run0 ausente em /etc/profile.d/run0-alias.sh"
+
+echo "=== rpmfusion removido ==="
+if compgen -G "/etc/yum.repos.d/rpmfusion-*.repo" > /dev/null; then
+    fail "Repos rpmfusion ainda presentes: $(echo /etc/yum.repos.d/rpmfusion-*.repo)"
+fi
 
 echo "=== Serviços systemd ==="
 REQUIRED_UNITS=(
@@ -62,6 +77,7 @@ REQUIRED_UNITS=(
     firewalld.service
     chronyd.service
     flatpak-nuke-fedora.service
+    flathub-system-setup.service
     input-remapper.service
     rpm-ostreed-automatic.timer
     podman-auto-update.timer
@@ -87,6 +103,7 @@ REQUIRED_FILES=(
     /etc/sysctl.d/99-performance.conf
     /usr/lib/bootc/kargs.d/10-hardening.toml
     /etc/dracut.conf.d/01-ostree-required.conf
+    /etc/dracut.conf.d/02-drm-drivers.conf
     /etc/dracut.conf.d/99-omit-firewire.conf
     /etc/dracut.conf.d/99-omit-thunderbolt.conf
     /etc/dracut.conf.d/90-luks-security.conf
@@ -95,7 +112,7 @@ REQUIRED_FILES=(
     /etc/selinux/config
     /etc/chrony.conf
     /etc/rpm-ostreed.conf
-    /etc/sddm.conf.d/10-theme.conf
+    /etc/plasmalogin.conf.d/10-theme.conf
     /etc/xdg/plasma-welcomerc
     /etc/systemd/zram-generator.conf
     /etc/systemd/system.conf.d/timeout.conf
@@ -103,6 +120,13 @@ REQUIRED_FILES=(
     /etc/security/limits.d/50-memlock.conf
     /etc/dnf/conf.d/no-weak-deps.conf
     /usr/lib/systemd/system/flatpak-nuke-fedora.service
+    /usr/lib/systemd/system/flathub-system-setup.service
+    /usr/share/flatpak/flathub.flatpakrepo
+    /etc/plasma-setup-done
+    /etc/udev/rules.d/99-input-remapper.rules
+    /etc/locale.conf
+    /usr/bin/run0
+    /etc/profile.d/run0-alias.sh
     /usr/lib/udev/rules.d/60-io-schedulers.rules
     /usr/lib/udev/rules.d/80-gpu-reset.rules
     /usr/lib/modules-load.d/wine-ntsync.conf
@@ -124,7 +148,11 @@ if [[ -n "$KVER" ]]; then
     INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
     [[ -s "$INITRAMFS" ]] || fail "Initramfs ausente ou vazio: $INITRAMFS (bib não consegue gerar disco de arranque)"
     # build.sh verifies the actual initramfs content immediately after dracut.
-    # Here we verify the dracut config that guarantees ostree is always included.
+    # virtio_gpu (ficheiro virtio-gpu.ko) ajuda o Plymouth em VM (evita o handoff
+    # simpledrm→virtio_gpu). NÃO-crítico: só avisa, não falha o build (no HW real
+    # o Plymouth funciona com o driver nativo; a imagem arranca bem sem isto).
+    lsinitrd "$INITRAMFS" 2>/dev/null | grep -qiE 'virtio.gpu\.ko' \
+        || echo "INFO: initramfs sem virtio_gpu (Plymouth em VM pode não aparecer; HW real ok)"
 fi
 
 echo "=== Boot: GRUB timeout e kargs ==="
@@ -135,6 +163,8 @@ grep -q 'timeout_style=hidden' "$GRUB_TIMEOUT_CFG" \
     || fail "GRUB: timeout_style não é hidden"
 grep -q '"quiet"' /usr/lib/bootc/kargs.d/10-hardening.toml \
     || fail "kargs: 'quiet' ausente (necessário para boot silencioso)"
+grep -q '"rhgb"' /usr/lib/bootc/kargs.d/10-hardening.toml \
+    || fail "kargs: 'rhgb' ausente (trigger do Plymouth no Fedora)"
 grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml \
     || fail "kargs: 'splash' ausente (necessário para Plymouth)"
 
@@ -177,9 +207,10 @@ else
     fail "appletsrc de skel ausente: $APPLETSRC"
 fi
 
-echo "=== SDDM tema ==="
-SDDM_CONF="/etc/sddm.conf.d/10-theme.conf"
-[[ -f "$SDDM_CONF" ]] || fail "SDDM: ficheiro de config ausente: $SDDM_CONF"
+echo "=== Login (plasmalogin) tema ==="
+# O DM é o plasma-login-manager, que lê /etc/plasmalogin.conf.d/ (não sddm.conf.d).
+SDDM_CONF="/etc/plasmalogin.conf.d/10-theme.conf"
+[[ -f "$SDDM_CONF" ]] || fail "Login: ficheiro de config ausente: $SDDM_CONF"
 grep -q '^Current=Catppuccin-Mocha-Mauve$' "$SDDM_CONF" \
     || fail "SDDM: tema não é Catppuccin-Mocha-Mauve ($(grep '^Current=' "$SDDM_CONF" || echo 'não definido'))"
 [[ -d "/usr/share/sddm/themes/Catppuccin-Mocha-Mauve" ]] \

@@ -60,6 +60,25 @@ plugin=org.kde.plasma.systemtray
 
 [Containments][2][Applets][7][Configuration]
 PreloadWeight=100
+# Liga o systemtray ao containment 10 (definido abaixo). Sem este link o
+# plasmashell cria o containment do systemtray on-the-fly e, durante a criação,
+# há um instante com plugin="" → "error when loading applet \"\"". Pré-definir o
+# containment (com plugin válido) elimina esse fantasma.
+SystrayContainmentId=10
+
+[Containments][10]
+activityId=
+formfactor=2
+immutability=1
+lastScreen=0
+location=4
+plugin=org.kde.plasma.private.systemtray
+
+[Containments][10][General]
+# Itens da bandeja: auto-descobertos pelos plugins instalados. Deixar listas vazias
+# faz o systemtray mostrar os defaults sem referenciar plugins inexistentes.
+extraItems=
+knownItems=
 
 [Containments][2][Applets][8]
 immutability=1

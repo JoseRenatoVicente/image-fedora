@@ -3,16 +3,19 @@ Description=Remove Fedora flatpak repositories
 Before=flatpak-preinstall.service
 Before=flatpak-system-helper.service
 Before=flatpak-add-fedora-repos.service
+# Só corre enquanto o sentinel não existir (idempotente entre boots)
+ConditionPathExists=!/var/lib/flatpak/.fedora-initialized
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/flatpak remote-delete --system fedora
-ExecStart=/usr/bin/flatpak remote-delete --system fedora-testing
+# Remove os remotes apenas se existirem. `remote-delete` emite
+# "error: Remote ... not found" em stderr (→ journal) quando o remote já
+# foi removido num boot anterior; redirecionar stderr evita esse ruído.
+# --force remove mesmo com apps instaladas dependentes.
+ExecStart=/usr/bin/bash -c 'for r in fedora fedora-testing; do /usr/bin/flatpak remote-delete --system --force "$r" 2>/dev/null || true; done'
 # Sentinel file prevents flatpak-add-fedora-repos.service from re-creating the remotes
 ExecStart=/usr/bin/touch /var/lib/flatpak/.fedora-initialized
-# Exit code 1 means the remote didn't exist — that's fine
-SuccessExitStatus=1
 
 [Install]
 WantedBy=multi-user.target

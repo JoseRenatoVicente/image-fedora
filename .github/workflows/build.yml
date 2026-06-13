@@ -73,7 +73,15 @@ jobs:
 
       - name: Verify base image signature
         run: |
-          BASE_IMAGE=$(awk '$1=="FROM" {for(i=2;i<=NF;i++) if($i!~/^--/) {print $i; exit}}' ./Containerfile)
+          BASE_IMAGE=$(awk '
+            toupper($1)=="FROM" {
+              image=""
+              for (i=2; i<=NF; i++) {
+                if ($i !~ /^--/) { image=$i; break }
+              }
+              if (image != "" && image != "scratch") { print image; exit }
+            }
+          ' ./Containerfile)
           [[ -n "$BASE_IMAGE" ]] || { echo "ERROR: imagem base não encontrada no Containerfile"; exit 1; }
           echo "Verifying base image: ${BASE_IMAGE}"
           curl -sL --fail --retry 3 --retry-delay 5 -o /tmp/fedora-ostree.pub \
@@ -130,6 +138,8 @@ jobs:
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
             IMAGE_VENDOR=${{ github.repository_owner }}
             SHA_HEAD_SHORT=${{ env.SHA_HEAD_SHORT }}
+          extra-args: |
+            --source-date-epoch=${{ env.SOURCE_DATE_EPOCH }}
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
       - name: Export image for scanning

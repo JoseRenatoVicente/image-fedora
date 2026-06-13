@@ -1,2 +1,6 @@
 [General]
 ShowOnStartup=false
+# Chave real de supressão usada pelo próprio plasma-setup do KDE: o plasma-welcome
+# só corre se a sua versão for > LastSeenVersion. Um valor alto suprime-o de forma
+# permanente (ShowOnStartup sozinho não impede o arranque-e-saída na 1ª sessão).
+LastSeenVersion=99.0

@@ -1,10 +1,11 @@
 [Unit]
 Description=Boot Health Check (imagem de teste)
 # Só existe na imagem de teste; nunca presente na imagem de produção.
-# Corre após multi-user.target para não depender de SDDM/KDE:
-# sem GPU real, o KWin Wayland não inicializa em VM headless com -display none.
-After=multi-user.target
-Wants=multi-user.target
+# Corre após graphical.target para que SDDM + autologin + sessão Plasma já
+# tenham arrancado — o health check aguarda o KWin Wayland do testuser e depois
+# varre o journal (sistema + sessão) por erros e avisos.
+After=graphical.target
+Wants=graphical.target
 
 [Service]
 Type=oneshot
@@ -17,4 +18,4 @@ StandardOutput=journal+console
 StandardError=journal+console
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=graphical.target

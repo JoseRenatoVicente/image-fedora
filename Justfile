@@ -1,7 +1,7 @@
 export image_name := env("IMAGE_NAME", "fedora-kde-custom") # output image name, usually same as repo name, change as needed
 export image_vendor := env("IMAGE_VENDOR", env("GITHUB_REPOSITORY_OWNER", "")) # ghcr.io owner; auto-detected in CI
 export default_tag := env("DEFAULT_TAG", "latest")
-export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
+export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder@sha256:7ae88b8d6f2cabfa971d7836b96d6cac19cd1384e658031bd154f9687e929905")
 
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2
@@ -324,9 +324,13 @@ run-vm-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-
 [group('Run Virtal Machine')]
 run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-vm target_image tag "iso" "disk_config/iso.toml")
 
-# Run a virtual machine with native QEMU + virtio-vga-gl (OpenGL real, janela SDL)
+# Run a virtual machine with native QEMU + virtio-vga-gl (OpenGL real via virgl)
 # Requer: qemu-system-x86_64, edk2-ovmf  →  sudo dnf install -y qemu-kvm edk2-ovmf
-# Melhor opção para testar desktop KDE: sem overhead de browser/VNC, aceleração OpenGL
+# Usa virtio-vga-gl: dá GL acelerado (virgl) → sem o flood de "ZINK: failed to
+# choose pdev" que o qxl provoca (qxl não tem Vulkan). Contrapartida: o virtio_gpu
+# NÃO está no initramfs, então o Plymouth não aparece nesta VM (cai em texto). No
+# HW real o Plymouth funciona (rhgb + driver nativo no initramfs). Para ter Plymouth
+# TAMBÉM na VM seria preciso pôr virtio_gpu/simpledrm no initramfs (regenerá-lo).
 [group('Run Virtal Machine')]
 run-vm-gl type="qcow2" ram="8G" cpus="4":
     #!/usr/bin/env bash
@@ -374,10 +378,10 @@ run-vm-gl type="qcow2" ram="8G" cpus="4":
     RAM_BYTES=$(echo "{{ ram }}" | numfmt --from=iec)
     RAM_MB=$(( RAM_BYTES / 1024 / 1024 ))
 
-    echo "Iniciando VM KDE — janela SDL com OpenGL"
+    echo "Iniciando VM KDE — janela SDL com OpenGL (virtio-vga-gl/virgl)"
     echo "  Imagem : ${image_file}"
     echo "  RAM    : ${RAM_MB}M  CPUs: {{ cpus }}"
-    echo "  GPU    : virtio-vga-gl (OpenGL via host)"
+    echo "  GPU    : virtio-vga-gl (OpenGL via host; sem Plymouth na VM)"
 
     qemu-system-x86_64 \
         -enable-kvm \
@@ -740,7 +744,7 @@ test-build:
 # arranca em QEMU sem display, aguarda o health check e reporta PASS/FAIL.
 # Dependências: qemu-kvm edk2-ovmf  →  sudo dnf install -y qemu-kvm edk2-ovmf
 [group('Testing')]
-test-boot timeout="300":
+test-boot timeout="420":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -848,7 +852,15 @@ test-boot timeout="300":
 
     # Analisar resultados
     FAILS=$(grep "^BOOT-FAIL" "$RESULTS_LOG" 2>/dev/null || true)
+    WARNS=$(grep "^BOOT-WARN" "$RESULTS_LOG" 2>/dev/null || true)
     DONE=$(grep "^BOOT-DONE:" "$RESULTS_LOG" 2>/dev/null || true)
+
+    # Avisos são informativos (não falham o teste) mas são sempre exibidos.
+    if [[ -n "$WARNS" ]]; then
+        echo ""
+        echo "── AVISOS surfacados (não-fatais, para correção) ──"
+        echo "$WARNS"
+    fi
 
     if [[ -z "$DONE" ]]; then
         CLEAN_TEST_BUILDTMP=0

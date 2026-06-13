@@ -1,0 +1,18 @@
+[Unit]
+Description=Configure Flathub system-wide flatpak remote
+# Sistemas atómicos (bootc/ostree): /var é estado mutável da máquina e NÃO deve
+# ser baked na imagem (não recebe updates; o bootc lint sinaliza-o). O remote
+# configura-se no boot, idempotente — mesmo padrão do flatpak-add-fedora-repos
+# do próprio Fedora Atomic. Lê a definição estática de /usr (imutável).
+After=local-fs.target
+ConditionPathExists=/usr/share/flatpak/flathub.flatpakrepo
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# .flatpakrepo local traz a GPGKey embutida → registar o remote não precisa de
+# rede; --if-not-exists torna a operação idempotente entre boots.
+ExecStart=/usr/bin/flatpak remote-add --system --if-not-exists flathub /usr/share/flatpak/flathub.flatpakrepo
+
+[Install]
+WantedBy=multi-user.target

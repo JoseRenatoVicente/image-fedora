@@ -9,6 +9,16 @@ export IMAGE_NAME="${IMAGE_NAME:-fedora}"
 export IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME:-Fedora}"
 export IMAGE_VENDOR="${IMAGE_VENDOR:-}"
 export SHA_HEAD_SHORT="${SHA_HEAD_SHORT:-}"
+# SOURCE_DATE_EPOCH só deve ser exportado quando tem um valor numérico válido
+# (CI passa o timestamp do commit). Em builds locais chega vazio via ARG do
+# Containerfile; exportá-lo vazio faz o fontconfig (fc-cache) emitir
+# "SOURCE_DATE_EPOCH invalid" — vazio ≠ indefinido. Nesse caso, deixamos
+# indefinido para as ferramentas usarem o comportamento normal.
+if [[ "${SOURCE_DATE_EPOCH:-}" =~ ^[0-9]+$ ]]; then
+    export SOURCE_DATE_EPOCH
+else
+    unset SOURCE_DATE_EPOCH
+fi
 
 # shellcheck source=shared/copr-helpers.sh
 source /ctx/shared/copr-helpers.sh
@@ -51,6 +61,25 @@ else
     echo "Nenhum pacote de bloat encontrado."
 fi
 echo "::endgroup::"
+
+# ─── sudo → run0 (alias) ──────────────────────────────────────────────────────
+# Objetivo: usar o run0 do systemd (eleva via polkit, sem setuid) em vez do sudo.
+# run0 já vem com o systemd (/usr/bin/run0 → systemd-run).
+#
+# NOTA: o pacote `sudo` NÃO pode ser removido nesta imagem. plasma-workspace exige
+# `kdesu` (kf6-kdesu), que por sua vez exige `sudo` — remover sudo arrasta o
+# desktop KDE inteiro (plasma-workspace/plasma-desktop, 16 pacotes, 91 MiB). Por
+# isso mantemos o pacote e adicionamos apenas o alias `sudo`→`run0` para shells
+# interativos (forma prática de migrar o hábito sem partir o desktop).
+echo "::group:: sudo → run0 (alias)"
+install -Dm644 /ctx/configs/run0-alias.sh /etc/profile.d/run0-alias.sh
+echo "::endgroup::"
+
+# ─── Remove repos rpmfusion ───────────────────────────────────────────────────
+# fedora-workstation-repositories traz definições rpmfusion-nonfree (nvidia/steam),
+# já desabilitadas (enabled=0) e não usadas nesta imagem. Removê-las elimina o
+# rpmfusion da superfície.
+rm -f /etc/yum.repos.d/rpmfusion-*.repo
 
 # ─── Install Fedora packages ──────────────────────────────────────────────────
 echo "::group:: Install packages"
@@ -95,21 +124,6 @@ PACKAGES=(
     rsync libsass sassc
 )
 dnf5 install -y --allowerasing "${PACKAGES[@]}"
-echo "::endgroup::"
-
-# ─── VS Code (isolado) ────────────────────────────────────────────────────────
-echo "::group:: VS Code"
-curl -sL --fail --retry 3 --retry-delay 5 https://packages.microsoft.com/keys/microsoft.asc | rpm --import -
-cat > /etc/yum.repos.d/vscode.repo << 'EOF'
-[code]
-name=Visual Studio Code
-baseurl=https://packages.microsoft.com/yumrepos/vscode
-enabled=0
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc
-EOF
-# Instalar com --enablerepo: o repo fica desabilitado na imagem final
-dnf5 install -y --enablerepo=code code
 echo "::endgroup::"
 
 # ─── COPR packages (isolados) ────────────────────────────────────────────────
@@ -199,7 +213,11 @@ install -Dm644 /ctx/configs/fstrim-fix.conf \
 install -Dm644 /ctx/configs/earlyoom-override.conf \
     /etc/systemd/system/earlyoom.service.d/override.conf
 
-install -Dm644 /ctx/configs/sddm-theme.conf /etc/sddm.conf.d/10-theme.conf
+# O display manager é o plasma-login-manager (plasmalogin), rebrand do SDDM que
+# lê /etc/plasmalogin.conf.d/ — NÃO /etc/sddm.conf.d/. Instalar no caminho errado
+# faz o tema de login ser silenciosamente ignorado. Temas continuam em
+# /usr/share/sddm/themes/.
+install -Dm644 /ctx/configs/sddm-theme.conf /etc/plasmalogin.conf.d/10-theme.conf
 
 install -Dm644 /ctx/configs/chrony-nts-policy.pmod \
     /etc/crypto-policies/policies/modules/CHRONY-NTS.pmod
@@ -214,6 +232,9 @@ install -Dm644 /ctx/configs/copr-vendor.conf \
 
 install -Dm644 /ctx/configs/flatpak-nuke-fedora.service \
     /usr/lib/systemd/system/flatpak-nuke-fedora.service
+
+install -Dm644 /ctx/configs/flathub-system-setup.service \
+    /usr/lib/systemd/system/flathub-system-setup.service
 
 # ── Bazzite-derived configs ───────────────────────────────────────────────────
 install -Dm644 /ctx/configs/zram-generator.conf \
@@ -271,7 +292,7 @@ setfattr -n user.component -v "image-config" \
     /usr/lib/systemd/system-preset/35-security-desktop.preset \
     /etc/xdg/kwinrc \
     /etc/systemd/journald.conf.d/size-limit.conf \
-    /etc/sddm.conf.d/10-theme.conf
+    /etc/plasmalogin.conf.d/10-theme.conf
 
 echo "::endgroup::"
 
@@ -294,11 +315,16 @@ install -Dm755 /ctx/skel/.local/bin/fedora-initial-setup \
 install -Dm644 /ctx/skel/.config/systemd/user/fedora-setup.service \
     /etc/skel/.config/systemd/user/fedora-setup.service
 
-# VM compatibility: disable heavy kwin effects in virtual machines
+# VM compatibility: disable heavy kwin effects in virtual machines.
+# Script em /usr/libexec (caminho absoluto): o .desktop NÃO pode referenciar
+# $HOME no Exec — o gerador xdg-autostart do systemd escapa o `$` (→ "\$HOME"),
+# o exec aponta para um ficheiro inexistente e o serviço de utilizador falha.
+# Autostart system-wide em /etc/xdg/autostart → corre para todos os utilizadores
+# (o script lê $HOME/.config/kwinrc em runtime, onde HOME já está definido).
 install -Dm755 /ctx/skel/.local/bin/kwin-vm-compat.sh \
-    /etc/skel/.local/bin/kwin-vm-compat.sh
+    /usr/libexec/kwin-vm-compat.sh
 install -Dm644 /ctx/skel/.config/autostart/kwin-vm-compat.desktop \
-    /etc/skel/.config/autostart/kwin-vm-compat.desktop
+    /etc/xdg/autostart/kwin-vm-compat.desktop
 
 # Panel layout: provides the bottom taskbar without relying on Garuda-specific
 # look-and-feel templates (org.garuda.desktop.defaultPanel) that don't exist on Fedora.
@@ -343,12 +369,23 @@ sed -i 's|^Image=file:///usr/share/wallpapers/garuda-mokka/Mokka-tree\.jpg$|Imag
 kwriteconfig6 --file /etc/skel/.config/ksplashrc \
     --group KSplash --key Theme "Mokka"
 
+# Disable plasma-setup OOBE (first-run wizard). plasma-setup.service corre
+# Before=display-manager.service e lança uma sessão Plasma própria (utilizador
+# plasma-setup) para criar o utilizador inicial — redundante aqui: o instalador
+# Anaconda já cria o utilizador (Modules.Users habilitado nos ISOs). Deixá-lo
+# activo preempta o login normal e gera ruído /run/plasma-setup no journal.
+# O flag /etc/plasma-setup-done é o mecanismo oficial (ConditionPathExists) que
+# o desliga.
+touch /etc/plasma-setup-done
+
 # Disable plasma-welcome OOBE for new users: system-wide default and per-user skel.
 # Without this, plasma-welcome runs on first login and plasma-setup tries to overwrite
 # kdeglobals/kwinrc — failing with "file already exists" because skel already wrote them.
 install -Dm644 /ctx/configs/plasma-welcomerc /etc/xdg/plasma-welcomerc
 kwriteconfig6 --file /etc/skel/.config/plasma-welcomerc \
     --group General --key ShowOnStartup "false"
+kwriteconfig6 --file /etc/skel/.config/plasma-welcomerc \
+    --group General --key LastSeenVersion "99.0"
 
 setfattr -n user.component -v "skel" \
     /etc/skel/setup-user.sh \
@@ -484,7 +521,6 @@ systemctl enable tuned
 systemctl enable earlyoom
 systemctl enable firewalld
 systemctl enable chronyd
-systemctl enable bluetooth.service bluetooth.target
 # Auto-updates: manter o sistema instalado actualizado automaticamente
 systemctl enable rpm-ostreed-automatic.timer
 systemctl enable podman-auto-update.timer
@@ -497,14 +533,24 @@ else
     echo "INFO: dconf-update.service não existe nesta base, ignorando"
 fi
 systemctl enable flatpak-nuke-fedora.service
+systemctl enable flathub-system-setup.service
 systemctl enable input-remapper.service
+# Silencia o ruído de autoload do input-remapper (falha benigna por dispositivo
+# quando não há preset) — override da regra udev upstream.
+install -Dm644 /ctx/configs/udev-input-remapper.rules \
+    /etc/udev/rules.d/99-input-remapper.rules
 if rpm -q scx-scheds &>/dev/null; then
     systemctl enable scx.service
 fi
 
-flatpak remote-add --system --if-not-exists flathub \
-    https://flathub.org/repo/flathub.flatpakrepo || true
-flatpak remote-delete --system --force fedora 2>/dev/null || true
+# Sistemas atómicos: o remote flathub NÃO é baked em /var (estado mutável que não
+# recebe updates e que o bootc lint sinaliza). Baixamos a definição estática para
+# /usr (imutável, com GPGKey embutida) e flathub-system-setup.service regista o
+# remote no boot. A remoção do remote `fedora` é feita pelo flatpak-nuke-fedora.service.
+install -d /usr/share/flatpak
+curl -L --fail --retry 3 --retry-delay 5 \
+    -o /usr/share/flatpak/flathub.flatpakrepo \
+    https://flathub.org/repo/flathub.flatpakrepo
 echo "::endgroup::"
 
 # ─── Remove build deps ────────────────────────────────────────────────────────
@@ -524,26 +570,43 @@ done
 [[ ${#FOUND_BUILD_DEPS[@]} -gt 0 ]] && dnf5 remove -y --setopt=clean_requirements_on_remove=True "${FOUND_BUILD_DEPS[@]}"
 echo "::endgroup::"
 
-# ─── Validate initramfs ───────────────────────────────────────────────────────
-# The base Kinoite image ships a known-good initramfs.img.  Do not overwrite it
-# in a container build: dracut can generate an initramfs that lacks bootc/ostree
-# assumptions and drops the VM into dracut emergency mode before root is mounted.
-# bootc-image-builder only needs the file to exist at /usr/lib/modules/<kver>/.
+# ─── Regenerate initramfs (virtio_gpu para Plymouth em VM) ────────────────────
+# A base Kinoite NÃO inclui virtio_gpu no initramfs. Numa VM QEMU isso faz o
+# Plymouth arrancar no simpledrm (built-in) e perder o ecrã quando o virtio_gpu
+# assume o framebuffer ~1s depois (handoff). Pôr virtio_gpu no initramfs faz dele
+# o framebuffer ANTES do Plymouth arrancar (como i915/amdgpu já estão), eliminando
+# o handoff. No HW real o Plymouth já funcionava (driver nativo no initramfs).
+#
+# SEGURANÇA (motivo do aviso histórico): um initramfs sem o módulo ostree larga o
+# sistema em emergency mode. O ostree é forçado (01-ostree-required.conf) e
+# verificamos abaixo que ficou presente — senão o build falha. `just test-boot`
+# valida o boot real.
 echo "::group:: Initramfs"
+install -Dm644 /ctx/configs/dracut-drm-drivers.conf /etc/dracut.conf.d/02-drm-drivers.conf
 KVER=$(ls /usr/lib/modules | sort -V | tail -1)
 INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
-[[ -s "$INITRAMFS" ]] || {
-    echo "FATAL: initramfs ausente ou vazio: $INITRAMFS"
-    echo "A base bootc deve fornecer este ficheiro; não regenerar via dracut no build."
-    exit 1
-}
+
+# Atualiza o índice de módulos antes do dracut: no meio do build o modules.dep
+# pode estar dessincronizado e o dracut não resolve o virtio_gpu via add/force_drivers.
+depmod "$KVER" 2>/dev/null || true
+
+# --force-drivers na linha de comando reforça a config (02-drm-drivers.conf).
+dracut --force --no-hostonly --force-drivers " virtio_gpu " --kver "$KVER" "$INITRAMFS"
+[[ -s "$INITRAMFS" ]] || { echo "FATAL: initramfs vazio após dracut: $INITRAMFS"; exit 1; }
+
+# ostree é CRÍTICO (sem ele → emergency mode) → falha o build se ausente.
 INITRD_MODS=$(lsinitrd --mod "$INITRAMFS" 2>/dev/null)
-echo "Módulos dracut no initramfs:"
-printf '%s\n' "$INITRD_MODS" | \
-    grep -v '^$\|^Image\|^====\|Early CPIO\|^drw\|-rw-\|microcode\|^kernel\|^Version'
 printf '%s\n' "$INITRD_MODS" | grep -qE '^[[:space:]]*(50)?ostree[[:space:]]*$' \
-    || { echo "FATAL: módulo ostree ausente no initramfs da base!"; exit 1; }
+    || { echo "FATAL: módulo ostree ausente no initramfs regenerado!"; exit 1; }
 echo "✓ ostree presente no initramfs"
+# virtio_gpu (ficheiro virtio-gpu.ko, hífen) é NÃO-crítico: só afeta o Plymouth em
+# VM. Se faltar, avisa mas NÃO falha o build (a imagem arranca bem; no HW real o
+# Plymouth funciona na mesma).
+if lsinitrd "$INITRAMFS" 2>/dev/null | grep -qiE 'virtio.gpu\.ko'; then
+    echo "✓ virtio_gpu presente no initramfs"
+else
+    echo "WARN: virtio_gpu não entrou no initramfs — Plymouth pode não aparecer em VM (HW real ok)"
+fi
 echo "::endgroup::"
 
 # ─── Cleanup final ────────────────────────────────────────────────────────────
@@ -551,6 +614,16 @@ echo "::group:: Cleanup"
 dnf5 versionlock clear
 dnf5 clean all
 rm -rf /var/cache/dnf /var/log/dnf* /var/log/hawkey*
+# bootc lint (nonempty-run-tmp): /run e /tmp são runtime-only — não devem conter
+# artefactos de build (dnf deixa /run/dnf).
+rm -rf /run/* /tmp/* 2>/dev/null || true
+# bootc lint (var-tmpfiles): cache de metadados e locks do dnf em /var/lib/dnf
+# não precisam de ser baked na imagem (recriados em runtime).
+rm -rf /var/lib/dnf/repos /var/lib/dnf/*.lock 2>/dev/null || true
+# bootc lint (var-tmpfiles): estado do flatpak em /var é mutável e configurado no
+# boot por flathub-system-setup.service — não deve ser baked. flatpak reinicializa
+# /var/lib/flatpak em runtime ao registar o remote.
+rm -rf /var/lib/flatpak 2>/dev/null || true
 rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
 LOCALE_REMOVED=0
 while IFS= read -r -d '' dir; do
@@ -559,6 +632,11 @@ done < <(find /usr/share/locale -mindepth 1 -maxdepth 1 \
     ! -name 'pt_BR' ! -name 'en_US' ! -name 'locale.alias' \
     -print0)
 echo "Locales removidos: $LOCALE_REMOVED (mantidos: pt_BR, en_US)"
+# Locale por omissão do sistema. Sem /etc/locale.conf, serviços como SDDM/
+# plasmalogin-helper correm com LANG=C (não-UTF-8) e o Qt avisa no journal.
+# en_US.UTF-8 está sempre disponível no locale-archive; o Anaconda sobrepõe
+# conforme a escolha do utilizador na instalação.
+echo "LANG=en_US.UTF-8" > /etc/locale.conf
 echo "::endgroup::"
 
 # ─── Validate repos ───────────────────────────────────────────────────────────

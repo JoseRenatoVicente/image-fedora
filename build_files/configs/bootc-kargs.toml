@@ -2,8 +2,11 @@
 # Instalado em /usr/lib/bootc/kargs.d/10-hardening.toml
 
 kargs = [
-  # Boot appearance: quiet suppresses kernel/initrd text; splash shows Plymouth graphical screen
+  # Boot appearance: quiet suppresses kernel/initrd text; rhgb é o trigger do
+  # Plymouth no Fedora (o `splash` estilo Debian é ignorado pelo plymouthd do
+  # Fedora). Sem rhgb não há animação de boot — vê-se a consola de texto.
   "quiet",
+  "rhgb",
   "splash",
   "hash_pointers=always",
   "init_on_alloc=1",

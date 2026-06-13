@@ -53,6 +53,7 @@ BREW_COMMIT="93a25fd2d2fdb86422303c292b9223f84ef23eaf"
 BREW_SHA256="17f204b128869ec71e6b650051f1e65ef5b74cf994c2ff8b919103241554dd2f"
 LAZYDOCKER_COMMIT="7e7aadc2071d58031bf2daafca1fbd4093efc23f"
 LAZYDOCKER_SHA256="57a1a5ca34097da604e19d3b5d0689a47037604d1ab9f8c1bcd0a63bab427359"
+OPENCODE_NPM_VERSION="1.17.3"
 
 if [[ "${EUID}" -eq 0 ]]; then
   echo "Não rode como root. Execute como seu usuário normal."
@@ -127,7 +128,7 @@ log "Instalando pacotes npm globais"
 if ! done_already "npm-globals" && command -v npm &>/dev/null; then
   npm install -g pnpm
   npm install -g @github/copilot-cli || warn "@github/copilot-cli falhou (nome pode ter mudado)"
-  npm install -g opencode-ai@latest || warn "opencode-ai falhou"
+  npm install -g "opencode-ai@${OPENCODE_NPM_VERSION}" || warn "opencode-ai falhou"
   mark_done "npm-globals"
   ok "npm globals instalados"
 fi
@@ -272,6 +273,8 @@ echo "  Próximos passos:"
 echo "  1. Faça logout/login para aplicar o shell zsh"
 echo "  2. Execute 'p10k configure' para configurar o Powerlevel10k"
 echo "  3. Instale o Go manualmente se necessário: https://go.dev/dl/"
+echo "  4. Para stacks de desenvolvimento, prefira: distrobox create --name dev --image registry.fedoraproject.org/fedora-toolbox:44"
+echo "  5. Instale toolchains por projeto dentro da distrobox/toolbox, não na base imutável"
 echo
 echo "  Estado salvo em: $STATE_DIR"
 echo "  Para re-executar uma etapa, delete o arquivo correspondente em $STATE_DIR"

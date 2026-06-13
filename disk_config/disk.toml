@@ -1,3 +1,14 @@
 [[customizations.filesystem]]
 mountpoint = "/"
 minsize = "20 GiB"
+
+# Utilizador padrão para os discos buildados diretamente (qcow2/raw) — usados em
+# VM local: `just build-qcow2`, `just run-vm-gl`, `just run-vm-qcow2`, `just spawn-vm`.
+# Estes discos NÃO passam pelo Anaconda, por isso o utilizador tem de ser declarado
+# aqui (o ISO de produção, esse sim, cria o utilizador no instalador).
+# `wheel` é necessário para elevar via run0/polkit (o sudo foi removido).
+# Apenas para teste local — não é o artefacto distribuído.
+[[customizations.user]]
+name = "user"
+password = "password"
+groups = ["wheel"]

@@ -7,6 +7,7 @@ ARG IMAGE_NAME="fedora"
 ARG IMAGE_PRETTY_NAME="Fedora"
 ARG IMAGE_VENDOR=""
 ARG SHA_HEAD_SHORT=""
+ARG SOURCE_DATE_EPOCH=""
 
 # Base Image
 FROM quay.io/fedora-ostree-desktops/kinoite:44@sha256:61fcd0a1752050c93692d91a663e13681e45eb489aa095783d2880275cbf5406
@@ -15,6 +16,7 @@ ARG IMAGE_NAME="fedora"
 ARG IMAGE_PRETTY_NAME="Fedora"
 ARG IMAGE_VENDOR=""
 ARG SHA_HEAD_SHORT=""
+ARG SOURCE_DATE_EPOCH=""
 
 ## Other possible base images include:
 # FROM ghcr.io/ublue-os/bazzite:latest
@@ -48,6 +50,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME}" \
     IMAGE_VENDOR="${IMAGE_VENDOR}" \
     SHA_HEAD_SHORT="${SHA_HEAD_SHORT}" \
+    SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}" \
     /ctx/build.sh
     
 ### LINTING

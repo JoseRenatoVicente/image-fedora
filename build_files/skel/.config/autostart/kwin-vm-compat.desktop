@@ -2,6 +2,6 @@
 Name=KWin VM Compatibility
 Comment=Adjusts KWin effects for virtual machine environments
 Type=Application
-Exec=bash -c 'exec "$HOME/.local/bin/kwin-vm-compat.sh"'
+Exec=/usr/libexec/kwin-vm-compat.sh
 X-KDE-autostart-phase=2
 Hidden=false
