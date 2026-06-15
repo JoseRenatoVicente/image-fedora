@@ -114,6 +114,32 @@ rm -f /etc/yum.repos.d/rpmfusion-*.repo
 # ─── Install Fedora packages ──────────────────────────────────────────────────
 echo "::group:: Install packages"
 PACKAGES=(
+    # ── KDE Plasma (mínimo) ───────────────────────────────────────────────────
+    # Core desktop
+    plasma-desktop plasma-workspace kwin kscreenlocker kscreen
+    plasma-login-manager kde-settings-plasmalogin kcm-plasmalogin
+    # Painel e widgets
+    kdeplasma-addons plasma-pa plasma-nm plasma-nm-openvpn
+    bluedevil polkit-kde plasma-drkonqi kinfocenter plasma-systemmonitor
+    # Integração
+    kde-gtk-config flatpak-kcm kio-admin pam-kwallet pinentry-qt
+    libappindicator-gtk3
+    # File manager e utilitários
+    dolphin kio-gdrive konsole kwrite spectacle ark kdialog
+    ffmpegthumbs kdegraphics-thumbnailers audiocd-kio kamera
+    # Display
+    xorg-x11-server-Xwayland xwaylandvideobridge
+    mesa-dri-drivers mesa-vulkan-drivers libva-intel-media-driver
+    # Portais
+    xdg-desktop-portal xdg-desktop-portal-kde
+    # Temas fallback
+    plasma-breeze breeze-icon-theme aurorae
+    # Extras Kinoite
+    plasma-discover-rpm-ostree plasma-keyboard
+    vulkan-tools mobile-broadband-provider-info NetworkManager-ppp
+    plymouth-system-theme
+
+    # ── Ferramentas do utilizador ─────────────────────────────────────────────
     # Dev tools
     git curl unzip tar jq make gettext
     # CLI tools
@@ -153,7 +179,24 @@ PACKAGES=(
     kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel
     rsync libsass sassc
 )
-dnf5 install -y --allowerasing "${PACKAGES[@]}"
+dnf5 install -y --allowerasing \
+    --exclude=PackageKit \
+    --exclude=PackageKit-glib \
+    --exclude=plasma-discover-offline-updates \
+    --exclude=plasma-discover-packagekit \
+    --exclude=plasma-pk-updates \
+    --exclude=tracker \
+    --exclude=tracker-miners \
+    --exclude=localsearch \
+    --exclude=tinysparql \
+    --exclude=plasma-x11 \
+    --exclude=plasma-workspace-x11 \
+    --exclude=mariadb-server-utils \
+    --exclude=qt5-qtbase \
+    --exclude=perl-interpreter \
+    --exclude=perl-libs \
+    --exclude=kde-connect \
+    "${PACKAGES[@]}"
 echo "::endgroup::"
 
 # ─── COPR packages (isolados) ────────────────────────────────────────────────
