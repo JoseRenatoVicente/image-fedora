@@ -10,7 +10,7 @@ ARG SHA_HEAD_SHORT=""
 ARG SOURCE_DATE_EPOCH=""
 
 # Base Image
-FROM quay.io/fedora-ostree-desktops/kinoite:44@sha256:61fcd0a1752050c93692d91a663e13681e45eb489aa095783d2880275cbf5406
+FROM quay.io/fedora-ostree-desktops/base-atomic:44
 
 ARG IMAGE_NAME="fedora"
 ARG IMAGE_PRETTY_NAME="Fedora"
@@ -19,6 +19,7 @@ ARG SHA_HEAD_SHORT=""
 ARG SOURCE_DATE_EPOCH=""
 
 ## Other possible base images include:
+# FROM quay.io/fedora-ostree-desktops/kinoite:44  (full KDE, ~7.1 GB)
 # FROM ghcr.io/ublue-os/bazzite:latest
 # FROM ghcr.io/ublue-os/bluefin-nvidia:stable
 # 
