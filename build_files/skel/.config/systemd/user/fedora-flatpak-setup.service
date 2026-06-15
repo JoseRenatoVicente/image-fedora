@@ -1,0 +1,16 @@
+[Unit]
+Description=Fedora Flatpak First-Boot Setup
+Wants=network-online.target
+After=network-online.target
+ConditionUser=!@system
+ConditionPathIsDirectory=/var/home/%u
+ConditionPathExists=!%E/fedora/fedora-flatpak-setup.stamp
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/fedora-flatpak-setup
+ExecStartPost=/bin/bash -c 'cfg="${XDG_CONFIG_HOME:-$HOME/.config}/fedora"; mkdir -p "$cfg" && touch "$cfg/fedora-flatpak-setup.stamp"'
+Restart=on-failure
+RestartSec=30s
+RestartMaxDelaySec=1800s
+RestartSteps=10

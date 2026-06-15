@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+NVM_VERSION="v0.40.3"
+LAZYDOCKER_COMMIT="7e7aadc2071d58031bf2daafca1fbd4093efc23f"
+LAZYDOCKER_SHA256="57a1a5ca34097da604e19d3b5d0689a47037604d1ab9f8c1bcd0a63bab427359"
+OPENCODE_NPM_VERSION="1.17.3"
+
+safe_run() {
+    local url="$1" expected_sha="$2"
+    shift 2
+    local tmp
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' RETURN
+    curl -fsSL "$url" -o "$tmp"
+    local actual_sha
+    actual_sha="$(sha256sum "$tmp" | cut -d' ' -f1)"
+    if [[ "$actual_sha" != "$expected_sha" ]]; then
+        notify-send -a 'Fedora' -i 'dialog-error' -u critical \
+            "SHA256 mismatch: $url — instalação cancelada por segurança."
+        return 1
+    fi
+    bash "$tmp" "$@"
+}
+
+notify-send -a 'Fedora' -i 'dialog-information' -u normal \
+    'A instalar ferramentas de desenvolvimento (NVM, Node.js, LazyDocker)...'
+
+# NVM
+export NVM_DIR="$HOME/.nvm"
+if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
+    curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" | bash
+fi
+# shellcheck source=/dev/null
+source "$NVM_DIR/nvm.sh"
+
+# Node.js LTS
+if ! nvm ls --no-colors 2>/dev/null | grep -qE '\->' ; then
+    nvm install --lts
+fi
+nvm use --lts
+nvm alias default node
+
+# npm globals
+npm install -g pnpm || true
+npm install -g "opencode-ai@${OPENCODE_NPM_VERSION}" || true
+
+# LazyDocker
+if [[ ! -f "$HOME/bin/lazydocker" ]] && [[ ! -f "$HOME/.local/bin/lazydocker" ]]; then
+    mkdir -p "$HOME/bin"
+    safe_run \
+        "https://raw.githubusercontent.com/jesseduffield/lazydocker/${LAZYDOCKER_COMMIT}/scripts/install_update_linux.sh" \
+        "$LAZYDOCKER_SHA256"
+fi
+
+notify-send -a 'Fedora' -i 'dialog-information' -u normal \
+    'Ferramentas de desenvolvimento instaladas.'

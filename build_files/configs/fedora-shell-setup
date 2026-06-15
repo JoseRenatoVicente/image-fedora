@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OMZ_COMMIT="c954bbb168fc645592c50017de0d0e138db8df5f"
+OMZ_SHA256="21043aec5b791ce4835479dc33ba2f92155946aeafd54604a8c83522627cc803"
+
+safe_run() {
+    local url="$1" expected_sha="$2"
+    shift 2
+    local tmp
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' RETURN
+    curl -fsSL "$url" -o "$tmp"
+    local actual_sha
+    actual_sha="$(sha256sum "$tmp" | cut -d' ' -f1)"
+    if [[ "$actual_sha" != "$expected_sha" ]]; then
+        notify-send -a 'Fedora' -i 'dialog-error' -u critical \
+            "SHA256 mismatch: $url — instalação cancelada por segurança."
+        return 1
+    fi
+    bash "$tmp" "$@"
+}
+
+notify-send -a 'Fedora' -i 'dialog-information' -u normal \
+    'A configurar shell (Oh My Zsh, Powerlevel10k)...'
+
+# Oh My Zsh
+if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+    RUNZSH=no CHSH=no safe_run \
+        "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/${OMZ_COMMIT}/tools/install.sh" \
+        "$OMZ_SHA256" --unattended
+fi
+
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+# Powerlevel10k
+if [[ ! -d "$ZSH_CUSTOM/themes/powerlevel10k" ]]; then
+    git clone --depth=1 --branch v1.20.0 \
+        https://github.com/romkatv/powerlevel10k.git \
+        "$ZSH_CUSTOM/themes/powerlevel10k"
+fi
+
+# Plugins
+if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]]; then
+    git clone --depth=1 --branch v0.7.1 \
+        https://github.com/zsh-users/zsh-autosuggestions \
+        "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+fi
+if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]]; then
+    git clone --depth=1 --branch 0.8.0 \
+        https://github.com/zsh-users/zsh-syntax-highlighting \
+        "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+fi
+if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-completions" ]]; then
+    git clone --depth=1 --branch 0.36.0 \
+        https://github.com/zsh-users/zsh-completions \
+        "$ZSH_CUSTOM/plugins/zsh-completions"
+fi
+
+# .zshrc — OMZ cria o ficheiro; aplicamos as nossas customizações por cima
+ZSHRC="$HOME/.zshrc"
+[[ -f "$ZSHRC" ]] || touch "$ZSHRC"
+
+sed -i 's/^ZSH_THEME=.*/ZSH_THEME="powerlevel10k\/powerlevel10k"/' "$ZSHRC"
+sed -i 's/^plugins=(.*/plugins=(git docker emoji kubectl terraform zsh-autosuggestions zsh-syntax-highlighting zsh-completions)/' "$ZSHRC"
+
+if ! grep -q 'NVM_DIR' "$ZSHRC"; then
+    cat >> "$ZSHRC" << 'EOF'
+
+# NVM
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+EOF
+fi
+
+if ! grep -q 'alias docker=' "$ZSHRC"; then
+    cat >> "$ZSHRC" << 'EOF'
+
+# Aliases
+alias docker='podman'
+alias docker-compose='podman-compose'
+alias ls='eza --icons'
+alias ll='eza -la --icons'
+alias lt='eza --tree --icons'
+EOF
+fi
+
+if ! grep -q 'linuxbrew' "$ZSHRC"; then
+    cat >> "$ZSHRC" << 'EOF'
+
+# Homebrew
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null || true)"
+EOF
+fi
+
+notify-send -a 'Fedora' -i 'dialog-information' -u normal \
+    'Shell configurada com sucesso.'

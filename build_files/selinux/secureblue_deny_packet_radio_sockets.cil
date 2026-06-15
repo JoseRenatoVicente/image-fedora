@@ -1,0 +1,9 @@
+; Denies all userspace processes access to socket classes related to packet
+; radio. These are not needed on a desktop system.
+; Source: https://github.com/secureblue/secureblue (Apache-2.0 OR MIT)
+
+(in secureblue
+    (call deny_userspace (ax25_socket))
+    (call deny_userspace (netrom_socket))
+    (call deny_userspace (rose_socket))
+    (call deny_userspace (x25_socket)))

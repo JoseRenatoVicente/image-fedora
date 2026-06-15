@@ -1,0 +1,7 @@
+; Denies all userspace processes except bluetooth_t access to AF_ALG sockets
+; (userspace interface to the kernel crypto API).
+; bluetooth_t is allowed since BlueZ relies on the kernel crypto API.
+; CVE reference: CVE-2026-31431 ("Copy Fail") privilege escalation via alg_socket.
+; Source: https://github.com/secureblue/secureblue (Apache-2.0 OR MIT)
+
+(call secureblue.deny_non_bluetooth (alg_socket))

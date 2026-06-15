@@ -1,19 +1,17 @@
 #!/bin/bash
+# Layer 2 — configuração, theming, skel, dracut, cleanup
+# Cache invalidado quando qualquer ficheiro em build_files/ muda.
+# Os pacotes já estão instalados pelo Layer 1 (build-packages.sh).
 set -euo pipefail
 
 trap 'printf "\033[1;31mERRO linha %s: %s\033[0m\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
 # Exportar variáveis de imagem para sub-scripts (image-info.sh, etc.)
-# Podem ser passadas via ARG no Containerfile: --build-arg IMAGE_NAME=minha-imagem
 export IMAGE_NAME="${IMAGE_NAME:-fedora}"
 export IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME:-Fedora}"
 export IMAGE_VENDOR="${IMAGE_VENDOR:-}"
 export SHA_HEAD_SHORT="${SHA_HEAD_SHORT:-}"
 # SOURCE_DATE_EPOCH só deve ser exportado quando tem um valor numérico válido
-# (CI passa o timestamp do commit). Em builds locais chega vazio via ARG do
-# Containerfile; exportá-lo vazio faz o fontconfig (fc-cache) emitir
-# "SOURCE_DATE_EPOCH invalid" — vazio ≠ indefinido. Nesse caso, deixamos
-# indefinido para as ferramentas usarem o comportamento normal.
 if [[ "${SOURCE_DATE_EPOCH:-}" =~ ^[0-9]+$ ]]; then
     export SOURCE_DATE_EPOCH
 else
@@ -23,201 +21,13 @@ fi
 # shellcheck source=shared/copr-helpers.sh
 source /ctx/shared/copr-helpers.sh
 
-# ─── Setup ────────────────────────────────────────────────────────────────────
-echo "::group:: Setup"
-install -Dm644 /ctx/configs/dnf-performance.conf /etc/dnf/conf.d/performance.conf
-# Ensure the ostree dracut module is always included in any initramfs generated
-# during this build — including those triggered by dnf package scripts before
-# our explicit dracut step.  Without this, initrd-switch-root.service fails
-# because ostree-prepare-root.service is absent from the initrd.
-echo 'add_dracutmodules+=" ostree "' > /etc/dracut.conf.d/01-ostree-required.conf
-dnf5 install -y dnf5-plugins
-echo "::endgroup::"
-
-# ─── Remove base-atomic bloat ─────────────────────────────────────────────────
-# A base-atomic traz pacotes que não usamos (impressoras, acessibilidade, firmware
-# de hardware que não temos, input methods asiáticos, VM guest agents, etc.).
-# Remover ANTES de instalar KDE para evitar dnf resolver dependências contra eles.
-echo "::group:: Remove base-atomic bloat"
-
-# Substituir glibc-all-langpacks por langpacks mínimos (pt_BR + en_US).
-# Deve ser feito ANTES da remoção em massa porque glibc exige pelo menos um
-# glibc-langpack — remover glibc-all-langpacks sem alternativa falha o resolver.
-dnf5 install -y --allowerasing glibc-langpack-pt glibc-langpack-en
-dnf5 remove -y glibc-all-langpacks
-
-REMOVE_PKGS=(
-    # Impressoras (~124 MB)
-    cups cups-browsed cups-filters hplip
-    gutenprint gutenprint-cups bluez-cups
-    system-config-printer-udev
-    c2esp dymo-cups-drivers printer-driver-brlaser ptouch-driver splix
-    mpage paps
-
-    # Acessibilidade (~121 MB)
-    orca brltty speech-dispatcher
-
-    # Firmware não-Intel (~224 MB)
-    nvidia-gpu-firmware amd-gpu-firmware amd-ucode-firmware
-    atheros-firmware mt7xxx-firmware realtek-firmware
-    brcmfmac-firmware libertas-firmware tiwilink-firmware
-    nxpwireless-firmware b43-fwcutter b43-openfwwf
-    qcom-wwan-firmware
-
-    # Fontes desnecessárias
-    default-fonts-cjk-mono default-fonts-cjk-sans default-fonts-cjk-serif
-    cldr-emoji-annotation
-
-    # IBus / input methods asiáticos (~160 MB)
-    ibus-anthy ibus-chewing ibus-hangul
-    ibus-libpinyin ibus-m17n ibus-typing-booster
-
-    # Firefox (vem na base-atomic, não é usado — substituído por flatpak)
-    firefox firefox-langpacks
-
-    # VM guest agents / virtualização (~50 MB)
-    open-vm-tools-desktop spice-vdagent spice-webdavd
-    hyperv-daemons qemu-guest-agent virtualbox-guest-additions
-
-    # Serviços de rede não utilizados
-    nfs-utils cifs-utils samba-client
-    sssd-common sssd-kcm
-
-    # Outros
-    hunspell sos fpaste words pinfo lrzsz kmscon
-)
-FOUND_PKGS=()
-for pkg in "${REMOVE_PKGS[@]}"; do
-    rpm -q "$pkg" &>/dev/null && FOUND_PKGS+=("$pkg")
-done
-if [[ ${#FOUND_PKGS[@]} -gt 0 ]]; then
-    dnf5 remove -y --setopt=clean_requirements_on_remove=False "${FOUND_PKGS[@]}"
-    echo "Removidos ${#FOUND_PKGS[@]} pacotes: ${FOUND_PKGS[*]}"
-else
-    echo "Nenhum pacote de bloat encontrado."
-fi
-echo "::endgroup::"
-
 # ─── sudo → run0 (alias) ──────────────────────────────────────────────────────
-# Objetivo: usar o run0 do systemd (eleva via polkit, sem setuid) em vez do sudo.
-# run0 já vem com o systemd (/usr/bin/run0 → systemd-run).
-#
-# NOTA: o pacote `sudo` NÃO pode ser removido nesta imagem. plasma-workspace exige
-# `kdesu` (kf6-kdesu), que por sua vez exige `sudo` — remover sudo arrasta o
-# desktop KDE inteiro (plasma-workspace/plasma-desktop, 16 pacotes, 91 MiB). Por
-# isso mantemos o pacote e adicionamos apenas o alias `sudo`→`run0` para shells
-# interativos (forma prática de migrar o hábito sem partir o desktop).
 echo "::group:: sudo → run0 (alias)"
 install -Dm644 /ctx/configs/run0-alias.sh /etc/profile.d/run0-alias.sh
 echo "::endgroup::"
 
 # ─── Remove repos rpmfusion ───────────────────────────────────────────────────
-# fedora-workstation-repositories traz definições rpmfusion-nonfree (nvidia/steam),
-# já desabilitadas (enabled=0) e não usadas nesta imagem. Removê-las elimina o
-# rpmfusion da superfície.
 rm -f /etc/yum.repos.d/rpmfusion-*.repo
-
-# ─── Install Fedora packages ──────────────────────────────────────────────────
-echo "::group:: Install packages"
-PACKAGES=(
-    # ── KDE Plasma (mínimo) ───────────────────────────────────────────────────
-    # Core desktop
-    plasma-desktop plasma-workspace kwin kscreenlocker kscreen
-    plasma-login-manager kde-settings-plasmalogin kcm-plasmalogin
-    # Painel e widgets
-    kdeplasma-addons plasma-pa plasma-nm plasma-nm-openvpn
-    bluedevil polkit-kde plasma-drkonqi kinfocenter plasma-systemmonitor
-    # Integração
-    kde-gtk-config flatpak-kcm kio-admin pam-kwallet pinentry-qt
-    libappindicator-gtk3
-    # File manager e utilitários
-    dolphin kio-gdrive konsole kwrite spectacle ark kdialog
-    ffmpegthumbs kdegraphics-thumbnailers audiocd-kio kamera
-    # Display
-    xorg-x11-server-Xwayland xwaylandvideobridge
-    mesa-dri-drivers mesa-vulkan-drivers libva-intel-media-driver
-    # Portais
-    xdg-desktop-portal xdg-desktop-portal-kde
-    # Temas fallback
-    plasma-breeze breeze-icon-theme aurorae
-    # Extras Kinoite
-    plasma-keyboard
-    vulkan-tools mobile-broadband-provider-info NetworkManager-ppp
-    plymouth-system-theme
-
-    # ── Ferramentas do utilizador ─────────────────────────────────────────────
-    # Dev tools (git-core já vem na base-atomic; full git entra via git-credential-libsecret)
-    curl unzip tar jq make gettext
-    # CLI tools
-    bat btop fd-find ripgrep fastfetch eza
-    neovim
-    inotify-tools xsel numlockx
-    util-linux-user zsh
-    # Terminal
-    kitty
-    # Ficheiros e fonts
-    file-roller glibc-gconv-extra
-    # Multimédia
-    ffmpeg
-    gstreamer1-plugins-base gstreamer1-plugins-good
-    gstreamer1-plugin-openh264
-    # Gaming
-    gamemode
-    # Sistema
-    earlyoom
-    tuned tuned-ppd
-    zram-generator
-    # Containers
-    distrobox podman-docker podman-compose
-    # KDE / temas
-    kvantum qt6ct
-    flameshot
-    # KDE integrations
-    git-credential-libsecret ksshaskpass ksystemlog plasma-firewall
-    # Hardware monitoring
-    lm_sensors nvtop powertop
-    # Peripheral support
-    input-remapper solaar-udev
-    # Security keys (U2F / YubiKey)
-    pam-u2f pam_yubico pamu2fcfg yubikey-manager
-    # Build deps (removidos no passo cleanup)
-    gcc-c++ cmake extra-cmake-modules libplasma-devel
-    kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel
-    rsync libsass sassc
-)
-dnf5 install -y --allowerasing \
-    --exclude=PackageKit \
-    --exclude=PackageKit-glib \
-    --exclude=plasma-discover-offline-updates \
-    --exclude=plasma-discover-packagekit \
-    --exclude=plasma-pk-updates \
-    --exclude=tracker \
-    --exclude=tracker-miners \
-    --exclude=localsearch \
-    --exclude=tinysparql \
-    --exclude=plasma-x11 \
-    --exclude=plasma-workspace-x11 \
-    --exclude=mariadb-server-utils \
-    --exclude=qt5-qtbase \
-    --exclude=kde-connect \
-    --exclude=firefox \
-    --exclude=orca \
-    --exclude=speech-dispatcher \
-    --exclude=plasma-discover \
-    "${PACKAGES[@]}"
-echo "::endgroup::"
-
-# ─── COPR packages (isolados) ────────────────────────────────────────────────
-echo "::group:: COPR packages"
-# kwin-effect-roundcorners não está nos repos Fedora
-copr_install_isolated "matinlotfali/KDE-Rounded-Corners" \
-    kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
-    || echo "WARN: kwin-effect-roundcorners não instalado"
-# scx-scheds não está nos repos padrão do Fedora (disponível via COPR sched_ext)
-copr_install_isolated "sched_ext/scx" \
-    scx-scheds \
-    || echo "WARN: scx-scheds não instalado"
-echo "::endgroup::"
 
 # ─── System configs ───────────────────────────────────────────────────────────
 echo "::group:: System configs"
@@ -235,8 +45,9 @@ install -Dm644 /ctx/configs/modprobe-hardening.conf \
     /etc/modprobe.d/security-hardening.conf
 install -Dm644 /ctx/configs/modprobe-framebuffer-blacklist.conf \
     /etc/modprobe.d/blacklist-framebuffer.conf
+install -Dm644 /ctx/configs/modprobe-dvb-rc.conf \
+    /etc/modprobe.d/no-dvb-rc.conf
 # IPSec blacklist opcional — não ativo por defeito (quebraria VPNs).
-# O utilizador pode copiar para /etc/modprobe.d/ se não usar VPN.
 install -Dm644 /ctx/configs/modprobe-ipsec-blacklist.conf \
     /usr/share/fedora-hardening/modprobe-ipsec-blacklist.conf
 
@@ -244,8 +55,6 @@ install -Dm644 /ctx/configs/bootc-kargs.toml \
     /usr/lib/bootc/kargs.d/10-hardening.toml
 
 # GRUB: hide the boot menu and boot immediately.
-# Overrides the 1-second menu in grub-static-pre.cfg (shipped by bootupd).
-# The user can still reach the GRUB menu by holding Shift/Escape at power-on.
 install -Dm644 /ctx/configs/grub-timeout.cfg \
     /usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg
 
@@ -295,9 +104,7 @@ install -Dm644 /ctx/configs/earlyoom-override.conf \
     /etc/systemd/system/earlyoom.service.d/override.conf
 
 # O display manager é o plasma-login-manager (plasmalogin), rebrand do SDDM que
-# lê /etc/plasmalogin.conf.d/ — NÃO /etc/sddm.conf.d/. Instalar no caminho errado
-# faz o tema de login ser silenciosamente ignorado. Temas continuam em
-# /usr/share/sddm/themes/.
+# lê /etc/plasmalogin.conf.d/ — NÃO /etc/sddm.conf.d/.
 install -Dm644 /ctx/configs/sddm-theme.conf /etc/plasmalogin.conf.d/10-theme.conf
 
 install -Dm644 /ctx/configs/chrony-nts-policy.pmod \
@@ -353,6 +160,17 @@ install -Dm644 /ctx/configs/modules-ntsync.conf \
 install -Dm644 /ctx/configs/limits-memlock.conf \
     /etc/security/limits.d/50-memlock.conf
 
+# login.defs: UMASK 027 (ficheiros novos não são world-readable por defeito)
+# e YESCRYPT_COST_FACTOR 8 (hashing de password mais resistente a brute-force)
+sed -i 's/^UMASK\s\+022/UMASK\t\t027/' /etc/login.defs
+sed -i 's/^#\?YESCRYPT_COST_FACTOR.*/YESCRYPT_COST_FACTOR 8/' /etc/login.defs
+
+# Container image signing: políticas sigstore para registos usados na imagem
+install -Dm644 /ctx/configs/containers-registries-d/quay.io-fedora-ostree-desktops.yaml \
+    /etc/containers/registries.d/quay.io-fedora-ostree-desktops.yaml
+install -Dm644 /ctx/configs/containers-registries-d/quay.io-toolbx-images.yaml \
+    /etc/containers/registries.d/quay.io-toolbx-images.yaml
+
 # Anotar ficheiros de hardening com metadados de componente
 setfattr -n user.component -v "security-hardening" \
     /etc/sysctl.d/60-security-hardening.conf \
@@ -378,9 +196,6 @@ setfattr -n user.component -v "image-config" \
 echo "::endgroup::"
 
 # ─── Plasmalogin workaround (from Kinoite) ────────────────────────────────────
-# base-atomic não inclui o fix que o Kinoite tem para entries em falta do
-# plasmalogin em /etc/shadow e /etc/gshadow. Sem isto o plasma-login-manager
-# pode não arrancar. Ref: https://forge.fedoraproject.org/kde/tickets/issues/684
 echo "::group:: Plasmalogin workaround"
 
 cat > /usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service << 'EOF'
@@ -450,23 +265,6 @@ echo "::endgroup::"
 echo "::group:: Skel + KDE defaults"
 mkdir -p /etc/skel/.config
 
-# Limpar ficheiros órfãos do skel Garuda Mokka que não devem existir nesta imagem:
-# - initial-setup.{desktop,sh}: usa fish shell (não instalado) e referencia configs Garuda
-# - environment.d/garuda.conf: define BROWSER=firedragon, EDITOR=/usr/bin/micro etc.
-# - starship-mokka.toml: config starship do Garuda (tema movido para starship.toml pelo script)
-# - fish/: config do fish shell (não instalado nesta imagem)
-# - .local/share/plasma/look-and-feel/Mokka/: o rsync do skel Garuda copia o
-#   pacote Mokka completo (incluindo layout.js) para o caminho user-local do skel.
-#   Plasma resolve temas user-local ANTES dos system-wide, então o layout.js que
-#   removemos de /usr/share/ ressurge em ~/.local/share/ quando o utilizador é
-#   criado a partir do skel → loadTemplate("org.garuda.desktop.defaultPanel")
-#   falha (template não existe no Fedora) → containment fantasma com plugin="" →
-#   "error when loading applet """. Remover a cópia user-local inteira força o
-#   Plasma a usar a versão system-wide (já sem layouts/).
-#   Os restantes assets Mokka user-local (.local/share/plasma/desktoptheme,
-#   color-schemes, wallpapers, konsole, Kvantum) são redundantes com os que
-#   install-assets.sh instala em /usr/share/ — removê-los evita duplicação e
-#   garante que updates à imagem se reflectem sem conflito user-local.
 rm -f /etc/skel/.config/autostart/initial-setup.desktop \
       /etc/skel/.config/autostart/initial-setup.sh \
       /etc/skel/.config/starship-mokka.toml
@@ -479,79 +277,55 @@ rm -rf /etc/skel/.config/environment.d \
        /etc/skel/.local/share/konsole/Mokka.colorscheme \
        /etc/skel/.local/share/Kvantum/Mokka
 
-install -Dm755 /ctx/skel/setup-user.sh /etc/skel/setup-user.sh
-install -Dm755 /ctx/skel/.local/bin/fedora-initial-setup \
-    /etc/skel/.local/bin/fedora-initial-setup
-install -Dm644 /ctx/skel/.config/systemd/user/fedora-setup.service \
-    /etc/skel/.config/systemd/user/fedora-setup.service
+# Shell padrão para novos utilizadores: zsh (evita chsh no primeiro login)
+sed -i 's|^SHELL=.*|SHELL=/bin/zsh|' /etc/default/useradd
 
-# VM compatibility: disable heavy kwin effects in virtual machines.
-# Script em /usr/libexec (caminho absoluto): o .desktop NÃO pode referenciar
-# $HOME no Exec — o gerador xdg-autostart do systemd escapa o `$` (→ "\$HOME"),
-# o exec aponta para um ficheiro inexistente e o serviço de utilizador falha.
-# Autostart system-wide em /etc/xdg/autostart → corre para todos os utilizadores
-# (o script lê $HOME/.config/kwinrc em runtime, onde HOME já está definido).
+# First-boot user services
+mkdir -p /etc/skel/.config/systemd/user/timers.target.wants
+
+for script in fedora-flatpak-setup fedora-shell-setup fedora-dev-setup fedora-brew-setup; do
+    install -Dm755 /ctx/configs/"${script}" /usr/libexec/"${script}"
+    install -Dm644 /ctx/skel/.config/systemd/user/"${script}".service \
+        /etc/skel/.config/systemd/user/"${script}".service
+    install -Dm644 /ctx/skel/.config/systemd/user/"${script}".timer \
+        /etc/skel/.config/systemd/user/"${script}".timer
+    ln -sf ../"${script}".timer \
+        /etc/skel/.config/systemd/user/timers.target.wants/"${script}".timer
+done
+
+install -Dm644 /ctx/configs/tmpfiles-homebrew.conf \
+    /usr/lib/tmpfiles.d/homebrew.conf
+
 install -Dm755 /ctx/skel/.local/bin/kwin-vm-compat.sh \
     /usr/libexec/kwin-vm-compat.sh
 install -Dm644 /ctx/skel/.config/autostart/kwin-vm-compat.desktop \
     /etc/xdg/autostart/kwin-vm-compat.desktop
 
-# Panel layout: provides the bottom taskbar without relying on Garuda-specific
-# look-and-feel templates (org.garuda.desktop.defaultPanel) that don't exist on Fedora.
 install -Dm644 /ctx/skel/.config/plasma-org.kde.plasma.desktop-appletsrc \
     /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc
 
-# Root user KDE config: /root is /var/roothome (mutable, empty at boot).
-# tmpfiles.d C entries copy skel config to root on first boot if files don't exist.
 install -Dm644 /ctx/configs/tmpfiles-root-kde.conf \
     /usr/lib/tmpfiles.d/fedora-kde-root-theme.conf
 
-# Remove Mokka layout.js (system-wide): the original Garuda script calls
-# loadTemplate() for panel templates that don't exist on Fedora and writes to
-# appletsrc via ConfigFile, creating key+subgroup collisions → ghost containment
-# with empty plugin → "error when loading applet """.  Removing the file entirely
-# makes Plasma skip the layout engine and use the skel appletsrc directly.
-# NOTA: a cópia user-local (skel/.local/share/plasma/look-and-feel/Mokka/) já foi
-# removida acima — sem isso o Plasma encontrava o layout.js no caminho user-local
-# (que tem prioridade sobre /usr/share/) e executava-o na mesma.
 rm -rf /usr/share/plasma/look-and-feel/Mokka/contents/layouts
 
-# KRunner: float KRunner in the center of the screen (moved here from layout.js
-# to avoid ConfigFile writes that conflict with the skel appletsrc).
 kwriteconfig6 --file /etc/skel/.config/krunnerrc \
     --group General --key FreeFloating "true"
 
-# Fix Mokka Splash.qml: 'sizes' is not defined — typo in the Garuda package (should be 'size')
-# Replace all word-bounded occurrences; 'sizes' appears in multiple lines (width, height, etc.)
 sed -i 's/\bsizes\b/size/g' \
     /usr/share/plasma/look-and-feel/Mokka/contents/splash/Splash.qml
 
-# Fix KSplash theme: Mokka defaults reference 'Catppuccin-Mocha-Mauve-splash' which
-# is not installed. Use 'Mokka' (the look-and-feel's own splash screen, now fixed above).
 sed -i 's/^Theme=Catppuccin-Mocha-Mauve-splash$/Theme=Mokka/' \
     /usr/share/plasma/look-and-feel/Mokka/contents/defaults
 
-# Fix lock screen wallpaper: Mokka defaults reference garuda-mokka/ path which does not
-# exist on Fedora. Wallpaper is installed as a KDE package at Mokka-tree/.
 sed -i 's|^Image=file:///usr/share/wallpapers/garuda-mokka/Mokka-tree\.jpg$|Image=file:///usr/share/wallpapers/Mokka-tree/|' \
     /usr/share/plasma/look-and-feel/Mokka/contents/defaults
 
-# KSplash skel config
 kwriteconfig6 --file /etc/skel/.config/ksplashrc \
     --group KSplash --key Theme "Mokka"
 
-# Disable plasma-setup OOBE (first-run wizard). plasma-setup.service corre
-# Before=display-manager.service e lança uma sessão Plasma própria (utilizador
-# plasma-setup) para criar o utilizador inicial — redundante aqui: o instalador
-# Anaconda já cria o utilizador (Modules.Users habilitado nos ISOs). Deixá-lo
-# activo preempta o login normal e gera ruído /run/plasma-setup no journal.
-# O flag /etc/plasma-setup-done é o mecanismo oficial (ConditionPathExists) que
-# o desliga.
 touch /etc/plasma-setup-done
 
-# Disable plasma-welcome OOBE for new users: system-wide default and per-user skel.
-# Without this, plasma-welcome runs on first login and plasma-setup tries to overwrite
-# kdeglobals/kwinrc — failing with "file already exists" because skel already wrote them.
 install -Dm644 /ctx/configs/plasma-welcomerc /etc/xdg/plasma-welcomerc
 kwriteconfig6 --file /etc/skel/.config/plasma-welcomerc \
     --group General --key ShowOnStartup "false"
@@ -559,18 +333,20 @@ kwriteconfig6 --file /etc/skel/.config/plasma-welcomerc \
     --group General --key LastSeenVersion "99.0"
 
 setfattr -n user.component -v "skel" \
-    /etc/skel/setup-user.sh \
-    /etc/skel/.local/bin/fedora-initial-setup
+    /usr/libexec/fedora-flatpak-setup \
+    /usr/libexec/fedora-shell-setup \
+    /usr/libexec/fedora-dev-setup \
+    /usr/libexec/fedora-brew-setup
 setfattr -n user.update-interval -v "monthly" \
-    /etc/skel/setup-user.sh \
-    /etc/skel/.local/bin/fedora-initial-setup
+    /usr/libexec/fedora-flatpak-setup \
+    /usr/libexec/fedora-shell-setup \
+    /usr/libexec/fedora-dev-setup \
+    /usr/libexec/fedora-brew-setup
 
-# ── Tema Mokka: visual theme ──────────────────────────────────────────────────
-# Plasma desktop shell theme (afecta painel, widgets, popup menus)
+# ── Tema Mokka ────────────────────────────────────────────────────────────────
 kwriteconfig6 --file /etc/skel/.config/plasmarc \
     --group Theme --key name "Mokka"
 
-# Color scheme + look-and-feel package
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
     --group General --key ColorScheme "Mokka"
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
@@ -578,11 +354,9 @@ kwriteconfig6 --file /etc/skel/.config/kdeglobals \
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
     --group KDE --key widgetStyle "kvantum-dark"
 
-# Ícones: variante -dark para fundo escuro (tray/painel com ícones claros)
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
     --group Icons --key Theme "Tela-circle-dracula-dark"
 
-# Fontes customizadas (JetBrains Mono em vez da Inter do Garuda)
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
     --group General --key fixed "JetBrains Mono,10,-1,5,50,0,0,0,0,0"
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
@@ -592,7 +366,6 @@ kwriteconfig6 --file /etc/skel/.config/kdeglobals \
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
     --group General --key toolBarFont "JetBrains Mono,10,-1,5,75,0,0,0,0,0"
 
-# Cursor
 kwriteconfig6 --file /etc/skel/.config/kcminputrc \
     --group Mouse --key cursorTheme "catppuccin-mocha-mauve-cursors"
 kwriteconfig6 --file /etc/skel/.config/kcminputrc \
@@ -601,19 +374,16 @@ kwriteconfig6 --file /etc/skel/.config/kcminputrc \
     --group "Libinput" --group "default" --key PointerAcceleration "0.45"
 
 # ── KWin ──────────────────────────────────────────────────────────────────────
-# Decoração Aurorae (requer catppuccin-kde instalado via install-assets.sh)
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group "org.kde.kdecoration2" --key library "org.kde.kwin.aurorae"
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group "org.kde.kdecoration2" --key theme "__aurorae__svg__CatppuccinMocha-Classic"
 
-# Botões à direita (estilo Windows, diferente do padrão Garuda que é à esquerda)
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group "org.kde.kdecoration2" --key ButtonsOnLeft ""
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group "org.kde.kdecoration2" --key ButtonsOnRight "IAX"
 
-# Efeitos visuais (desabilitados em VMs pelo kwin-vm-compat.sh; ativos em metal)
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group Plugins --key blurEnabled "true"
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
@@ -621,7 +391,6 @@ kwriteconfig6 --file /etc/skel/.config/kwinrc \
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group Plugins --key kwin4_effect_roundcornersEnabled "true"
 
-# Night Color
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group NightColor --key Active "true"
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
@@ -637,10 +406,7 @@ kwriteconfig6 --file /etc/skel/.config/kwinrc \
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group NightColor --key TransitionTime "30"
 
-# ── Ecrã de bloqueio (lock screen) ───────────────────────────────────────────
-# O Garuda skel instala kscreenlockerrc com Theme=Mokka (inválido: Mokka não tem
-# QML de lockscreen) e com wallpaper a apontar para o background do SDDM em vez
-# do Mokka-tree. Sobrescrever ambos os valores problemáticos.
+# ── Lock screen ───────────────────────────────────────────────────────────────
 kwriteconfig6 --file /etc/skel/.config/kscreenlockerrc \
     --group Greeter --key Theme --delete 2>/dev/null || true
 kwriteconfig6 --file /etc/skel/.config/kscreenlockerrc \
@@ -650,8 +416,6 @@ kwriteconfig6 --file /etc/skel/.config/kscreenlockerrc \
     --key Image "file:///usr/share/wallpapers/Mokka-tree/"
 
 # ── GTK themes ────────────────────────────────────────────────────────────────
-# O Garuda skel tem gtk-theme-name=Catppuccin-Purple-Dark-Catppuccin (não instalado)
-# e ícones/fontes errados. Sobrescrever com os nossos valores correctos.
 kwriteconfig6 --file /etc/skel/.config/gtk-3.0/settings.ini \
     --group Settings --key gtk-theme-name "catppuccin-mocha-mauve-standard+default"
 kwriteconfig6 --file /etc/skel/.config/gtk-3.0/settings.ini \
@@ -669,13 +433,15 @@ kwriteconfig6 --file /etc/skel/.config/gtk-4.0/settings.ini \
 kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
     --group "AC" --group "Performance" --key PowerProfile "performance"
 kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
-    --group "AC" --group "SuspendAndShutdown" --key AutoSuspendAction "0"
+    --group "AC" --group "SuspendAndShutdown" --key AutoSuspendAction "1"
+kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
+    --group "AC" --group "SuspendAndShutdown" --key AutoSuspendIdleTimeoutSec "1800"
 kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
     --group "Battery" --group "Performance" --key PowerProfile "power-saver"
 kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
     --group "Battery" --group "SuspendAndShutdown" --key AutoSuspendAction "1"
 kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
-    --group "Battery" --group "SuspendAndShutdown" --key AutoSuspendIdleTimeoutSec "600"
+    --group "Battery" --group "SuspendAndShutdown" --key AutoSuspendIdleTimeoutSec "1200"
 kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
     --group "LowBattery" --group "Performance" --key PowerProfile "power-saver"
 kwriteconfig6 --file /etc/skel/.config/powerdevilrc \
@@ -692,7 +458,6 @@ systemctl enable tuned
 systemctl enable earlyoom
 systemctl enable firewalld
 systemctl enable chronyd
-# Auto-updates: manter o sistema instalado actualizado automaticamente
 systemctl enable rpm-ostreed-automatic.timer
 systemctl enable podman-auto-update.timer
 systemctl list-unit-files flatpak-system-update.timer &>/dev/null \
@@ -706,22 +471,71 @@ fi
 systemctl enable flatpak-nuke-fedora.service
 systemctl enable flathub-system-setup.service
 systemctl enable input-remapper.service
-# Silencia o ruído de autoload do input-remapper (falha benigna por dispositivo
-# quando não há preset) — override da regra udev upstream.
 install -Dm644 /ctx/configs/udev-input-remapper.rules \
     /etc/udev/rules.d/99-input-remapper.rules
 if rpm -q scx-scheds &>/dev/null; then
     systemctl enable scx.service
 fi
 
-# Sistemas atómicos: o remote flathub NÃO é baked em /var (estado mutável que não
-# recebe updates e que o bootc lint sinaliza). Baixamos a definição estática para
-# /usr (imutável, com GPGKey embutida) e flathub-system-setup.service regista o
-# remote no boot. A remoção do remote `fedora` é feita pelo flatpak-nuke-fedora.service.
+systemctl enable thermald.service irqbalance.service
+# bolt e fwupd são D-Bus/udev-activated; o enable não é necessário (nem funciona no container)
+systemctl preset power-profiles-daemon.service 2>/dev/null || true
+
+mkdir -p /etc/tuned
+echo "balanced" > /etc/tuned/active_profile
+echo "auto" > /etc/tuned/profile_mode
+
+if command -v authselect >/dev/null 2>&1; then
+    authselect current --raw &>/dev/null || authselect select minimal --force
+    authselect enable-feature with-fingerprint || true
+    authselect enable-feature with-faillock || true
+fi
+
 install -d /usr/share/flatpak
 curl -L --fail --retry 3 --retry-delay 5 \
     -o /usr/share/flatpak/flathub.flatpakrepo \
     https://flathub.org/repo/flathub.flatpakrepo
+echo "::endgroup::"
+
+# ─── SELinux CIL policies (socket denial + user namespace hardening) ─────────
+echo "::group:: SELinux CIL policies"
+CIL_FILES=(
+    /ctx/selinux/secureblue_socket_utils.cil
+    /ctx/selinux/secureblue_deny_ipsec_sockets.cil
+    /ctx/selinux/secureblue_deny_obscure_sockets.cil
+    /ctx/selinux/secureblue_deny_alg_sockets.cil
+    /ctx/selinux/secureblue_deny_packet_radio_sockets.cil
+    /ctx/selinux/container-ptrace.cil
+    /ctx/selinux/harden_userns.cil
+    /ctx/selinux/harden_container_userns.cil
+    /ctx/selinux/grant_userns.cil
+    /ctx/selinux/userns_deny_unconfined_relabels.cil
+)
+# Instalados com prioridade 300 (>200 dos pacotes RPM, <400 do admin local)
+semodule -v -X 300 -i "${CIL_FILES[@]}"
+# SELinux booleans: nega ptrace via MAC (camada adicional ao Yama ptrace_scope=2)
+# container_allow_ptrace é definido no container-ptrace.cil acima
+setsebool -P deny_ptrace=on container_allow_ptrace=off || \
+    echo "WARN: setsebool falhou (SELinux não activo no build container; booleans aplicados no arranque)"
+restorecon -FRv /usr 2>/dev/null || true
+echo "::endgroup::"
+
+# ─── SUID removal ─────────────────────────────────────────────────────────────
+echo "::group:: SUID removal"
+# Strip SUID/SGID de todos os binários em /usr excepto sudo (KDE/kdesu precisa)
+find /usr -type f -perm /6000 -print0 | while IFS= read -r -d '' binary; do
+    case "$binary" in
+        /usr/bin/sudo|/usr/bin/su) continue ;;
+        *) chmod ug-s "$binary" && echo "Stripped: $binary" ;;
+    esac
+done
+# Remover binários desnecessários com histórico de vulnerabilidades SUID
+rm -f /usr/bin/chsh /usr/bin/chfn /usr/bin/pkexec
+# Substituir SUID por capabilities mínimas onde necessário
+setcap cap_sys_admin=ep /usr/bin/fusermount3 2>/dev/null \
+    || echo "WARN: setcap fusermount3 falhou"
+setcap cap_dac_read_search,cap_audit_write=ep /usr/sbin/unix_chkpwd 2>/dev/null \
+    || echo "WARN: setcap unix_chkpwd falhou"
 echo "::endgroup::"
 
 # ─── Remove build deps ────────────────────────────────────────────────────────
@@ -742,37 +556,19 @@ done
 echo "::endgroup::"
 
 # ─── Regenerate initramfs (virtio_gpu para Plymouth em VM) ────────────────────
-# A base-atomic NÃO inclui virtio_gpu no initramfs. Numa VM QEMU isso faz o
-# Plymouth arrancar no simpledrm (built-in) e perder o ecrã quando o virtio_gpu
-# assume o framebuffer ~1s depois (handoff). Pôr virtio_gpu no initramfs faz dele
-# o framebuffer ANTES do Plymouth arrancar (como i915/amdgpu já estão), eliminando
-# o handoff. No HW real o Plymouth já funcionava (driver nativo no initramfs).
-#
-# SEGURANÇA (motivo do aviso histórico): um initramfs sem o módulo ostree larga o
-# sistema em emergency mode. O ostree é forçado (01-ostree-required.conf) e
-# verificamos abaixo que ficou presente — senão o build falha. `just test-boot`
-# valida o boot real.
 echo "::group:: Initramfs"
 install -Dm644 /ctx/configs/dracut-drm-drivers.conf /etc/dracut.conf.d/02-drm-drivers.conf
 KVER=$(ls /usr/lib/modules | sort -V | tail -1)
 INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
 
-# Atualiza o índice de módulos antes do dracut: no meio do build o modules.dep
-# pode estar dessincronizado e o dracut não resolve o virtio_gpu via add/force_drivers.
 depmod "$KVER" 2>/dev/null || true
-
-# --force-drivers na linha de comando reforça a config (02-drm-drivers.conf).
 dracut --force --no-hostonly --force-drivers " virtio_gpu " --kver "$KVER" "$INITRAMFS"
 [[ -s "$INITRAMFS" ]] || { echo "FATAL: initramfs vazio após dracut: $INITRAMFS"; exit 1; }
 
-# ostree é CRÍTICO (sem ele → emergency mode) → falha o build se ausente.
 INITRD_MODS=$(lsinitrd --mod "$INITRAMFS" 2>/dev/null)
 printf '%s\n' "$INITRD_MODS" | grep -qE '^[[:space:]]*(50)?ostree[[:space:]]*$' \
     || { echo "FATAL: módulo ostree ausente no initramfs regenerado!"; exit 1; }
 echo "✓ ostree presente no initramfs"
-# virtio_gpu (ficheiro virtio-gpu.ko, hífen) é NÃO-crítico: só afeta o Plymouth em
-# VM. Se faltar, avisa mas NÃO falha o build (a imagem arranca bem; no HW real o
-# Plymouth funciona na mesma).
 if lsinitrd "$INITRAMFS" 2>/dev/null | grep -qiE 'virtio.gpu\.ko'; then
     echo "✓ virtio_gpu presente no initramfs"
 else
@@ -784,15 +580,8 @@ echo "::endgroup::"
 echo "::group:: Cleanup"
 dnf5 clean all
 rm -rf /var/cache/dnf /var/log/dnf* /var/log/hawkey*
-# bootc lint (nonempty-run-tmp): /run e /tmp são runtime-only — não devem conter
-# artefactos de build (dnf deixa /run/dnf).
 rm -rf /run/* /tmp/* 2>/dev/null || true
-# bootc lint (var-tmpfiles): cache de metadados e locks do dnf em /var/lib/dnf
-# não precisam de ser baked na imagem (recriados em runtime).
 rm -rf /var/lib/dnf/repos /var/lib/dnf/*.lock 2>/dev/null || true
-# bootc lint (var-tmpfiles): estado do flatpak em /var é mutável e configurado no
-# boot por flathub-system-setup.service — não deve ser baked. flatpak reinicializa
-# /var/lib/flatpak em runtime ao registar o remote.
 rm -rf /var/lib/flatpak 2>/dev/null || true
 rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
 LOCALE_REMOVED=0
@@ -802,10 +591,6 @@ done < <(find /usr/share/locale -mindepth 1 -maxdepth 1 \
     ! -name 'pt_BR' ! -name 'en_US' ! -name 'locale.alias' \
     -print0)
 echo "Locales removidos: $LOCALE_REMOVED (mantidos: pt_BR, en_US)"
-# Locale por omissão do sistema. Sem /etc/locale.conf, serviços como SDDM/
-# plasmalogin-helper correm com LANG=C (não-UTF-8) e o Qt avisa no journal.
-# en_US.UTF-8 está sempre disponível no locale-archive; o Anaconda sobrepõe
-# conforme a escolha do utilizador na instalação.
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 echo "::endgroup::"
 

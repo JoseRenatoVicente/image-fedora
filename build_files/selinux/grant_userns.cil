@@ -1,0 +1,5 @@
+;; Grants user namespace creation to specific system daemons that require it.
+;; Source: https://github.com/secureblue/secureblue (Apache-2.0 OR MIT)
+
+(allow colord_t self (user_namespace (create)))
+(allow devicekit_power_t self (user_namespace (create)))

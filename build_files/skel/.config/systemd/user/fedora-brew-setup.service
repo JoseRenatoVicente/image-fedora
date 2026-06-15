@@ -1,0 +1,16 @@
+[Unit]
+Description=Fedora Brew First-Boot Setup (Homebrew, terraform, kubectl, flux, talosctl)
+Wants=network-online.target
+After=network-online.target
+ConditionUser=!@system
+ConditionPathIsDirectory=/var/home/%u
+ConditionPathExists=!%E/fedora/fedora-brew-setup.stamp
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/fedora-brew-setup
+ExecStartPost=/bin/bash -c 'cfg="${XDG_CONFIG_HOME:-$HOME/.config}/fedora"; mkdir -p "$cfg" && touch "$cfg/fedora-brew-setup.stamp"'
+Restart=on-failure
+RestartSec=30s
+RestartMaxDelaySec=1800s
+RestartSteps=10

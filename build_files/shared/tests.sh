@@ -26,6 +26,21 @@ REQUIRED_PACKAGES=(
     plasma-firewall
     podman-docker
     tuned
+    # Dell/Intel laptop support
+    fprintd
+    libfprint
+    bolt
+    iio-sensor-proxy
+    thermald
+    irqbalance
+    tuned-ppd
+    alsa-sof-firmware
+    alsa-ucm
+    pipewire
+    wireplumber
+    fwupd
+    libsmbios
+    dmidecode
     yubikey-manager
     zsh
 )
@@ -61,7 +76,14 @@ UNWANTED_PACKAGES=(
     # Acessibilidade (removida)
     orca brltty speech-dispatcher
     # Firmware não-Intel (removido)
-    nvidia-gpu-firmware amd-gpu-firmware
+    amd-gpu-firmware
+    # Power stack conflicts / NVIDIA out of scope
+    power-profiles-daemon
+    nvidia-gpu-firmware
+    xorg-x11-drv-nvidia
+    akmod-nvidia
+    kmod-nvidia
+    nvidia-driver
     # VM guest agents (removidos)
     open-vm-tools-desktop virtualbox-guest-additions
     # KDE bloat que não deve estar presente
@@ -102,13 +124,62 @@ REQUIRED_UNITS=(
     flathub-system-setup.service
     input-remapper.service
     fedora-kinoite-plasmalogin-workaround.service
+    thermald.service
+    irqbalance.service
     rpm-ostreed-automatic.timer
     podman-auto-update.timer
 )
+# bolt e fwupd são ativados por D-Bus/udev — não têm WantedBy; presença verificada abaixo
+for unit in bolt.service fwupd.service; do
+    systemctl is-enabled "$unit" 2>/dev/null | grep -qE "^(enabled|static)$" \
+        || fail "Serviço ausente ou mascarado: $unit"
+done
 for unit in "${REQUIRED_UNITS[@]}"; do
     systemctl is-enabled "$unit" 2>/dev/null | grep -q "^enabled$" \
         || fail "Serviço não habilitado: $unit"
 done
+
+echo "=== Dell/Intel laptop support ==="
+systemctl list-unit-files fprintd.service &>/dev/null \
+    || fail "fprintd.service ausente"
+systemctl list-unit-files iio-sensor-proxy.service &>/dev/null \
+    || fail "iio-sensor-proxy.service ausente"
+systemctl list-unit-files tuned.service &>/dev/null \
+    || fail "tuned.service ausente"
+if systemctl list-unit-files power-profiles-daemon.service &>/dev/null; then
+    fail "power-profiles-daemon não deve estar instalado; tuned-ppd é o provedor escolhido"
+fi
+
+echo "=== Fingerprint PAM ==="
+if command -v authselect >/dev/null 2>&1; then
+    authselect current 2>/dev/null | grep -qi 'fingerprint\|fprint' \
+        || grep -Rqs 'pam_fprintd\.so' /etc/pam.d \
+        || fail "PAM/authselect sem suporte fingerprint"
+else
+    grep -Rqs 'pam_fprintd\.so' /etc/pam.d \
+        || fail "PAM sem pam_fprintd.so"
+fi
+
+echo "=== Intel SOF audio e Thunderbolt ==="
+[[ -d /lib/firmware/intel/sof || -d /usr/lib/firmware/intel/sof ]] \
+    || fail "Firmware Intel SOF ausente"
+[[ -e /usr/lib/udev/rules.d/70-libfprint-2.rules || -e /usr/lib/udev/rules.d/60-libfprint-2.rules ]] \
+    || fail "Regras udev do libfprint ausentes"
+rpm -q bolt >/dev/null 2>&1 \
+    || fail "bolt ausente para Thunderbolt/dock"
+
+echo "=== fwupd e SMBIOS ==="
+rpm -q fwupd >/dev/null 2>&1 \
+    || fail "fwupd ausente"
+rpm -q libsmbios >/dev/null 2>&1 \
+    || fail "libsmbios ausente"
+rpm -q dmidecode >/dev/null 2>&1 \
+    || fail "dmidecode ausente"
+
+echo "=== tuned perfil padrão ==="
+grep -q 'balanced' /etc/tuned/active_profile 2>/dev/null \
+    || fail "perfil tuned não é balanced; esperado para notebook Dell"
+
 # flatpak-system-update.timer é opcional: não existe em todas as versões da base
 if systemctl list-unit-files flatpak-system-update.timer &>/dev/null; then
     systemctl is-enabled flatpak-system-update.timer 2>/dev/null | grep -q "^enabled$" \
@@ -130,8 +201,10 @@ REQUIRED_FILES=(
     /etc/dracut.conf.d/99-omit-firewire.conf
     /etc/dracut.conf.d/99-omit-thunderbolt.conf
     /etc/dracut.conf.d/90-luks-security.conf
-    /etc/skel/setup-user.sh
-    /etc/skel/.local/bin/fedora-initial-setup
+    /usr/libexec/fedora-flatpak-setup
+    /usr/libexec/fedora-shell-setup
+    /usr/libexec/fedora-dev-setup
+    /usr/libexec/fedora-brew-setup
     /etc/selinux/config
     /etc/chrony.conf
     /etc/rpm-ostreed.conf
@@ -198,12 +271,14 @@ grep -qE '^FUTURE' /etc/crypto-policies/config 2>/dev/null \
     || fail "Crypto policy não é FUTURE (ou FUTURE:*)"
 
 echo "=== Performance / ZRAM ==="
-grep -q 'vm.swappiness = 180' /etc/sysctl.d/99-performance.conf \
-    || fail "swappiness não é 180 (requerido com ZRAM)"
+grep -q 'vm.swappiness = 100' /etc/sysctl.d/99-performance.conf \
+    || fail "swappiness não é 100 (ZRAM moderado para notebooks)"
 grep -q 'vm.max_map_count' /etc/sysctl.d/99-performance.conf \
     || fail "vm.max_map_count não configurado"
 grep -q 'compression-algorithm=zstd' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não configurado com zstd"
+grep -q 'zram-size = min(ram / 4, 4096)' /etc/systemd/zram-generator.conf \
+    || fail "ZRAM não limitado a min(ram / 4, 4096)"
 
 echo "=== DNF wrapper ==="
 grep -q 'rpm-ostree' /usr/bin/dnf \
@@ -371,6 +446,49 @@ KWIN_VER="$(rpm -q --qf '%{VERSION}' kwin 2>/dev/null || echo '')"
 if [[ -n "$KDE_VER" && -n "$KWIN_VER" && "$KDE_VER" != "$KWIN_VER" ]]; then
     fail "Mismatch de versão KDE: plasma-desktop=${KDE_VER} kwin=${KWIN_VER}"
 fi
+
+echo "=== login.defs hardening ==="
+grep -qE '^UMASK[[:space:]]+027' /etc/login.defs \
+    || fail "login.defs: UMASK não é 027 (ficheiros novos serão world-readable)"
+grep -qE '^YESCRYPT_COST_FACTOR[[:space:]]+8' /etc/login.defs \
+    || fail "login.defs: YESCRYPT_COST_FACTOR não é 8 (password hashing fraco)"
+
+echo "=== Authselect faillock ==="
+authselect current 2>/dev/null | grep -q 'with-faillock' \
+    || grep -rqs 'pam_faillock\.so' /etc/pam.d \
+    || fail "PAM/authselect sem faillock activo"
+
+echo "=== SUID removal ==="
+[[ ! -f /usr/bin/chsh ]]   || fail "chsh deve ter sido removido (SUID desnecessário)"
+[[ ! -f /usr/bin/chfn ]]   || fail "chfn deve ter sido removido (SUID desnecessário)"
+[[ ! -f /usr/bin/pkexec ]] || fail "pkexec deve ter sido removido (CVE-2021-4034)"
+[[ -u /usr/bin/sudo ]]     || fail "sudo perdeu bit SUID (necessário para KDE/kdesu)"
+
+echo "=== Container signing ==="
+[[ -f /etc/containers/registries.d/quay.io-fedora-ostree-desktops.yaml ]] \
+    || fail "Container signing: policy ausente para fedora-ostree-desktops"
+[[ -f /etc/containers/registries.d/quay.io-toolbx-images.yaml ]] \
+    || fail "Container signing: policy ausente para toolbx-images"
+
+echo "=== SELinux CIL policies ==="
+semodule -l 2>/dev/null | grep -q 'secureblue_deny_ipsec_sockets' \
+    || fail "SELinux: módulo secureblue_deny_ipsec_sockets não carregado"
+semodule -l 2>/dev/null | grep -q 'harden_userns' \
+    || fail "SELinux: módulo harden_userns não carregado"
+semodule -l 2>/dev/null | grep -q 'container-ptrace' \
+    || fail "SELinux: módulo container-ptrace não carregado"
+
+echo "=== sysctl sysrq e ICMP ==="
+grep -qE '^kernel\.sysrq\s*=\s*0' /etc/sysctl.d/60-security-hardening.conf \
+    || fail "sysctl: kernel.sysrq não é 0"
+grep -qE '^net\.ipv4\.icmp_echo_ignore_all\s*=\s*1' /etc/sysctl.d/60-security-hardening.conf \
+    || fail "sysctl: net.ipv4.icmp_echo_ignore_all não é 1"
+
+echo "=== modprobe DVB/RC ==="
+[[ -f /etc/modprobe.d/no-dvb-rc.conf ]] \
+    || fail "modprobe: blacklist DVB/RC ausente"
+grep -q 'dvb-core' /etc/modprobe.d/no-dvb-rc.conf \
+    || fail "modprobe: dvb-core não está blacklisted"
 
 if [[ $FAILED -eq 1 ]]; then
     echo "::endgroup::"

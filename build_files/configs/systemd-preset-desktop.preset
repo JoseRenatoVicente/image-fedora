@@ -31,8 +31,14 @@ disable sshd-keygen.target
 
 # Desabilitar serviços rootful não confinados
 disable low-memory-monitor.service
-disable thermald.service
 disable uresourced.service
+
+# Dell/Intel laptop support
+enable bolt.service
+enable thermald.service
+enable irqbalance.service
+enable fwupd.service
+disable power-profiles-daemon.service
 
 # Desabilitar SSSD
 disable sssd.service
