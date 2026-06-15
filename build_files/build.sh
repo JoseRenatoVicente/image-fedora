@@ -369,6 +369,66 @@ setfattr -n user.component -v "image-config" \
 
 echo "::endgroup::"
 
+# ─── Plasmalogin workaround (from Kinoite) ────────────────────────────────────
+# base-atomic não inclui o fix que o Kinoite tem para entries em falta do
+# plasmalogin em /etc/shadow e /etc/gshadow. Sem isto o plasma-login-manager
+# pode não arrancar. Ref: https://forge.fedoraproject.org/kde/tickets/issues/684
+echo "::group:: Plasmalogin workaround"
+
+cat > /usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service << 'EOF'
+[Unit]
+Description=Workaround for missing plasmalogin entries in /etc/shadow & /etc/gshadow
+Documentation=https://forge.fedoraproject.org/kde/tickets/issues/684
+ConditionPathIsReadWrite=/etc
+ConditionPathExists=/run/ostree-booted
+ConditionPathExists=!/etc/.fedora-kinoite-plasmalogin-workaround
+Before=plasmalogin.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/fedora-kinoite-plasmalogin-workaround
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /usr/libexec/fedora-kinoite-plasmalogin-workaround << 'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+
+echo "Checking plasmalogin entries in /etc/shadow & /etc/gshadow"
+
+if [[ $(grep -c "plasmalogin" "/etc/shadow") -eq 0 ]]; then
+    echo "plasmalogin:!*:::::::" >> "/etc/shadow"
+    echo "Added missing plasmalogin entry to /etc/shadow"
+else
+    echo "Nothing to do for /etc/shadow"
+fi
+
+if [[ $(grep -c "plasmalogin" "/etc/gshadow") -eq 0 ]]; then
+    echo "plasmalogin:!*::" >> "/etc/gshadow"
+    echo "Added missing plasmalogin entry to /etc/gshadow"
+else
+    echo "Nothing to do for /etc/gshadow"
+fi
+
+echo "Writing stamp file: /etc/.fedora-kinoite-plasmalogin-workaround"
+touch /etc/.fedora-kinoite-plasmalogin-workaround
+SCRIPT
+
+chmod a+x /usr/libexec/fedora-kinoite-plasmalogin-workaround
+
+cat >> /usr/lib/systemd/system-preset/35-security-desktop.preset << 'EOF'
+
+# Plasmalogin workaround (from Kinoite)
+enable fedora-kinoite-plasmalogin-workaround.service
+EOF
+
+systemctl preset fedora-kinoite-plasmalogin-workaround.service
+
+echo "::endgroup::"
+
 # ─── Theming ──────────────────────────────────────────────────────────────────
 echo "::group:: Theming"
 bash /ctx/install-assets.sh
