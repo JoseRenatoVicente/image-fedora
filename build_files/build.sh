@@ -34,32 +34,62 @@ echo 'add_dracutmodules+=" ostree "' > /etc/dracut.conf.d/01-ostree-required.con
 dnf5 install -y dnf5-plugins
 echo "::endgroup::"
 
-# ─── Versionlock KDE/Qt ───────────────────────────────────────────────────────
-# Previne partial upgrade do Plasma durante o build (causaria black screen).
-# Deve correr ANTES de qualquer dnf install que possa actualizar qt6/plasma.
-echo "::group:: Versionlock KDE/Qt"
-dnf5 versionlock add "qt6-*" "plasma-desktop"
-echo "::endgroup::"
-
-# ─── Remove bloat ─────────────────────────────────────────────────────────────
-echo "::group:: Remove bloat"
+# ─── Remove base-atomic bloat ─────────────────────────────────────────────────
+# A base-atomic traz pacotes que não usamos (impressoras, acessibilidade, firmware
+# de hardware que não temos, input methods asiáticos, VM guest agents, etc.).
+# Remover ANTES de instalar KDE para evitar dnf resolver dependências contra eles.
+echo "::group:: Remove base-atomic bloat"
 REMOVE_PKGS=(
-    kmahjongg kpat kmines kolourpaint
-    krdc krfb kmouth kmousetool
-    konversation kaddressbook korganizer kmail kontact
-    akregator elisa-player dragon kamoso
-    mediawriter ptyxis firefox
+    # Impressoras (~124 MB)
+    cups cups-browsed cups-filters hplip
+    gutenprint gutenprint-cups bluez-cups
+    system-config-printer-udev
+    c2esp dymo-cups-drivers printer-driver-brlaser ptouch-driver splix
+    mpage paps
+
+    # Acessibilidade (~121 MB)
+    orca brltty speech-dispatcher
+
+    # Firmware não-Intel (~224 MB)
+    nvidia-gpu-firmware amd-gpu-firmware amd-ucode-firmware
+    atheros-firmware mt7xxx-firmware realtek-firmware
+    brcmfmac-firmware libertas-firmware tiwilink-firmware
+    nxpwireless-firmware b43-fwcutter b43-openfwwf
+    qcom-wwan-firmware
+
+    # Langpacks/fontes desnecessárias (~400 MB)
+    glibc-all-langpacks
+    default-fonts-cjk-mono default-fonts-cjk-sans default-fonts-cjk-serif
+    cldr-emoji-annotation
+
+    # IBus / input methods asiáticos (~160 MB)
+    ibus-anthy ibus-chewing ibus-hangul
+    ibus-libpinyin ibus-m17n ibus-typing-booster
+
+    # VM guest agents / virtualização (~50 MB)
+    open-vm-tools-desktop spice-vdagent spice-webdavd
+    hyperv-daemons qemu-guest-agent virtualbox-guest-additions
+
+    # Serviços de rede não utilizados
+    nfs-utils cifs-utils samba-client
+    sssd-common sssd-kcm
+
+    # Outros
+    hunspell sos fpaste words pinfo lrzsz kmscon
 )
 FOUND_PKGS=()
 for pkg in "${REMOVE_PKGS[@]}"; do
     rpm -q "$pkg" &>/dev/null && FOUND_PKGS+=("$pkg")
 done
 if [[ ${#FOUND_PKGS[@]} -gt 0 ]]; then
-    dnf5 remove -y "${FOUND_PKGS[@]}"
-    echo "Removidos: ${FOUND_PKGS[*]}"
+    dnf5 remove -y --setopt=clean_requirements_on_remove=False "${FOUND_PKGS[@]}"
+    echo "Removidos ${#FOUND_PKGS[@]} pacotes: ${FOUND_PKGS[*]}"
 else
     echo "Nenhum pacote de bloat encontrado."
 fi
+
+# Substituir glibc-all-langpacks por langpacks mínimos (pt_BR + en_US)
+dnf5 install -y glibc-langpack-pt glibc-langpack-en
 echo "::endgroup::"
 
 # ─── sudo → run0 (alias) ──────────────────────────────────────────────────────
