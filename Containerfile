@@ -10,7 +10,7 @@ ARG SHA_HEAD_SHORT=""
 ARG SOURCE_DATE_EPOCH=""
 
 # Base Image
-FROM quay.io/fedora-ostree-desktops/base-atomic:44
+FROM quay.io/fedora-ostree-desktops/base-atomic:44@sha256:6856041720a8a506343df50b357f0e643801a8cc10e092fd5ac2024031fc5d34
 
 ARG IMAGE_NAME="fedora"
 ARG IMAGE_PRETTY_NAME="Fedora"

@@ -36,7 +36,7 @@ ALLOWLIST=(
     'Bluetooth: hci' 'BlueZ system service is not available' 'org.bluez'
     'compatible running Bluez' 'bluetooth adapter' 'Bolt manager'
     # ── systemd-tmpfiles / SELinux / namespacing benignos ──
-    'systemd-tmpfiles.*(already exists|Failed to open path)'
+    'systemd-tmpfiles.*(already exists|Failed to open path|Failed to parse ACL)'
     'SELinux.*checkreqprot' 'systemd-analyze'
     'Failed to set up mount namespacing.*/proc'
     # ── Resolução de grupos/users no boot precoce (initramfs/pré-sysusers): os
@@ -140,6 +140,12 @@ if [[ -f "$APPLETSRC_RT" ]]; then
     LAYOUT_LOCAL="/var/home/${TESTUSER}/.local/share/plasma/look-and-feel/Mokka/contents/layouts"
     if [[ -d "$LAYOUT_LOCAL" ]]; then
         report FAIL "Painel: layout.js user-local existe ($LAYOUT_LOCAL) — skel não foi limpo"
+    fi
+    if grep -q 'SystrayContainmentId' "$APPLETSRC_RT" 2>/dev/null; then
+        report FAIL "Painel: SystrayContainmentId legado presente em runtime (systemtray Plasma 6 deve usar applets aninhados)"
+    fi
+    if grep -q '^plugin=org\.kde\.plasma\.private\.systemtray$' "$APPLETSRC_RT" 2>/dev/null; then
+        report FAIL "Painel: containment legado org.kde.plasma.private.systemtray presente em runtime"
     fi
 else
     report INFO "Painel: appletsrc de runtime ainda não escrito ($APPLETSRC_RT)"

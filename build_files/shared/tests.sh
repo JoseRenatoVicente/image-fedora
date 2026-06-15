@@ -215,17 +215,43 @@ echo "=== Plasma: plugins do skel ==="
 APPLETSRC="/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc"
 if [[ -f "$APPLETSRC" ]]; then
     # Apanha plugins VAZIOS — causa do "error when loading applet """
-    # Plugins built-in do KDE (org.kde.*) não têm directório em plasmoids/ mas são válidos.
-    # Só verificamos a existência de plugins de terceiros (sem prefixo org.kde.).
+    # Valida plugins referenciados no skel contra os diretórios de pacote Plasma.
+    # Alguns built-ins não vivem em plasmoids/ (ex.: org.kde.panel), mas os applets
+    # e containments declarados explicitamente aqui devem existir onde aplicável.
     while IFS= read -r plugin; do
         [[ -z "$plugin" ]] && fail "Plugin vazio em appletsrc (causa de 'error when loading applet \"\"')" && continue
-        # Plugin built-in do KDE — sem directório, mas válido
-        [[ "$plugin" == org.kde.* ]] && continue
+        case "$plugin" in
+            org.kde.panel|org.kde.plasma.digitalclock|org.kde.plasma.kickoff|org.kde.plasma.marginsseparator|org.kde.plasma.pager|org.kde.plasma.showdesktop|org.kde.plasma.systemtray|org.kde.plasma.taskmanager)
+                continue
+                ;;
+            org.kde.plasma.desktop)
+                fail "Plugin inválido no skel: org.kde.plasma.desktop (Plasma 6 usa org.kde.plasma.folder)"
+                continue
+                ;;
+        esac
         # Plugin de terceiros: deve ter directório em plasmoids/
         [[ -d "/usr/share/plasma/plasmoids/$plugin" ]] ||
             [[ -d "/usr/share/kpackage/genericqml/$plugin" ]] ||
-            fail "Plugin de terceiros não encontrado em plasmoids/: $plugin"
+            fail "Plugin referenciado no skel não encontrado em plasmoids/kpackage: $plugin"
     done < <(grep "^plugin=" "$APPLETSRC" | sed 's/^plugin=//')
+    # Systemtray: extraItems= / knownItems= com string vazia são parseados como
+    # lista com um elemento "" → systemtray tenta carregar applet com plugin="" →
+    # "error when loading applet """. Estas chaves devem estar AUSENTES (auto-descoberta)
+    # ou conter IDs reais separados por vírgula.
+    for key in extraItems knownItems; do
+        if grep -qE "^${key}=\$" "$APPLETSRC" 2>/dev/null; then
+            fail "Systemtray: ${key}= é string vazia no appletsrc (causa 'error when loading applet'; remover a chave)"
+        fi
+    done
+    # O skel deve manter o systray mínimo. Deixar o Plasma 6 gerar os sub-applets
+    # evita migração/criação parcial no arranque, que produz "File name empty!" e
+    # "error when loading applet \"\"" mesmo sem plugin vazio persistido.
+    grep -q 'SystrayContainmentId' "$APPLETSRC" && \
+        fail "Systemtray: SystrayContainmentId legado presente; usar applets aninhados do Plasma 6"
+    grep -q '^plugin=org\.kde\.plasma\.private\.systemtray$' "$APPLETSRC" && \
+        fail "Systemtray: containment legado org.kde.plasma.private.systemtray presente; usar applets aninhados do Plasma 6"
+    grep -q '^\[Containments\]\[2\]\[Applets\]\[7\]\[Applets\]\[[0-9][0-9]*\]$' "$APPLETSRC" && \
+        fail "Systemtray: skel pré-popula sub-applets; deixar Plasma gerar em runtime"
 else
     fail "appletsrc de skel ausente: $APPLETSRC"
 fi

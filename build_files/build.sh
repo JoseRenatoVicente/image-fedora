@@ -72,6 +72,9 @@ REMOVE_PKGS=(
     ibus-anthy ibus-chewing ibus-hangul
     ibus-libpinyin ibus-m17n ibus-typing-booster
 
+    # Firefox (vem na base-atomic, não é usado — substituído por flatpak)
+    firefox firefox-langpacks
+
     # VM guest agents / virtualização (~50 MB)
     open-vm-tools-desktop spice-vdagent spice-webdavd
     hyperv-daemons qemu-guest-agent virtualbox-guest-additions
@@ -138,7 +141,7 @@ PACKAGES=(
     # Temas fallback
     plasma-breeze breeze-icon-theme aurorae
     # Extras Kinoite
-    plasma-discover-rpm-ostree plasma-keyboard
+    plasma-keyboard
     vulkan-tools mobile-broadband-provider-info NetworkManager-ppp
     plymouth-system-theme
 
@@ -197,6 +200,10 @@ dnf5 install -y --allowerasing \
     --exclude=mariadb-server-utils \
     --exclude=qt5-qtbase \
     --exclude=kde-connect \
+    --exclude=firefox \
+    --exclude=orca \
+    --exclude=speech-dispatcher \
+    --exclude=plasma-discover \
     "${PACKAGES[@]}"
 echo "::endgroup::"
 
