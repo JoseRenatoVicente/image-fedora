@@ -143,8 +143,8 @@ PACKAGES=(
     plymouth-system-theme
 
     # ── Ferramentas do utilizador ─────────────────────────────────────────────
-    # Dev tools
-    git curl unzip tar jq make gettext
+    # Dev tools (git-core já vem na base-atomic; full git entra via git-credential-libsecret)
+    curl unzip tar jq make gettext
     # CLI tools
     bat btop fd-find ripgrep fastfetch eza
     neovim
@@ -196,8 +196,6 @@ dnf5 install -y --allowerasing \
     --exclude=plasma-workspace-x11 \
     --exclude=mariadb-server-utils \
     --exclude=qt5-qtbase \
-    --exclude=perl-interpreter \
-    --exclude=perl-libs \
     --exclude=kde-connect \
     "${PACKAGES[@]}"
 echo "::endgroup::"
