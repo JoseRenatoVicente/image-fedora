@@ -774,7 +774,6 @@ echo "::endgroup::"
 
 # ─── Cleanup final ────────────────────────────────────────────────────────────
 echo "::group:: Cleanup"
-dnf5 versionlock clear
 dnf5 clean all
 rm -rf /var/cache/dnf /var/log/dnf* /var/log/hawkey*
 # bootc lint (nonempty-run-tmp): /run e /tmp são runtime-only — não devem conter
