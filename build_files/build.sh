@@ -39,6 +39,13 @@ echo "::endgroup::"
 # de hardware que não temos, input methods asiáticos, VM guest agents, etc.).
 # Remover ANTES de instalar KDE para evitar dnf resolver dependências contra eles.
 echo "::group:: Remove base-atomic bloat"
+
+# Substituir glibc-all-langpacks por langpacks mínimos (pt_BR + en_US).
+# Deve ser feito ANTES da remoção em massa porque glibc exige pelo menos um
+# glibc-langpack — remover glibc-all-langpacks sem alternativa falha o resolver.
+dnf5 install -y --allowerasing glibc-langpack-pt glibc-langpack-en
+dnf5 remove -y glibc-all-langpacks
+
 REMOVE_PKGS=(
     # Impressoras (~124 MB)
     cups cups-browsed cups-filters hplip
@@ -57,8 +64,7 @@ REMOVE_PKGS=(
     nxpwireless-firmware b43-fwcutter b43-openfwwf
     qcom-wwan-firmware
 
-    # Langpacks/fontes desnecessárias (~400 MB)
-    glibc-all-langpacks
+    # Fontes desnecessárias
     default-fonts-cjk-mono default-fonts-cjk-sans default-fonts-cjk-serif
     cldr-emoji-annotation
 
@@ -87,9 +93,6 @@ if [[ ${#FOUND_PKGS[@]} -gt 0 ]]; then
 else
     echo "Nenhum pacote de bloat encontrado."
 fi
-
-# Substituir glibc-all-langpacks por langpacks mínimos (pt_BR + en_US)
-dnf5 install -y glibc-langpack-pt glibc-langpack-en
 echo "::endgroup::"
 
 # ─── sudo → run0 (alias) ──────────────────────────────────────────────────────
