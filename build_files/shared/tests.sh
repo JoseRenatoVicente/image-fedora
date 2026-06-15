@@ -39,15 +39,37 @@ for pkg in "${REQUIRED_PACKAGES[@]}"; do
     fi
 done
 
+echo "=== Pacotes KDE essenciais ==="
+KDE_REQUIRED=(
+    plasma-desktop
+    plasma-workspace
+    kwin
+    plasma-login-manager
+    dolphin
+    konsole
+)
+for pkg in "${KDE_REQUIRED[@]}"; do
+    rpm -q "$pkg" > /dev/null 2>&1 || fail "Pacote KDE ausente: $pkg"
+done
+
 echo "=== Pacotes indesejados ==="
 UNWANTED_PACKAGES=(
     code
     firefox
-    kmahjongg
-    kpat
-    kmines
-    mediawriter
-    ptyxis
+    # Impressoras (removidas da base-atomic)
+    cups hplip gutenprint
+    # Acessibilidade (removida)
+    orca brltty speech-dispatcher
+    # Firmware não-Intel (removido)
+    nvidia-gpu-firmware amd-gpu-firmware
+    # VM guest agents (removidos)
+    open-vm-tools-desktop virtualbox-guest-additions
+    # KDE bloat que não deve estar presente
+    plasma-discover
+    plasma-workspace-wallpapers
+    kde-connect
+    akonadi-server
+    mariadb-server
 )
 for pkg in "${UNWANTED_PACKAGES[@]}"; do
     if rpm -q "$pkg" > /dev/null 2>&1; then
@@ -79,6 +101,7 @@ REQUIRED_UNITS=(
     flatpak-nuke-fedora.service
     flathub-system-setup.service
     input-remapper.service
+    fedora-kinoite-plasmalogin-workaround.service
     rpm-ostreed-automatic.timer
     podman-auto-update.timer
 )
