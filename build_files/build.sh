@@ -734,7 +734,7 @@ done
 echo "::endgroup::"
 
 # ─── Regenerate initramfs (virtio_gpu para Plymouth em VM) ────────────────────
-# A base Kinoite NÃO inclui virtio_gpu no initramfs. Numa VM QEMU isso faz o
+# A base-atomic NÃO inclui virtio_gpu no initramfs. Numa VM QEMU isso faz o
 # Plymouth arrancar no simpledrm (built-in) e perder o ecrã quando o virtio_gpu
 # assume o framebuffer ~1s depois (handoff). Pôr virtio_gpu no initramfs faz dele
 # o framebuffer ANTES do Plymouth arrancar (como i915/amdgpu já estão), eliminando
