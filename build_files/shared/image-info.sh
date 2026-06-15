@@ -14,13 +14,13 @@ cat > "$IMAGE_INFO" << EOF
 {
   "image-name": "${IMAGE_NAME}",
   "image-vendor": "${IMAGE_VENDOR:-custom}",
-  "base-image-name": "kinoite",
+  "base-image-name": "base-atomic",
   "fedora-version": "$(rpm -E %fedora)"
 }
 EOF
 
 # Personalizar /usr/lib/os-release para que neofetch/fastfetch mostrem
-# o nome correcto em vez de "Fedora Linux (Kinoite)".
+# o nome correcto em vez de "Fedora Linux".
 sed -i "s|^NAME=.*|NAME=\"${IMAGE_PRETTY_NAME}\"|" /usr/lib/os-release
 sed -i "s|^PRETTY_NAME=.*|PRETTY_NAME=\"${IMAGE_PRETTY_NAME}\"|" /usr/lib/os-release
 sed -i "s|^VARIANT_ID=.*|VARIANT_ID=${IMAGE_NAME}|" /usr/lib/os-release

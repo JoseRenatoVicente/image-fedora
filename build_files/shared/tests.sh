@@ -109,12 +109,12 @@ for unit in "${REQUIRED_UNITS[@]}"; do
     systemctl is-enabled "$unit" 2>/dev/null | grep -q "^enabled$" \
         || fail "Serviço não habilitado: $unit"
 done
-# flatpak-system-update.timer é opcional: não existe em todas as versões do Kinoite
+# flatpak-system-update.timer é opcional: não existe em todas as versões da base
 if systemctl list-unit-files flatpak-system-update.timer &>/dev/null; then
     systemctl is-enabled flatpak-system-update.timer 2>/dev/null | grep -q "^enabled$" \
         || fail "Serviço não habilitado: flatpak-system-update.timer"
 fi
-# dconf-update.service é opcional: não existe em todas as versões do Kinoite
+# dconf-update.service é opcional: não existe em todas as versões da base
 if systemctl list-unit-files dconf-update.service &>/dev/null; then
     systemctl is-enabled dconf-update.service 2>/dev/null | grep -q "^enabled$" \
         || fail "Serviço não habilitado: dconf-update.service"

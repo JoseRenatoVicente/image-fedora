@@ -205,7 +205,7 @@ echo "::group:: COPR packages"
 copr_install_isolated "matinlotfali/KDE-Rounded-Corners" \
     kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
     || echo "WARN: kwin-effect-roundcorners não instalado"
-# scx-scheds não está nos repos padrão do Kinoite (disponível via COPR sched_ext)
+# scx-scheds não está nos repos padrão do Fedora (disponível via COPR sched_ext)
 copr_install_isolated "sched_ext/scx" \
     scx-scheds \
     || echo "WARN: scx-scheds não instalado"
