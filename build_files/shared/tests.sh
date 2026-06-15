@@ -254,13 +254,31 @@ grep -q 'Catppuccin-Mocha-Mauve-splash' "$MOKKA_DEFAULTS" && \
 grep -q 'garuda-mokka' "$MOKKA_DEFAULTS" && \
     fail "Mokka defaults: ainda referencia path 'garuda-mokka' (wallpaper lock screen não corrigido)"
 
-LAYOUT_JS="$MOKKA_DIR/contents/layouts/org.kde.plasma.desktop-layout.js"
-[[ -f "$LAYOUT_JS" ]] || fail "Mokka: layout.js ausente"
-grep -qE 'loadTemplate\s*\(|a2n\.blur\s*\(' "$LAYOUT_JS" && \
-    fail "Mokka layout.js: ainda contém chamadas Garuda-específicas (patch não aplicado)"
-# ConfigFile writes to appletsrc create key+subgroup collision → ghost containment → empty applet error
-grep -qE 'ConfigFile\s*\(\s*['"'"'"]plasma-org\.kde\.plasma\.desktop-appletsrc' "$LAYOUT_JS" && \
-    fail "Mokka layout.js: ainda escreve em appletsrc via ConfigFile (causa 'error when loading applet \"\"')"
+# layout.js deve ter sido removido — a sua existência activa o pipeline de layout
+# do Plasma, que pode criar containments fantasma com plugin vazio.
+LAYOUT_DIR="$MOKKA_DIR/contents/layouts"
+[[ -d "$LAYOUT_DIR" ]] && \
+    fail "Mokka: directório layouts/ ainda existe (deve ser removido para evitar ghost containments)"
+
+# layout.js user-local (skel): o rsync do Garuda copia o pacote Mokka completo
+# para /etc/skel/.local/share/. Plasma resolve caminhos user-local ANTES dos
+# system-wide, então um layout.js em ~/.local/share/ anula a remoção de
+# /usr/share/. O build deve limpar esta cópia.
+SKEL_LOCAL_MOKKA="/etc/skel/.local/share/plasma/look-and-feel/Mokka"
+[[ -d "$SKEL_LOCAL_MOKKA" ]] && \
+    fail "Mokka: skel user-local look-and-feel existe ($SKEL_LOCAL_MOKKA) — deve ser removido (overrides system-wide)"
+
+# Assets Mokka redundantes no skel: instalados system-wide por install-assets.sh,
+# não devem existir também em user-local (duplicação + conflito em updates).
+for skel_dup in \
+    "/etc/skel/.local/share/plasma/desktoptheme/Mokka" \
+    "/etc/skel/.local/share/color-schemes/Mokka.colors" \
+    "/etc/skel/.local/share/wallpapers/Mokka-tree" \
+    "/etc/skel/.local/share/konsole/Mokka.colorscheme" \
+    "/etc/skel/.local/share/Kvantum/Mokka"; do
+    [[ -e "$skel_dup" ]] && \
+        fail "Mokka: asset user-local duplicado no skel: $skel_dup (já instalado em /usr/share/)"
+done
 
 [[ -f "/usr/share/color-schemes/Mokka.colors" ]] || fail "Mokka: color scheme ausente"
 [[ -d "/usr/share/plasma/desktoptheme/Mokka" ]]  || fail "Mokka: desktop theme ausente"

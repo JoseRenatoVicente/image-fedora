@@ -309,6 +309,35 @@ echo "::endgroup::"
 echo "::group:: Skel + KDE defaults"
 mkdir -p /etc/skel/.config
 
+# Limpar ficheiros órfãos do skel Garuda Mokka que não devem existir nesta imagem:
+# - initial-setup.{desktop,sh}: usa fish shell (não instalado) e referencia configs Garuda
+# - environment.d/garuda.conf: define BROWSER=firedragon, EDITOR=/usr/bin/micro etc.
+# - starship-mokka.toml: config starship do Garuda (tema movido para starship.toml pelo script)
+# - fish/: config do fish shell (não instalado nesta imagem)
+# - .local/share/plasma/look-and-feel/Mokka/: o rsync do skel Garuda copia o
+#   pacote Mokka completo (incluindo layout.js) para o caminho user-local do skel.
+#   Plasma resolve temas user-local ANTES dos system-wide, então o layout.js que
+#   removemos de /usr/share/ ressurge em ~/.local/share/ quando o utilizador é
+#   criado a partir do skel → loadTemplate("org.garuda.desktop.defaultPanel")
+#   falha (template não existe no Fedora) → containment fantasma com plugin="" →
+#   "error when loading applet """. Remover a cópia user-local inteira força o
+#   Plasma a usar a versão system-wide (já sem layouts/).
+#   Os restantes assets Mokka user-local (.local/share/plasma/desktoptheme,
+#   color-schemes, wallpapers, konsole, Kvantum) são redundantes com os que
+#   install-assets.sh instala em /usr/share/ — removê-los evita duplicação e
+#   garante que updates à imagem se reflectem sem conflito user-local.
+rm -f /etc/skel/.config/autostart/initial-setup.desktop \
+      /etc/skel/.config/autostart/initial-setup.sh \
+      /etc/skel/.config/starship-mokka.toml
+rm -rf /etc/skel/.config/environment.d \
+       /etc/skel/.config/fish \
+       /etc/skel/.local/share/plasma/look-and-feel/Mokka \
+       /etc/skel/.local/share/plasma/desktoptheme/Mokka \
+       /etc/skel/.local/share/color-schemes/Mokka.colors \
+       /etc/skel/.local/share/wallpapers/Mokka-tree \
+       /etc/skel/.local/share/konsole/Mokka.colorscheme \
+       /etc/skel/.local/share/Kvantum/Mokka
+
 install -Dm755 /ctx/skel/setup-user.sh /etc/skel/setup-user.sh
 install -Dm755 /ctx/skel/.local/bin/fedora-initial-setup \
     /etc/skel/.local/bin/fedora-initial-setup
@@ -336,14 +365,15 @@ install -Dm644 /ctx/skel/.config/plasma-org.kde.plasma.desktop-appletsrc \
 install -Dm644 /ctx/configs/tmpfiles-root-kde.conf \
     /usr/lib/tmpfiles.d/fedora-kde-root-theme.conf
 
-# Patch Mokka layout.js: remove Garuda-specific loadTemplate / a2n.blur calls and
-# all ConfigFile writes to plasma-org.kde.plasma.desktop-appletsrc.
-# Writing [ActionPlugins][0][RightButton;NoModifier] (nested subgroup) while the
-# skel already has [ActionPlugins][0] with RightButton;NoModifier as a flat key
-# creates an invalid KConfig state → Plasma generates a ghost containment with
-# empty plugin → "error when loading applet """.
-install -Dm644 /ctx/configs/mokka-layout.js \
-    /usr/share/plasma/look-and-feel/Mokka/contents/layouts/org.kde.plasma.desktop-layout.js
+# Remove Mokka layout.js (system-wide): the original Garuda script calls
+# loadTemplate() for panel templates that don't exist on Fedora and writes to
+# appletsrc via ConfigFile, creating key+subgroup collisions → ghost containment
+# with empty plugin → "error when loading applet """.  Removing the file entirely
+# makes Plasma skip the layout engine and use the skel appletsrc directly.
+# NOTA: a cópia user-local (skel/.local/share/plasma/look-and-feel/Mokka/) já foi
+# removida acima — sem isso o Plasma encontrava o layout.js no caminho user-local
+# (que tem prioridade sobre /usr/share/) e executava-o na mesma.
+rm -rf /usr/share/plasma/look-and-feel/Mokka/contents/layouts
 
 # KRunner: float KRunner in the center of the screen (moved here from layout.js
 # to avoid ConfigFile writes that conflict with the skel appletsrc).

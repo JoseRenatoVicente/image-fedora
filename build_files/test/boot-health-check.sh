@@ -55,9 +55,10 @@ ALLOWLIST=(
     'Didn.t find any Discover backend' 'Unexpected transport format'
     'org/kde/discover' 'Only binding to one of multiple key bindings'
     # ── plasmashell cosmético (a sessão funciona; entradas órfãs/QML upstream) ──
-    # NOTA: 'error when loading applet' NÃO está allowlistado de propósito — é o
-    # fantasma do painel Mokka que estamos a corrigir (systemtray containment).
-    # Se reaparecer, deve surgir como WARN para sabermos.
+    # 'error when loading applet' NÃO está na allowlist: indica containment fantasma
+    # (plugin vazio) causado por layout.js do Garuda ou criação dinâmica do systemtray.
+    # O skel appletsrc pré-define SystrayContainmentId e a cópia user-local do
+    # layout.js foi removida no build — se este erro surgir, é uma regressão real.
     'Entry is not valid' 'File name empty' 'QQmlComponent: Component is not ready'
     'Unable to assign'
     # ── Cosmético upstream KDE (não corrigível sem patch dos pacotes KDE) ──
@@ -122,15 +123,23 @@ fi
 # ── 3b. Painel Plasma: fantasma de containment (plugin vazio) ────────────────
 # Causa do "error when loading applet \"\"". Lê o appletsrc em runtime do testuser
 # (escrito pelo plasmashell na 1ª sessão) e reporta plugins vazios.
+# Com o skel appletsrc correcto (SystrayContainmentId pré-definido) e o layout.js
+# removido (system-wide + user-local), fantasmas indicam regressão real → FAIL.
 APPLETSRC_RT="/var/home/${TESTUSER}/.config/plasma-org.kde.plasma.desktop-appletsrc"
 if [[ -f "$APPLETSRC_RT" ]]; then
     GHOSTS=$(grep -c '^plugin=$' "$APPLETSRC_RT" 2>/dev/null || echo 0)
     if [[ "$GHOSTS" -gt 0 ]]; then
-        report WARN "Painel: $GHOSTS containment(s) com plugin vazio no appletsrc (fantasma)"
+        report FAIL "Painel: $GHOSTS containment(s) com plugin vazio no appletsrc (fantasma)"
         # Mostra as seções afetadas para diagnóstico
         grep -nE '^\[Containments\]|^plugin=$' "$APPLETSRC_RT" 2>/dev/null | grep -B1 '^[0-9]*:plugin=$' | while IFS= read -r l; do report INFO "  appletsrc: $l"; done
     else
         report PASS "Painel: sem fantasmas (nenhum plugin vazio no appletsrc)"
+    fi
+    # Verifica se o layout.js do Garuda foi executado (user-local): se existir,
+    # indica que a limpeza do skel falhou e o Plasma pode ter criado fantasmas.
+    LAYOUT_LOCAL="/var/home/${TESTUSER}/.local/share/plasma/look-and-feel/Mokka/contents/layouts"
+    if [[ -d "$LAYOUT_LOCAL" ]]; then
+        report FAIL "Painel: layout.js user-local existe ($LAYOUT_LOCAL) — skel não foi limpo"
     fi
 else
     report INFO "Painel: appletsrc de runtime ainda não escrito ($APPLETSRC_RT)"
