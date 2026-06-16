@@ -14,5 +14,23 @@ RemainAfterExit=yes
 # rede; --if-not-exists torna a operação idempotente entre boots.
 ExecStart=/usr/bin/flatpak remote-add --system --if-not-exists flathub /usr/share/flatpak/flathub.flatpakrepo
 
+# Sandboxing (Ubuntu apport/insights pattern)
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/flatpak
+ProtectHome=yes
+PrivateTmp=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
 [Install]
 WantedBy=multi-user.target

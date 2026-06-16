@@ -14,3 +14,7 @@ Restart=on-failure
 RestartSec=30s
 RestartMaxDelaySec=1800s
 RestartSteps=10
+NoNewPrivileges=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
