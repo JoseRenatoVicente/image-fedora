@@ -36,7 +36,10 @@ _install_garuda_mokka() {
     fi
 
     _copy_if_exists() {
-        [[ -d "$1" ]] && { mkdir -p "$2"; rsync -a "$1"/ "$2"/; }
+        if [[ -d "$1" ]]; then
+            mkdir -p "$2"
+            rsync -a "$1"/ "$2"/
+        fi
     }
     _copy_if_exists "$dir/usr/share/plasma/look-and-feel"  /usr/share/plasma/look-and-feel
     _copy_if_exists "$dir/usr/share/color-schemes"         /usr/share/color-schemes
