@@ -1,0 +1,13 @@
+# Imagem de teste apenas — autologin do testuser numa sessão COSMIC, sem interação.
+# O cosmic-greeter usa o greetd; `initial_session` arranca a sessão automaticamente
+# uma vez (autologin). NÃO usar em produção.
+[terminal]
+vt = 1
+
+[default_session]
+command = "cosmic-greeter"
+user = "cosmic-greeter"
+
+[initial_session]
+command = "/usr/libexec/cosmic-test-session"
+user = "testuser"

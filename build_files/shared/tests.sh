@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 echo "::group:: ===$(basename "$0")==="
-set -eou pipefail
+set -euo pipefail
 
 FAILED=0
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
@@ -8,22 +8,19 @@ fail() { echo "FAIL: $*" >&2; FAILED=1; }
 echo "=== Pacotes obrigatórios ==="
 REQUIRED_PACKAGES=(
     distrobox
-    earlyoom
+    systemd-oomd-defaults
     fastfetch
     ffmpeg
     firewalld
     gamemode
     git-credential-libsecret
-    input-remapper
+    zsh-autosuggestions
+    zsh-syntax-highlighting
     kitty
-    ksshaskpass
-    ksystemlog
-    kwin-effect-roundcorners
     lm_sensors
     neovim
     nvtop
     pam-u2f
-    plasma-firewall
     podman-docker
     tuned
     # Dell/Intel laptop support
@@ -54,17 +51,18 @@ for pkg in "${REQUIRED_PACKAGES[@]}"; do
     fi
 done
 
-echo "=== Pacotes KDE essenciais ==="
-KDE_REQUIRED=(
-    plasma-desktop
-    plasma-workspace
-    kwin
-    plasma-login-manager
-    dolphin
-    konsole
+echo "=== Pacotes COSMIC essenciais ==="
+COSMIC_REQUIRED=(
+    cosmic-comp
+    cosmic-session
+    cosmic-panel
+    cosmic-settings
+    cosmic-greeter
+    cosmic-files
+    cosmic-term
 )
-for pkg in "${KDE_REQUIRED[@]}"; do
-    rpm -q "$pkg" > /dev/null 2>&1 || fail "Pacote KDE ausente: $pkg"
+for pkg in "${COSMIC_REQUIRED[@]}"; do
+    rpm -q "$pkg" > /dev/null 2>&1 || fail "Pacote COSMIC ausente: $pkg"
 done
 
 echo "=== Pacotes indesejados ==="
@@ -79,6 +77,7 @@ UNWANTED_PACKAGES=(
     amd-gpu-firmware
     # Power stack conflicts / NVIDIA out of scope
     power-profiles-daemon
+    ModemManager
     nvidia-gpu-firmware
     xorg-x11-drv-nvidia
     akmod-nvidia
@@ -86,9 +85,14 @@ UNWANTED_PACKAGES=(
     nvidia-driver
     # VM guest agents (removidos)
     open-vm-tools-desktop virtualbox-guest-additions
-    # KDE bloat que não deve estar presente
-    plasma-discover
-    plasma-workspace-wallpapers
+    # KDE/Plasma — removido por completo na migração para COSMIC
+    plasma-desktop
+    plasma-workspace
+    kwin
+    plasma-login-manager
+    dolphin
+    konsole
+    kvantum
     kde-connect
     akonadi-server
     mariadb-server
@@ -102,8 +106,8 @@ done
     || fail "Repo VS Code não deve existir na imagem base: /etc/yum.repos.d/vscode.repo"
 
 echo "=== sudo → run0 (alias) ==="
-# Nota: o pacote sudo NÃO é removido — plasma-workspace exige kdesu→sudo. Apenas
-# adicionamos run0 + alias interativo.
+# Nota: o pacote sudo é mantido (alguns CLIs/docs assumem-no). Adicionamos run0 +
+# alias interativo; o COSMIC usa polkit para elevação gráfica.
 [[ -x /usr/bin/run0 ]] || fail "run0 ausente (deveria vir com o systemd)"
 grep -q "alias sudo='run0'" /etc/profile.d/run0-alias.sh \
     || fail "alias sudo→run0 ausente em /etc/profile.d/run0-alias.sh"
@@ -117,13 +121,12 @@ echo "=== Serviços systemd ==="
 REQUIRED_UNITS=(
     podman.socket
     tuned.service
-    earlyoom.service
+    systemd-oomd.service
     firewalld.service
     chronyd.service
     flatpak-nuke-fedora.service
     flathub-system-setup.service
-    input-remapper.service
-    fedora-kinoite-plasmalogin-workaround.service
+    cosmic-greeter.service
     thermald.service
     irqbalance.service
     rpm-ostreed-automatic.timer
@@ -137,6 +140,15 @@ done
 for unit in "${REQUIRED_UNITS[@]}"; do
     systemctl is-enabled "$unit" 2>/dev/null | grep -q "^enabled$" \
         || fail "Serviço não habilitado: $unit"
+done
+for unit in \
+    NetworkManager-wait-online.service \
+    ModemManager.service \
+    plymouth-quit-wait.service \
+    avahi-daemon.service \
+    avahi-daemon.socket; do
+    [[ "$(readlink /etc/systemd/system/${unit} 2>/dev/null)" == "/dev/null" ]] \
+        || fail "Serviço devia estar mascarado (boot speed): $unit"
 done
 
 echo "=== Dell/Intel laptop support ==="
@@ -199,7 +211,7 @@ REQUIRED_FILES=(
     /etc/dracut.conf.d/01-ostree-required.conf
     /etc/dracut.conf.d/02-drm-drivers.conf
     /etc/dracut.conf.d/99-omit-firewire.conf
-    /etc/dracut.conf.d/99-omit-thunderbolt.conf
+    /etc/dracut.conf.d/98-omit-unused.conf
     /etc/dracut.conf.d/90-luks-security.conf
     /usr/libexec/fedora-flatpak-setup
     /usr/libexec/fedora-shell-setup
@@ -208,8 +220,6 @@ REQUIRED_FILES=(
     /etc/selinux/config
     /etc/chrony.conf
     /etc/rpm-ostreed.conf
-    /etc/plasmalogin.conf.d/10-theme.conf
-    /etc/xdg/plasma-welcomerc
     /etc/systemd/zram-generator.conf
     /etc/systemd/system.conf.d/timeout.conf
     /etc/systemd/user.conf.d/timeout.conf
@@ -218,8 +228,8 @@ REQUIRED_FILES=(
     /usr/lib/systemd/system/flatpak-nuke-fedora.service
     /usr/lib/systemd/system/flathub-system-setup.service
     /usr/share/flatpak/flathub.flatpakrepo
-    /etc/plasma-setup-done
-    /etc/udev/rules.d/99-input-remapper.rules
+    /etc/keyd/default.conf
+    /etc/systemd/oomd.conf.d/10-oomd.conf
     /etc/locale.conf
     /usr/bin/run0
     /etc/profile.d/run0-alias.sh
@@ -229,11 +239,15 @@ REQUIRED_FILES=(
     /usr/share/dnf/plugins/copr.vendor.conf
     /usr/share/fonts/JetBrainsMonoNerdFont
     /usr/share/image-info.json
-    /usr/share/qt6/qtlogging.ini
     /usr/share/wireplumber/wireplumber.conf.d/51-disable-suspension.conf
     /usr/bin/dnf
-    /usr/lib/tmpfiles.d/fedora-kde-root-theme.conf
     /usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg
+    # COSMIC skel: tema Mokka derivado + toolkit + wallpaper
+    /etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v1/accent
+    /etc/skel/.config/cosmic/com.system76.CosmicTk/v1/interface_font
+    /etc/skel/.config/cosmic/com.system76.CosmicBackground/v1/all
+    /usr/share/backgrounds/mokka/Mokka-tree.jpg
+    /usr/share/cosmic-mokka/theme-builder.ron
 )
 for f in "${REQUIRED_FILES[@]}"; do
     [[ -e "$f" ]] || fail "Ficheiro/directório ausente: $f"
@@ -262,13 +276,13 @@ grep -q '"quiet"' /usr/lib/bootc/kargs.d/10-hardening.toml \
 grep -q '"rhgb"' /usr/lib/bootc/kargs.d/10-hardening.toml \
     || fail "kargs: 'rhgb' ausente (trigger do Plymouth no Fedora)"
 grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml \
-    || fail "kargs: 'splash' ausente (necessário para Plymouth)"
+    || fail "kargs: 'splash' ausente (mantido por compatibilidade; o trigger real do Plymouth no Fedora é 'rhgb')"
 
 echo "=== Hardening ==="
 grep -qx 'SELINUX=enforcing' /etc/selinux/config \
     || fail "SELinux não está em modo enforcing"
-grep -qE '^FUTURE' /etc/crypto-policies/config 2>/dev/null \
-    || fail "Crypto policy não é FUTURE (ou FUTURE:*)"
+grep -qE '^DEFAULT' /etc/crypto-policies/config 2>/dev/null \
+    || fail "Crypto policy não é DEFAULT (ou DEFAULT:*)"
 
 echo "=== Performance / ZRAM ==="
 grep -q 'vm.swappiness = 100' /etc/sysctl.d/99-performance.conf \
@@ -286,72 +300,49 @@ grep -q 'rpm-ostree' /usr/bin/dnf \
 [[ -x /usr/bin/dnf ]] \
     || fail "/usr/bin/dnf não é executável"
 
-echo "=== Plasma: plugins do skel ==="
-APPLETSRC="/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc"
-if [[ -f "$APPLETSRC" ]]; then
-    # Apanha plugins VAZIOS — causa do "error when loading applet """
-    # Valida plugins referenciados no skel contra os diretórios de pacote Plasma.
-    # Alguns built-ins não vivem em plasmoids/ (ex.: org.kde.panel), mas os applets
-    # e containments declarados explicitamente aqui devem existir onde aplicável.
-    while IFS= read -r plugin; do
-        [[ -z "$plugin" ]] && fail "Plugin vazio em appletsrc (causa de 'error when loading applet \"\"')" && continue
-        case "$plugin" in
-            org.kde.panel|org.kde.plasma.digitalclock|org.kde.plasma.kickoff|org.kde.plasma.marginsseparator|org.kde.plasma.pager|org.kde.plasma.showdesktop|org.kde.plasma.systemtray|org.kde.plasma.taskmanager)
-                continue
-                ;;
-            org.kde.plasma.desktop)
-                fail "Plugin inválido no skel: org.kde.plasma.desktop (Plasma 6 usa org.kde.plasma.folder)"
-                continue
-                ;;
-        esac
-        # Plugin de terceiros: deve ter directório em plasmoids/
-        [[ -d "/usr/share/plasma/plasmoids/$plugin" ]] ||
-            [[ -d "/usr/share/kpackage/genericqml/$plugin" ]] ||
-            fail "Plugin referenciado no skel não encontrado em plasmoids/kpackage: $plugin"
-    done < <(grep "^plugin=" "$APPLETSRC" | sed 's/^plugin=//')
-    # Systemtray: extraItems= / knownItems= com string vazia são parseados como
-    # lista com um elemento "" → systemtray tenta carregar applet com plugin="" →
-    # "error when loading applet """. Estas chaves devem estar AUSENTES (auto-descoberta)
-    # ou conter IDs reais separados por vírgula.
-    for key in extraItems knownItems; do
-        if grep -qE "^${key}=\$" "$APPLETSRC" 2>/dev/null; then
-            fail "Systemtray: ${key}= é string vazia no appletsrc (causa 'error when loading applet'; remover a chave)"
-        fi
-    done
-    # O skel deve manter o systray mínimo. Deixar o Plasma 6 gerar os sub-applets
-    # evita migração/criação parcial no arranque, que produz "File name empty!" e
-    # "error when loading applet \"\"" mesmo sem plugin vazio persistido.
-    grep -q 'SystrayContainmentId' "$APPLETSRC" && \
-        fail "Systemtray: SystrayContainmentId legado presente; usar applets aninhados do Plasma 6"
-    grep -q '^plugin=org\.kde\.plasma\.private\.systemtray$' "$APPLETSRC" && \
-        fail "Systemtray: containment legado org.kde.plasma.private.systemtray presente; usar applets aninhados do Plasma 6"
-    grep -q '^\[Containments\]\[2\]\[Applets\]\[7\]\[Applets\]\[[0-9][0-9]*\]$' "$APPLETSRC" && \
-        fail "Systemtray: skel pré-popula sub-applets; deixar Plasma gerar em runtime"
-else
-    fail "appletsrc de skel ausente: $APPLETSRC"
-fi
-
-echo "=== Login (plasmalogin) tema ==="
-# O DM é o plasma-login-manager, que lê /etc/plasmalogin.conf.d/ (não sddm.conf.d).
-SDDM_CONF="/etc/plasmalogin.conf.d/10-theme.conf"
-[[ -f "$SDDM_CONF" ]] || fail "Login: ficheiro de config ausente: $SDDM_CONF"
-grep -q '^Current=Catppuccin-Mocha-Mauve$' "$SDDM_CONF" \
-    || fail "SDDM: tema não é Catppuccin-Mocha-Mauve ($(grep '^Current=' "$SDDM_CONF" || echo 'não definido'))"
-[[ -d "/usr/share/sddm/themes/Catppuccin-Mocha-Mauve" ]] \
-    || fail "SDDM: directório do tema Catppuccin-Mocha-Mauve ausente"
-
-echo "=== Lock screen ==="
-LOCK_CFG="/etc/skel/.config/kscreenlockerrc"
-if [[ -f "$LOCK_CFG" ]]; then
-    grep -q '^Theme=Mokka' "$LOCK_CFG" \
-        && fail "kscreenlockerrc: Theme=Mokka inválido (Mokka não tem QML de lockscreen)"
-    LOCK_WALL=$(sed -n '/^\[Greeter\]\[Wallpaper\]\[org.kde.image\]\[General\]$/,/^\[/{s/^Image=//p}' \
-        "$LOCK_CFG" 2>/dev/null | head -1)
-    if [[ -n "$LOCK_WALL" ]]; then
-        LOCK_WALL_PATH="${LOCK_WALL#file://}"
-        [[ -e "$LOCK_WALL_PATH" ]] || fail "Lock screen: wallpaper não existe: $LOCK_WALL_PATH"
-    fi
-fi
+echo "=== COSMIC skel (toolkit + fontes + wallpaper) ==="
+COSMIC_SKEL="/etc/skel/.config/cosmic"
+# Modo escuro activo
+grep -qx 'true' "$COSMIC_SKEL/com.system76.CosmicTheme.Mode/v1/is_dark" 2>/dev/null \
+    || fail "COSMIC: modo escuro (is_dark) não definido no skel"
+# Fontes JetBrainsMono Nerd Font
+grep -q 'JetBrainsMono Nerd Font' "$COSMIC_SKEL/com.system76.CosmicTk/v1/interface_font" 2>/dev/null \
+    || fail "COSMIC: interface_font não é JetBrainsMono Nerd Font"
+grep -q 'JetBrainsMono Nerd Font Mono' "$COSMIC_SKEL/com.system76.CosmicTk/v1/monospace_font" 2>/dev/null \
+    || fail "COSMIC: monospace_font não é JetBrainsMono Nerd Font Mono"
+# Propagar tema às apps GTK
+grep -qx 'true' "$COSMIC_SKEL/com.system76.CosmicTk/v1/apply_theme_global" 2>/dev/null \
+    || fail "COSMIC: apply_theme_global não está activo (apps GTK não seguem o accent)"
+# Ícones Tela
+ICON_THEME=$(tr -d '"' < "$COSMIC_SKEL/com.system76.CosmicTk/v1/icon_theme" 2>/dev/null)
+[[ -n "$ICON_THEME" ]] && { [[ -d "/usr/share/icons/$ICON_THEME" ]] \
+    || fail "COSMIC: tema de ícones ausente: $ICON_THEME"; }
+# Wallpaper referenciado existe
+COSMIC_WALL=$(sed -n 's/.*Path("\([^"]*\)").*/\1/p' \
+    "$COSMIC_SKEL/com.system76.CosmicBackground/v1/all" 2>/dev/null | head -1)
+[[ -n "$COSMIC_WALL" ]] && { [[ -e "$COSMIC_WALL" ]] \
+    || fail "COSMIC: wallpaper referenciado não existe: $COSMIC_WALL"; }
+# Painel inferior fixo (estilo KDE/Windows)
+grep -qx 'Bottom' "$COSMIC_SKEL/com.system76.CosmicPanel.Panel/v1/anchor" 2>/dev/null \
+    || fail "COSMIC: painel não está em baixo (anchor != Bottom)"
+grep -qx 'false' "$COSMIC_SKEL/com.system76.CosmicPanel.Panel/v1/anchor_gap" 2>/dev/null \
+    || fail "COSMIC: painel não está fixo (anchor_gap != false)"
+grep -qx '0' "$COSMIC_SKEL/com.system76.CosmicPanel.Panel/v1/border_radius" 2>/dev/null \
+    || fail "COSMIC: painel deve ter border_radius 0"
+grep -qx '0' "$COSMIC_SKEL/com.system76.CosmicPanel.Panel/v1/margin" 2>/dev/null \
+    || fail "COSMIC: painel deve ter margin 0"
+[[ -x /usr/libexec/fedora-cosmic-layout-setup ]] \
+    || fail "COSMIC: fedora-cosmic-layout-setup ausente ou não executável"
+[[ -f /etc/skel/.config/systemd/user/fedora-cosmic-layout-setup.service ]] \
+    || fail "COSMIC: serviço user de layout ausente no skel"
+[[ -f /etc/skel/.config/systemd/user/fedora-cosmic-layout-setup.timer ]] \
+    || fail "COSMIC: timer user de layout ausente no skel"
+[[ -f /usr/lib/systemd/user/fedora-cosmic-layout-setup.service ]] \
+    || fail "COSMIC: serviço user global de layout ausente"
+[[ -f /usr/lib/systemd/user/fedora-cosmic-layout-setup.timer ]] \
+    || fail "COSMIC: timer user global de layout ausente"
+[[ -L /etc/systemd/user/timers.target.wants/fedora-cosmic-layout-setup.timer ]] \
+    || fail "COSMIC: timer user global de layout não está habilitado"
 
 echo "=== GTK tema ==="
 GTK3_CONF="/etc/skel/.config/gtk-3.0/settings.ini"
@@ -363,69 +354,19 @@ if [[ -f "$GTK3_CONF" ]]; then
     fi
 fi
 
-echo "=== Tema Mokka ==="
-MOKKA_DIR="/usr/share/plasma/look-and-feel/Mokka"
-[[ -d "$MOKKA_DIR" ]] || fail "Mokka: look-and-feel ausente: $MOKKA_DIR"
-
-SPLASH_QML="$MOKKA_DIR/contents/splash/Splash.qml"
-[[ -f "$SPLASH_QML" ]] || fail "Mokka: Splash.qml ausente"
-grep -wq 'sizes' "$SPLASH_QML" && fail "Mokka Splash.qml: variável 'sizes' não corrigida (patch não aplicado)"
-
-MOKKA_DEFAULTS="$MOKKA_DIR/contents/defaults"
-[[ -f "$MOKKA_DEFAULTS" ]] || fail "Mokka: ficheiro defaults ausente"
-grep -q 'Catppuccin-Mocha-Mauve-splash' "$MOKKA_DEFAULTS" && \
-    fail "Mokka defaults: KSplash ainda referencia 'Catppuccin-Mocha-Mauve-splash' (patch não aplicado)"
-grep -q 'garuda-mokka' "$MOKKA_DEFAULTS" && \
-    fail "Mokka defaults: ainda referencia path 'garuda-mokka' (wallpaper lock screen não corrigido)"
-
-# layout.js deve ter sido removido — a sua existência activa o pipeline de layout
-# do Plasma, que pode criar containments fantasma com plugin vazio.
-LAYOUT_DIR="$MOKKA_DIR/contents/layouts"
-[[ -d "$LAYOUT_DIR" ]] && \
-    fail "Mokka: directório layouts/ ainda existe (deve ser removido para evitar ghost containments)"
-
-# layout.js user-local (skel): o rsync do Garuda copia o pacote Mokka completo
-# para /etc/skel/.local/share/. Plasma resolve caminhos user-local ANTES dos
-# system-wide, então um layout.js em ~/.local/share/ anula a remoção de
-# /usr/share/. O build deve limpar esta cópia.
-SKEL_LOCAL_MOKKA="/etc/skel/.local/share/plasma/look-and-feel/Mokka"
-[[ -d "$SKEL_LOCAL_MOKKA" ]] && \
-    fail "Mokka: skel user-local look-and-feel existe ($SKEL_LOCAL_MOKKA) — deve ser removido (overrides system-wide)"
-
-# Assets Mokka redundantes no skel: instalados system-wide por install-assets.sh,
-# não devem existir também em user-local (duplicação + conflito em updates).
-for skel_dup in \
-    "/etc/skel/.local/share/plasma/desktoptheme/Mokka" \
-    "/etc/skel/.local/share/color-schemes/Mokka.colors" \
-    "/etc/skel/.local/share/wallpapers/Mokka-tree" \
-    "/etc/skel/.local/share/konsole/Mokka.colorscheme" \
-    "/etc/skel/.local/share/Kvantum/Mokka"; do
-    [[ -e "$skel_dup" ]] && \
-        fail "Mokka: asset user-local duplicado no skel: $skel_dup (já instalado em /usr/share/)"
-done
-
-[[ -f "/usr/share/color-schemes/Mokka.colors" ]] || fail "Mokka: color scheme ausente"
-[[ -d "/usr/share/plasma/desktoptheme/Mokka" ]]  || fail "Mokka: desktop theme ausente"
-
-APPLETSRC_WALL=$(grep '^Image=' /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null | head -1 | sed 's|^Image=file://||')
-if [[ -n "$APPLETSRC_WALL" ]]; then
-    [[ -e "$APPLETSRC_WALL" ]] || fail "Mokka: wallpaper referenciado no skel não existe: $APPLETSRC_WALL"
-fi
-
-ICON_THEME=$(sed -n '/^\[Icons\]/,/^\[/{s/^Theme=//p}' /etc/skel/.config/kdeglobals 2>/dev/null | head -1)
-[[ -n "$ICON_THEME" ]] && { [[ -d "/usr/share/icons/$ICON_THEME" ]] || fail "Mokka: tema de ícones ausente: $ICON_THEME"; }
-
-echo "=== Plasma: Panel Colorizer (se instalado) ==="
-PC_DIR="/usr/share/plasma/plasmoids/luisbocanegra.panelcolorizer"
-if [[ -d "$PC_DIR" ]]; then
-    PC_META="$PC_DIR/metadata.json"
-    if [[ -f "$PC_META" ]]; then
-        PLUGIN_ID=$(python3 -c "import json; d=json.load(open('$PC_META')); print(d.get('KPlugin',{}).get('Id',''))" 2>/dev/null || echo "")
-        [[ -n "$PLUGIN_ID" ]] || fail "Panel Colorizer: metadata.json sem plugin ID"
-    else
-        fail "Panel Colorizer instalado mas sem metadata.json"
-    fi
-fi
+echo "=== Tema COSMIC derivado (Catppuccin Mocha Mauve) ==="
+COSMIC_DARK="/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v1"
+COSMIC_BUILDER="/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark.Builder/v1"
+# O tema derivado deve existir (gerado por cosmic-theme-gen no build)
+[[ -s "$COSMIC_DARK/accent" ]] || fail "COSMIC: tema derivado ausente ($COSMIC_DARK/accent)"
+[[ -s "$COSMIC_DARK/background" ]] || fail "COSMIC: tema derivado incompleto (background ausente)"
+[[ -s "$COSMIC_BUILDER/accent" ]] || fail "COSMIC: ThemeBuilder ausente ($COSMIC_BUILDER/accent)"
+# Accent mauve do Catppuccin Mocha (#cba6f7 ≈ rgb 0.796, 0.651, 0.969)
+grep -q '0.79' "$COSMIC_BUILDER/accent" 2>/dev/null \
+    || fail "COSMIC: accent do builder não corresponde ao mauve Catppuccin Mocha"
+# Theme builder empacotado para import opcional
+[[ -f /usr/share/cosmic-mokka/theme-builder.ron ]] \
+    || fail "COSMIC: theme-builder.ron empacotado ausente"
 
 echo "=== wpctl Steam wrapper ==="
 [[ -x /usr/bin/wpctl.real ]] || fail "wpctl.real ausente (wrapper não instalado)"
@@ -440,12 +381,48 @@ else
     echo "INFO: scx-scheds não instalado (COPR indisponível para esta arquitectura)"
 fi
 
-echo "=== Consistência de versão KDE ==="
-KDE_VER="$(rpm -q --qf '%{VERSION}' plasma-desktop 2>/dev/null || echo '')"
-KWIN_VER="$(rpm -q --qf '%{VERSION}' kwin 2>/dev/null || echo '')"
-if [[ -n "$KDE_VER" && -n "$KWIN_VER" && "$KDE_VER" != "$KWIN_VER" ]]; then
-    fail "Mismatch de versão KDE: plasma-desktop=${KDE_VER} kwin=${KWIN_VER}"
+echo "=== keyd (COPR alternateved/keyd; substitui input-remapper) ==="
+[[ ! -e /usr/bin/input-remapper-service ]] \
+    || fail "input-remapper ainda presente (devia ter sido substituído por keyd)"
+[[ ! -e /etc/udev/rules.d/99-input-remapper.rules ]] \
+    || fail "regra udev do input-remapper ainda presente"
+if rpm -q keyd &>/dev/null; then
+    systemctl is-enabled keyd.service 2>/dev/null | grep -q "^enabled$" \
+        || fail "keyd instalado mas keyd.service não habilitado"
+    [[ -f /etc/keyd/default.conf ]] || fail "keyd: /etc/keyd/default.conf ausente"
+else
+    echo "INFO: keyd não instalado (COPR indisponível para esta arquitectura)"
 fi
+
+echo "=== starship (prompt; substitui Oh My Zsh + Powerlevel10k) ==="
+if [[ "$(uname -m)" == "x86_64" ]]; then
+    [[ -x /usr/bin/starship ]] || fail "starship ausente em /usr/bin (substituto de p10k)"
+else
+    echo "INFO: starship não verificado (arquitectura $(uname -m) sem binário pinado)"
+fi
+# A configuração do shell (fedora-shell-setup) já não deve clonar OMZ/p10k.
+grep -q 'oh-my-zsh\|powerlevel10k' /usr/libexec/fedora-shell-setup 2>/dev/null \
+    && fail "fedora-shell-setup ainda referencia Oh My Zsh/Powerlevel10k"
+grep -q 'starship init' /usr/libexec/fedora-shell-setup 2>/dev/null \
+    || fail "fedora-shell-setup não inicializa o starship"
+
+echo "=== First-login shell/dev setup contracts ==="
+grep -q 'sudo-command-line()' /usr/libexec/fedora-shell-setup 2>/dev/null \
+    || fail "fedora-shell-setup sem widget sudo-command-line"
+grep -q 'fj()' /usr/libexec/fedora-shell-setup 2>/dev/null \
+    || fail "fedora-shell-setup sem helper fj"
+grep -q 'fgb()' /usr/libexec/fedora-shell-setup 2>/dev/null \
+    || fail "fedora-shell-setup sem helper fgb"
+grep -q 'zoxide init zsh' /usr/libexec/fedora-shell-setup 2>/dev/null \
+    || fail "fedora-shell-setup não inicializa zoxide condicionalmente"
+grep -q 'direnv hook zsh' /usr/libexec/fedora-shell-setup 2>/dev/null \
+    || fail "fedora-shell-setup não inicializa direnv condicionalmente"
+grep -q '.local/share/fedora-dev-setup' /usr/libexec/fedora-dev-setup 2>/dev/null \
+    || fail "fedora-dev-setup não escreve guia user-scoped"
+grep -q 'distrobox create' /usr/libexec/fedora-dev-setup 2>/dev/null \
+    || fail "fedora-dev-setup não orienta uso de Distrobox"
+grep -q 'toolbox create' /usr/libexec/fedora-dev-setup 2>/dev/null \
+    || fail "fedora-dev-setup não orienta uso de Toolbox"
 
 echo "=== login.defs hardening ==="
 grep -qE '^UMASK[[:space:]]+027' /etc/login.defs \
@@ -462,7 +439,7 @@ echo "=== SUID removal ==="
 [[ ! -f /usr/bin/chsh ]]   || fail "chsh deve ter sido removido (SUID desnecessário)"
 [[ ! -f /usr/bin/chfn ]]   || fail "chfn deve ter sido removido (SUID desnecessário)"
 [[ ! -f /usr/bin/pkexec ]] || fail "pkexec deve ter sido removido (CVE-2021-4034)"
-[[ -u /usr/bin/sudo ]]     || fail "sudo perdeu bit SUID (necessário para KDE/kdesu)"
+[[ -u /usr/bin/sudo ]]     || fail "sudo perdeu bit SUID (mantido para uso em CLI)"
 
 echo "=== Container signing ==="
 [[ -f /etc/containers/registries.d/quay.io-fedora-ostree-desktops.yaml ]] \

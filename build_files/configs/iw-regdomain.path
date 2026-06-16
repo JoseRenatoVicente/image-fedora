@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch timezone changes to update WiFi regulatory domain
+
+[Path]
+PathChanged=/etc/localtime
+Unit=iw-regdomain.service
+
+[Install]
+WantedBy=multi-user.target

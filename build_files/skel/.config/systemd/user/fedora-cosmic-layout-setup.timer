@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply Fedora COSMIC layout defaults after login
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1d
+Persistent=true
+Unit=fedora-cosmic-layout-setup.service
+
+[Install]
+WantedBy=timers.target

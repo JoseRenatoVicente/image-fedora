@@ -7,14 +7,14 @@ FROM ${BASE}
 # Console serial para o health check escrever resultados capturáveis pelo QEMU
 COPY build_files/test/test-kargs.toml /usr/lib/bootc/kargs.d/20-test-console.toml
 
-# Auto-login: inicia sessão KDE sem interação humana. O DM é o plasma-login-manager
-# (plasmalogin), que lê /etc/plasmalogin.conf.d/ — não /etc/sddm.conf.d/. Sem isto o
-# autologin é ignorado e cai no greeter, cujo compositor falha no render headless.
-COPY build_files/test/sddm-autologin.conf /etc/plasmalogin.conf.d/20-autologin.conf
+# Auto-login: arranca a sessão COSMIC sem interação humana. O cosmic-greeter usa
+# o greetd; `initial_session` no config.toml faz o autologin do testuser. Sem isto
+# o teste cai no greeter, cujo compositor falha no render headless.
+COPY build_files/test/greetd-autologin.toml /etc/greetd/config.toml
 
-# Render de software: sem GPU real numa VM headless, o KWin Wayland precisa de
-# llvmpipe/QPainter para arrancar. Sourced por startplasma-wayland.
-COPY build_files/test/plasma-software-render.sh /etc/xdg/plasma-workspace/env/99-test-software-render.sh
+# Render de software: sem GPU real numa VM headless, o cosmic-comp (wgpu) precisa
+# de llvmpipe. O wrapper exporta o env e arranca a sessão (initial_session acima).
+COPY build_files/test/cosmic-test-session.sh /usr/libexec/cosmic-test-session
 
 # Utilizador de teste — padrão correto para imagem atómica bootc:
 #   sysusers.d declara o utilizador; tmpfiles.d cria o home a partir do skel no primeiro boot
@@ -33,7 +33,7 @@ COPY build_files/test/boot-health-check.service /usr/lib/systemd/system/boot-hea
 
 RUN chmod +x /usr/lib/bootc-test/boot-health-check.sh && \
     chmod 644 /usr/lib/systemd/system/boot-health-check.service && \
-    chmod +x /etc/xdg/plasma-workspace/env/99-test-software-render.sh && \
+    chmod +x /usr/libexec/cosmic-test-session && \
     mkdir -p /usr/lib/systemd/system/graphical.target.wants && \
     ln -sf ../boot-health-check.service \
         /usr/lib/systemd/system/graphical.target.wants/boot-health-check.service

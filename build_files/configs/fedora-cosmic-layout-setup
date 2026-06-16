@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+layout_version="1"
+config_home="${XDG_CONFIG_HOME:-${HOME}/.config}"
+marker="${config_home}/fedora-cosmic-layout.version"
+panel_dir="${config_home}/cosmic/com.system76.CosmicPanel.Panel/v1"
+
+if [[ -f "${marker}" ]] && [[ "$(< "${marker}")" == "${layout_version}" ]]; then
+    exit 0
+fi
+
+mkdir -p "${panel_dir}"
+printf '%s\n' 'Bottom' > "${panel_dir}/anchor"
+printf '%s\n' 'false' > "${panel_dir}/anchor_gap"
+printf '%s\n' '0' > "${panel_dir}/border_radius"
+printf '%s\n' '0' > "${panel_dir}/margin"
+printf '%s\n' '1.0' > "${panel_dir}/opacity"
+
+mkdir -p "${config_home}"
+printf '%s\n' "${layout_version}" > "${marker}"

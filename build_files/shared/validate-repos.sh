@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 echo "::group:: ===$(basename "$0")==="
-set -eou pipefail
+set -euo pipefail
 
 REPOS_DIR="/etc/yum.repos.d"
 VALIDATION_FAILED=0

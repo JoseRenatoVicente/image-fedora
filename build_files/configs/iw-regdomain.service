@@ -1,0 +1,8 @@
+[Unit]
+Description=Set WiFi regulatory domain from system timezone
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/iw-regdomain
+RemainAfterExit=yes

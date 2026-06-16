@@ -15,8 +15,8 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_DESC: "Fedora KDE custom image — Aurora base, Mokka theme, dev/gaming packages"
-  IMAGE_KEYWORDS: "bootc,ublue,universal-blue,kde,plasma,mokka,catppuccin"
+  IMAGE_DESC: "Fedora COSMIC custom image — Atomic base, Mokka theme, dev/gaming packages"
+  IMAGE_KEYWORDS: "bootc,ublue,universal-blue,cosmic,system76,mokka,catppuccin"
   IMAGE_LOGO_URL: "https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
   IMAGE_NAME: "${{ github.event.repository.name }}"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
@@ -288,16 +288,21 @@ jobs:
         env:
           IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
         run: |
+          # Pin à identidade concreta deste repositório/workflow — não aceitar
+          # qualquer identidade do GitHub Actions (o regex '.+' deixava passar
+          # uma imagem assinada por QUALQUER workflow do GitHub via Fulcio).
           cosign verify "${IMAGE_REF}" \
-            --certificate-identity-regexp 'https://github.com/.+' \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build.yml@refs/heads/" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 
       - name: Verify published provenance attestation
         env:
           IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
         run: |
+          # A provenance é assinada pelo reusable workflow do slsa-github-generator,
+          # não por este repo — pin à identidade desse gerador.
           cosign verify-attestation "${IMAGE_REF}" \
-            --certificate-identity-regexp 'https://github.com/.+' \
+            --certificate-identity-regexp '^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             --type slsaprovenance
 

@@ -1,0 +1,7 @@
+[Unit]
+Description=Apply Fedora COSMIC layout defaults
+ConditionEnvironment=HOME
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/fedora-cosmic-layout-setup

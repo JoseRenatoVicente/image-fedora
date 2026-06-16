@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-# Roda dentro da VM de teste. Aguarda a sessão gráfica Plasma (autologin do
+# Roda dentro da VM de teste. Aguarda a sessão gráfica COSMIC (autologin do
 # testuser) arrancar e assentar, depois varre o journal COMPLETO (sistema +
 # sessão de utilizador) à procura de ERROS e AVISOS, aplicando uma allowlist
 # de ruído conhecido (hardware/VM/upstream cosmético).
@@ -21,7 +21,7 @@ FAILED=0
 #   warn (=4) → WARN  (surfacados para correção, não bloqueiam)
 #
 # Allowlist: ruído investigado e confirmado NÃO-acionável a partir da config da
-# imagem (hardware/VM ausente, ou bug cosmético de upstream KDE). Agrupada por
+# imagem (hardware/VM ausente, ou cosmético de upstream COSMIC). Agrupada por
 # categoria. Tudo o que não estiver aqui deve aparecer para podermos corrigir.
 ALLOWLIST=(
     # ── Hardware / kernel / firmware (VM e HW real) ──
@@ -48,24 +48,13 @@ ALLOWLIST=(
     "sd-event.*assertion '<dropped>' failed"
     # ── chrony a corrigir o relógio no arranque (RTC da VM dessincronizado) ──
     'System clock (wrong by|was stepped)'
-    # ── Discover: verifica updates fazendo skopeo ao ref bootc. Na imagem de teste
-    #    o ref é localhost/fedora-kde-test → sem registry → falha. Em produção é
-    #    ghcr.io e funciona. Artefacto exclusivo do teste. ──
-    'skopeo' 'check for updates' 'pinging container registry'
-    'Didn.t find any Discover backend' 'Unexpected transport format'
-    'org/kde/discover' 'Only binding to one of multiple key bindings'
-    # ── plasmashell cosmético (a sessão funciona; entradas órfãs/QML upstream) ──
-    # 'error when loading applet' NÃO está na allowlist: indica containment fantasma
-    # (plugin vazio) causado por layout.js do Garuda ou criação dinâmica do systemtray.
-    # O skel appletsrc pré-define SystrayContainmentId e a cópia user-local do
-    # layout.js foi removida no build — se este erro surgir, é uma regressão real.
-    'Entry is not valid' 'File name empty' 'QQmlComponent: Component is not ready'
-    'Unable to assign'
-    # ── Cosmético upstream KDE (não corrigível sem patch dos pacotes KDE) ──
-    'is not named after the D-Bus name' 'kded module name .* is invalid'
-    'QDBusObjectPath: invalid path' 'Failed to register with host portal'
-    'overrides a member of the base object' 'qtvirtualkeyboard'
-    'No object for name' 'is not an XDG toplevel'
+    # ── COSMIC em VM headless: cosmic-comp usa wgpu; sem GPU real cai em llvmpipe.
+    #    Avisos de render de software / scanout não ocorrem em HW real. ──
+    'wgpu' 'llvmpipe' 'NoAvailableAdapter' 'Failed to create.*surface'
+    'direct scanout' 'No scale factor' 'cursor plane'
+    # ── Portais / D-Bus benignos (sessão funciona) ──
+    'Failed to register with host portal' 'No object for name'
+    'is not an XDG toplevel' 'atspi' 'org.a11y'
 )
 ALLOWLIST_REGEX=$(IFS='|'; printf '%s' "${ALLOWLIST[*]}")
 
@@ -81,23 +70,23 @@ printf 'BOOT-INFO [INIT]: boot-health-check arrancou\n' > "$SERIAL" 2>/dev/null 
 printf 'BOOT-INFO [INIT]: boot-health-check arrancou\n'
 report INFO "Health check iniciado (após graphical.target)"
 
-# ── 1. Aguarda a sessão gráfica (KWin Wayland do testuser) ───────────────────
-# Sem GPU real, KWin cai em render de software (LIBGL_ALWAYS_SOFTWARE/KWIN_COMPOSE=Q
-# definidos pelo Containerfile.test). Damos até 120s para SDDM→autologin→Plasma.
-report INFO "Aguardando sessão gráfica KWin Wayland (testuser)..."
+# ── 1. Aguarda a sessão gráfica (cosmic-comp do testuser) ────────────────────
+# Sem GPU real, cosmic-comp usa wgpu sobre llvmpipe (render de software). Damos
+# até 120s para cosmic-greeter→autologin→cosmic-session→cosmic-comp.
+report INFO "Aguardando sessão gráfica COSMIC (cosmic-comp, testuser)..."
 GFX_UP=0
 for _ in $(seq 1 60); do
-    if pgrep -u "$TESTUSER" kwin_wayland >/dev/null 2>&1; then
+    if pgrep -u "$TESTUSER" cosmic-comp >/dev/null 2>&1; then
         GFX_UP=1; break
     fi
     sleep 2
 done
 if [[ $GFX_UP -eq 1 ]]; then
-    report PASS "Sessão gráfica KWin Wayland arrancou"
-    # Deixa a sessão assentar e registar portal/kded/plasmashell no journal.
+    report PASS "Sessão gráfica COSMIC (cosmic-comp) arrancou"
+    # Deixa a sessão assentar e registar painel/portal/applets no journal.
     sleep 30
 else
-    report FAIL "Sessão gráfica não arrancou (kwin_wayland ausente após 120s)"
+    report FAIL "Sessão gráfica não arrancou (cosmic-comp ausente após 120s)"
 fi
 
 # ── 2. Unidades systemd falhadas (sistema) ───────────────────────────────────
@@ -120,35 +109,14 @@ if [[ -n "$TESTUID" ]]; then
     [[ ${#FAILED_USER_UNITS[@]} -eq 0 ]] && report PASS "Sem unidades de utilizador falhadas"
 fi
 
-# ── 3b. Painel Plasma: fantasma de containment (plugin vazio) ────────────────
-# Causa do "error when loading applet \"\"". Lê o appletsrc em runtime do testuser
-# (escrito pelo plasmashell na 1ª sessão) e reporta plugins vazios.
-# Com o skel appletsrc correcto (SystrayContainmentId pré-definido) e o layout.js
-# removido (system-wide + user-local), fantasmas indicam regressão real → FAIL.
-APPLETSRC_RT="/var/home/${TESTUSER}/.config/plasma-org.kde.plasma.desktop-appletsrc"
-if [[ -f "$APPLETSRC_RT" ]]; then
-    GHOSTS=$(grep -c '^plugin=$' "$APPLETSRC_RT" 2>/dev/null || echo 0)
-    if [[ "$GHOSTS" -gt 0 ]]; then
-        report FAIL "Painel: $GHOSTS containment(s) com plugin vazio no appletsrc (fantasma)"
-        # Mostra as seções afetadas para diagnóstico
-        grep -nE '^\[Containments\]|^plugin=$' "$APPLETSRC_RT" 2>/dev/null | grep -B1 '^[0-9]*:plugin=$' | while IFS= read -r l; do report INFO "  appletsrc: $l"; done
-    else
-        report PASS "Painel: sem fantasmas (nenhum plugin vazio no appletsrc)"
-    fi
-    # Verifica se o layout.js do Garuda foi executado (user-local): se existir,
-    # indica que a limpeza do skel falhou e o Plasma pode ter criado fantasmas.
-    LAYOUT_LOCAL="/var/home/${TESTUSER}/.local/share/plasma/look-and-feel/Mokka/contents/layouts"
-    if [[ -d "$LAYOUT_LOCAL" ]]; then
-        report FAIL "Painel: layout.js user-local existe ($LAYOUT_LOCAL) — skel não foi limpo"
-    fi
-    if grep -q 'SystrayContainmentId' "$APPLETSRC_RT" 2>/dev/null; then
-        report FAIL "Painel: SystrayContainmentId legado presente em runtime (systemtray Plasma 6 deve usar applets aninhados)"
-    fi
-    if grep -q '^plugin=org\.kde\.plasma\.private\.systemtray$' "$APPLETSRC_RT" 2>/dev/null; then
-        report FAIL "Painel: containment legado org.kde.plasma.private.systemtray presente em runtime"
-    fi
+# ── 3b. Tema COSMIC aplicado em runtime ──────────────────────────────────────
+# O tema derivado vem do skel; confirma que o cosmic-comp tem um accent definido
+# na sessão do testuser (ficheiro copiado do skel para o home).
+COSMIC_ACCENT_RT="/var/home/${TESTUSER}/.config/cosmic/com.system76.CosmicTheme.Dark/v1/accent"
+if [[ -f "$COSMIC_ACCENT_RT" ]]; then
+    report PASS "Tema COSMIC presente na sessão do testuser"
 else
-    report INFO "Painel: appletsrc de runtime ainda não escrito ($APPLETSRC_RT)"
+    report INFO "Tema COSMIC de runtime ainda não presente ($COSMIC_ACCENT_RT)"
 fi
 
 # ── 4. Erros críticos no journal (prioridade err, ≤3) → FAIL ─────────────────
@@ -177,8 +145,8 @@ else
 fi
 
 # ── 6. Serviços essenciais ativos ────────────────────────────────────────────
-# display-manager.service é o alias estável → plasmalogin.service (rebrand do SDDM)
-for svc in earlyoom tuned firewalld chronyd display-manager; do
+# display-manager.service é o alias estável → cosmic-greeter.service
+for svc in systemd-oomd tuned firewalld chronyd display-manager; do
     if systemctl is-active "$svc" &>/dev/null; then
         report PASS "Ativo: $svc"
     else

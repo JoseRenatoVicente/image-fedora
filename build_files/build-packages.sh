@@ -63,6 +63,7 @@ REMOVE_PKGS=(
     # Serviços de rede não utilizados
     nfs-utils cifs-utils samba-client
     sssd-common sssd-kcm
+    ModemManager
 
     # Outros
     hunspell sos fpaste words pinfo lrzsz kmscon
@@ -85,29 +86,31 @@ PACKAGES=(
     # dnf5-plugins (necessário para copr_install_isolated abaixo)
     dnf5-plugins
 
-    # ── KDE Plasma (mínimo) ───────────────────────────────────────────────────
-    # Core desktop
-    plasma-desktop plasma-workspace kwin kscreenlocker kscreen
-    plasma-login-manager kde-settings-plasmalogin kcm-plasmalogin
-    # Painel e widgets
-    kdeplasma-addons plasma-pa plasma-nm plasma-nm-openvpn
-    bluedevil polkit-kde plasma-drkonqi kinfocenter plasma-systemmonitor
-    # Integração
-    kde-gtk-config flatpak-kcm kio-admin pam-kwallet pinentry-qt
-    libappindicator-gtk3
-    # File manager e utilitários
-    dolphin kio-gdrive konsole kwrite spectacle ark kdialog
-    ffmpegthumbs kdegraphics-thumbnailers audiocd-kio kamera
-    # Display
-    xorg-x11-server-Xwayland xwaylandvideobridge
-    mesa-dri-drivers mesa-vulkan-drivers libva-intel-media-driver
+    # ── COSMIC Desktop (System76) ─────────────────────────────────────────────
+    # Lista explícita do ambiente (NÃO usamos o grupo cosmic-desktop-environment:
+    # é o grupo da spin oficial e arrasta firefox/cups/firmware/guest-agents/a11y,
+    # exactamente o bloat que esta imagem remove). cosmic-initial-setup (OOBE) e
+    # cosmic-player ficam de fora de propósito.
+    cosmic-session cosmic-comp cosmic-settings cosmic-settings-daemon
+    cosmic-panel cosmic-applets cosmic-launcher cosmic-app-library
+    cosmic-bg cosmic-osd cosmic-notifications cosmic-idle cosmic-randr
+    cosmic-workspaces cosmic-icon-theme cosmic-wallpapers
+    # NOTA: cosmic-config-fedora NÃO é instalado — é um meta de "defaults" do
+    # Fedora que arrasta ~300 pacotes (firefox, plasma-breeze, cups, firmware…),
+    # exactamente o bloat que removemos. Os nossos defaults vêm do skel.
+    # Apps COSMIC-native
+    cosmic-files cosmic-term cosmic-edit cosmic-store cosmic-screenshot
+    # Greeter (display manager baseado em greetd)
+    cosmic-greeter
     # Portais
-    xdg-desktop-portal xdg-desktop-portal-kde
-    # Temas fallback
-    plasma-breeze breeze-icon-theme aurorae
-    # Extras Kinoite
-    plasma-keyboard
+    xdg-desktop-portal xdg-desktop-portal-cosmic xdg-desktop-portal-gtk
+    # GTK status icons (system tray) para apps legadas
+    libappindicator-gtk3
+    # Display / aceleração
+    xorg-x11-server-Xwayland
+    mesa-dri-drivers mesa-vulkan-drivers libva-intel-media-driver
     vulkan-tools mobile-broadband-provider-info NetworkManager-ppp
+    NetworkManager-openvpn
     plymouth-system-theme
 
     # ── Ferramentas do utilizador ─────────────────────────────────────────────
@@ -129,7 +132,9 @@ PACKAGES=(
     # Gaming
     gamemode
     # Sistema
-    earlyoom
+    # systemd-oomd (via systemd-oomd-defaults): OOM killer baseado em PSI/cgroups v2,
+    # substitui o earlyoom. Mata por pressão de memória real em vez de % de RAM livre.
+    systemd-oomd-defaults
     tuned tuned-ppd
     zram-generator
 
@@ -142,57 +147,68 @@ PACKAGES=(
     libsmbios dmidecode
     # Containers
     distrobox podman-docker podman-compose
-    # KDE / temas
-    kvantum qt6ct
-    flameshot
-    # KDE integrations
-    git-credential-libsecret ksshaskpass ksystemlog plasma-firewall
+    # Git integration (credential helper via libsecret)
+    git-credential-libsecret
+    # Secret Service / keyring (substitui o pam-kwallet do KDE; necessário para
+    # git-credential-libsecret e qualquer app que use libsecret)
+    gnome-keyring
     # Hardware monitoring
     lm_sensors nvtop powertop
-    # Peripheral support
-    input-remapper solaar-udev
+    # Shell prompt plugins (starship vem via install-assets.sh — não está nos repos)
+    zsh-autosuggestions zsh-syntax-highlighting
+    # Peripheral support (keyd vem via COPR abaixo — substitui o input-remapper)
+    solaar-udev
     # Security keys (U2F / YubiKey)
     pam-u2f pam_yubico pamu2fcfg yubikey-manager
-    # Build deps (removidos no passo cleanup do build-configure.sh)
-    gcc-c++ cmake extra-cmake-modules libplasma-devel
-    kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel
-    rsync libsass sassc
+    # Build/asset deps (removidos no passo cleanup do build-configure.sh)
+    # rsync: usado por install-assets.sh para copiar árvores de tema
+    rsync
 )
 dnf5 install -y --allowerasing \
     --exclude=PackageKit \
     --exclude=PackageKit-glib \
-    --exclude=plasma-discover-offline-updates \
-    --exclude=plasma-discover-packagekit \
-    --exclude=plasma-pk-updates \
     --exclude=tracker \
     --exclude=tracker-miners \
     --exclude=localsearch \
     --exclude=tinysparql \
-    --exclude=plasma-x11 \
-    --exclude=plasma-workspace-x11 \
     --exclude=mariadb-server-utils \
     --exclude=qt5-qtbase \
-    --exclude=kde-connect \
     --exclude=firefox \
     --exclude=orca \
     --exclude=speech-dispatcher \
-    --exclude=plasma-discover \
     --exclude=power-profiles-daemon \
+    --exclude=ModemManager \
     --exclude=nvidia-gpu-firmware \
     --exclude=xorg-x11-drv-nvidia \
     --exclude=akmod-nvidia \
     --exclude=kmod-nvidia \
     "${PACKAGES[@]}"
+
+# Rede de segurança: re-remover o bloat que possa ter sido reintroduzido por
+# weak-deps/recommends dos pacotes do desktop. Só remove o que existir e sem
+# cascata (clean_requirements_on_remove=False) — nenhum destes é dependência
+# forte do core COSMIC.
+REINTRODUCED=()
+for pkg in "${FOUND_PKGS[@]}"; do
+    rpm -q "$pkg" &>/dev/null && REINTRODUCED+=("$pkg")
+done
+if [[ ${#REINTRODUCED[@]} -gt 0 ]]; then
+    echo "Re-removendo bloat reintroduzido: ${REINTRODUCED[*]}"
+    dnf5 remove -y --setopt=clean_requirements_on_remove=False "${REINTRODUCED[@]}"
+fi
 echo "::endgroup::"
 
 # ─── COPR packages (isolados) ────────────────────────────────────────────────
 echo "::group:: COPR packages"
-# kwin-effect-roundcorners não está nos repos Fedora
-copr_install_isolated "matinlotfali/KDE-Rounded-Corners" \
-    kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
-    || echo "WARN: kwin-effect-roundcorners não instalado"
+# COSMIC faz cantos arredondados nativamente — o KDE-Rounded-Corners (KWin) deixa
+# de ser necessário e foi removido na migração para COSMIC.
 # scx-scheds não está nos repos padrão do Fedora (disponível via COPR sched_ext)
 copr_install_isolated "sched_ext/scx" \
     scx-scheds \
     || echo "WARN: scx-scheds não instalado"
+# keyd não está nos repos Fedora (substitui o input-remapper) — remapeamento de
+# teclas por ficheiro de config, daemon leve sem GUI/Python.
+copr_install_isolated "alternateved/keyd" \
+    keyd \
+    || echo "WARN: keyd não instalado"
 echo "::endgroup::"

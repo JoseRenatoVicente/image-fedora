@@ -3,6 +3,12 @@ export image_vendor := env("IMAGE_VENDOR", env("GITHUB_REPOSITORY_OWNER", "")) #
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder@sha256:7ae88b8d6f2cabfa971d7836b96d6cac19cd1384e658031bd154f9687e929905")
 
+# Cosign: identidades confiáveis para verificação (não aceitar qualquer repo GitHub).
+# Assinatura da imagem → workflow build.yml do dono do repo; provenance → slsa-github-generator.
+sign_oidc_issuer := "https://token.actions.githubusercontent.com"
+sign_identity := "^https://github.com/" + env("GITHUB_REPOSITORY_OWNER", env("USER", "local")) + "/[^/]+/.github/workflows/build.yml@refs/heads/"
+provenance_identity := "^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v"
+
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2
 alias run-vm := run-vm-qcow2
@@ -378,7 +384,7 @@ run-vm-gl type="qcow2" ram="8G" cpus="4":
     RAM_BYTES=$(echo "{{ ram }}" | numfmt --from=iec)
     RAM_MB=$(( RAM_BYTES / 1024 / 1024 ))
 
-    echo "Iniciando VM KDE — janela SDL com OpenGL (virtio-vga-gl/virgl)"
+    echo "Iniciando VM COSMIC — janela SDL com OpenGL (virtio-vga-gl/virgl)"
     echo "  Imagem : ${image_file}"
     echo "  RAM    : ${RAM_MB}M  CPUs: {{ cpus }}"
     echo "  GPU    : virtio-vga-gl (OpenGL via host; sem Plymouth na VM)"
@@ -460,8 +466,8 @@ verify-signature $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env(
     fi
     echo "Verifying signature for ${target_image}:${tag}..."
     cosign verify \
-        --certificate-identity-regexp='https://github.com/.+' \
-        --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+        --certificate-identity-regexp='{{ sign_identity }}' \
+        --certificate-oidc-issuer="{{ sign_oidc_issuer }}" \
         "${target_image}:${tag}"
     echo "Signature verified successfully."
 
@@ -476,8 +482,8 @@ verify-provenance $target_image=("ghcr.io/" + env("GITHUB_REPOSITORY_OWNER", env
     fi
     echo "Verifying provenance for ${target_image}:${tag}..."
     cosign verify-attestation \
-        --certificate-identity-regexp='https://github.com/.+' \
-        --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \
+        --certificate-identity-regexp='{{ provenance_identity }}' \
+        --certificate-oidc-issuer='{{ sign_oidc_issuer }}' \
         --type slsaprovenance \
         "${target_image}:${tag}"
     echo "Provenance verified successfully."
@@ -701,6 +707,15 @@ promote-local $source_image=image_name $target_image=("ghcr.io/" + env("GITHUB_R
 
 # ── Testes automatizados ──────────────────────────────────────────────────────
 
+# Corre os testes source-level sem construir a imagem.
+[group('Testing')]
+validate-source:
+    ./tests/security_hardening_test.sh
+    ./tests/workflow_policy_test.sh
+    ./tests/justfile_sudoif_test.sh
+    ./tests/dell_intel_policy_test.sh
+    ./tests/cosmic_shell_dev_policy_test.sh
+
 # Corre os testes estáticos contra a imagem de container já construída (sem boot).
 # Rápido (~30s). Equivalente ao que corre no final do build, mas invocável a qualquer momento.
 # Requer: just build (ou just rebuild-qcow2 — a imagem container deve existir)
@@ -804,7 +819,7 @@ test-boot timeout="420":
 
     # Boot headless:
     #   -display none       → descarta output VGA (sem janela)
-    #   -device virtio-vga  → VGA existe (SDDM/KDE precisa de um device)
+    #   -device virtio-vga  → VGA existe (cosmic-greeter/COSMIC precisa de um device)
     #   -serial mon:stdio   → serial (ttyS0) capturado em stdout → log
     # NÃO usar -nographic aqui: implica sem VGA device e redirects serial
     # de forma diferente — conflita com -display none + -serial explícito.

@@ -62,15 +62,17 @@ jobs:
       - name: Verify published image signature
         run: |
           IMAGE_REF="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
+          # Pin à identidade concreta deste repo/workflow (não aceitar qualquer repo GitHub).
           cosign verify "${IMAGE_REF}" \
-            --certificate-identity-regexp 'https://github.com/.+' \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build.yml@refs/heads/" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 
       - name: Verify published provenance attestation
         run: |
           IMAGE_REF="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
+          # Provenance é assinada pelo slsa-github-generator, não por este repo.
           cosign verify-attestation "${IMAGE_REF}" \
-            --certificate-identity-regexp 'https://github.com/.+' \
+            --certificate-identity-regexp '^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             --type slsaprovenance
 

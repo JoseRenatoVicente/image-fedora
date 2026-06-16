@@ -1,8 +1,8 @@
-# Fedora Kinoite Secure Dev Image
+# Fedora COSMIC Secure Dev Image
 
-Custom Fedora Kinoite bootc image for a secure development workstation.
+Custom Fedora Atomic bootc image running the COSMIC desktop (System76), for a secure development workstation.
 
-The image keeps the base OS focused on boot, security hardening, KDE integration, container workflow support, and hardware/security-key support. Development stacks and user applications should live in Flatpak, Distrobox, Toolbox, or user-scoped setup instead of being layered into the immutable base.
+The image keeps the base OS focused on boot, security hardening, COSMIC desktop integration, container workflow support, and hardware/security-key support. Development stacks and user applications should live in Flatpak, Distrobox, Toolbox, or user-scoped setup instead of being layered into the immutable base.
 
 ## Atomic Model
 
@@ -14,17 +14,19 @@ The image keeps the base OS focused on boot, security hardening, KDE integration
 
 ## Base OS Contents
 
-- Fedora Kinoite bootc base pinned by digest in `Containerfile`.
+- Fedora Atomic (`base-atomic`) bootc base pinned by digest in `Containerfile`.
 - SELinux enforcing configuration.
 - Firewalld, hardened sysctl settings, bootc kernel arguments, coredump restrictions, and module blacklists.
 - Podman, Distrobox, Podman Compose, and Docker-compatible Podman wrappers for container workflows.
-- KDE/Plasma defaults, theme assets, SDDM configuration, and desktop integration.
+- COSMIC desktop with a Mokka-inspired theme (Catppuccin Mocha Mauve): derived COSMIC theme, JetBrainsMono Nerd Font, Tela-circle icons, Catppuccin cursors, Mokka-tree wallpaper, floating panel, and cosmic-greeter login.
 - YubiKey/U2F packages and PAM support for security keys.
 - Small recovery and productivity CLI tools such as `git`, `curl`, `jq`, `ripgrep`, `fd`, `bat`, `eza`, and `neovim`.
 
 ## Development Workflow
 
-On first login, the image offers an interactive user setup script from `~/setup-user.sh`. It can install user-scoped Flatpaks, shell conveniences, NVM/Node.js, Oh My Zsh, Homebrew, and selected infrastructure tools.
+On first login, the image offers an interactive user setup script from `~/setup-user.sh`. It can install user-scoped Flatpaks, shell conveniences (zsh + starship prompt with system autosuggestions/syntax-highlighting plugins), NVM/Node.js, Homebrew, and selected infrastructure tools.
+
+The shell setup is offline-friendly: it writes a managed block to `~/.zshrc`, enables Starship when present, uses Fedora-packaged zsh autosuggestions/syntax-highlighting, and adds small helpers for `just`, git branch checkout, and run0/sudo line toggling. Heavy development stacks remain outside the base image; `fedora-dev-setup` writes Distrobox/Toolbox guidance to `~/.local/share/fedora-dev-setup/containers.md`.
 
 Prefer a per-project development container for toolchains:
 

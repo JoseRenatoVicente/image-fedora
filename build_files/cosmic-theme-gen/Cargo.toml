@@ -1,0 +1,22 @@
+# Helper de build-time: deriva o tema COSMIC (Catppuccin Mocha Mauve) a partir do
+# ThemeBuilder .ron, usando a MESMA lógica (ThemeBuilder::build) que o cosmic-settings
+# usa ao importar um tema. Compilado e executado dentro do build da imagem e depois
+# removido (cargo/rust não ficam na imagem final).
+#
+# O rev do libcosmic está pinado para builds reprodutíveis — atualizar para casar
+# com a versão do COSMIC empacotada no Fedora quando o formato do tema mudar.
+[package]
+name = "cosmic-theme-gen"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+cosmic-theme = { git = "https://github.com/pop-os/libcosmic", rev = "a991d7bb433f67016c1473e8e4a03691ededd75a" }
+cosmic-config = { git = "https://github.com/pop-os/libcosmic", rev = "a991d7bb433f67016c1473e8e4a03691ededd75a", default-features = false, features = ["macro"] }
+ron = "0.8"
+
+[profile.release]
+opt-level = 0
+debug = false
+strip = true
