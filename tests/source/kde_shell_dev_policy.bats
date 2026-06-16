@@ -1,40 +1,71 @@
 #!/usr/bin/env bats
-# Source-level tests: COSMIC desktop, shell, and dev environment policy
+# Source-level tests: KDE Plasma desktop, shell, and dev environment policy
 
 setup() {
     load '../helpers/common'
-    configure="${REPO_ROOT}/build_files/configure/03-skel.sh"
+    configure="${REPO_ROOT}/build_files/build-configure.sh"
     packages="${REPO_ROOT}/build_files/build-packages.sh"
     runtime_tests="${REPO_ROOT}/build_files/shared/tests.sh"
     shell_setup="${REPO_ROOT}/build_files/configs/fedora-shell-setup"
     dev_setup="${REPO_ROOT}/build_files/configs/fedora-dev-setup"
-    cosmic_layout="${REPO_ROOT}/build_files/configs/fedora-cosmic-layout-setup"
 }
 
-# ── COSMIC layout ────────────────────────────────────────────────────────────
+# ── KDE theme setup ──────────────────────────────────────────────────────────
 
-@test "configure references fedora-cosmic-layout-setup" {
-    assert_contains "$configure" 'fedora-cosmic-layout-setup'
+@test "configure sets Mokka look-and-feel" {
+    assert_contains "$configure" 'Mokka'
 }
 
-@test "configure installs cosmic-layout-setup systemd service" {
-    assert_contains "$configure" '/usr/lib/systemd/user/fedora-cosmic-layout-setup.service'
+@test "configure installs SDDM theme" {
+    assert_contains "$configure" 'plasmalogin.conf.d'
 }
 
-@test "configure enables cosmic-layout-setup timer" {
-    assert_contains "$configure" '/etc/systemd/user/timers.target.wants/fedora-cosmic-layout-setup.timer'
+@test "configure sets kwin-vm-compat" {
+    assert_contains "$configure" 'kwin-vm-compat'
 }
 
-@test "runtime tests check for cosmic-layout-setup" {
-    assert_contains "$runtime_tests" 'fedora-cosmic-layout-setup'
+@test "configure installs plasma appletsrc" {
+    assert_contains "$configure" 'plasma-org.kde.plasma.desktop-appletsrc'
 }
 
-@test "cosmic layout script has layout_version" {
-    assert_contains "$cosmic_layout" 'layout_version='
+@test "configure sets kvantum widget style" {
+    assert_contains "$configure" 'kvantum'
 }
 
-@test "cosmic layout script references version file" {
-    assert_contains "$cosmic_layout" 'fedora-cosmic-layout.version'
+@test "configure sets Catppuccin cursor theme" {
+    assert_contains "$configure" 'catppuccin-mocha-mauve-cursors'
+}
+
+# ── KDE packages present ─────────────────────────────────────────────────────
+
+@test "plasma-desktop is in packages" {
+    assert_contains "$packages" 'plasma-desktop'
+}
+
+@test "kwin is in packages" {
+    assert_contains "$packages" 'kwin'
+}
+
+@test "konsole is in packages" {
+    assert_contains "$packages" 'konsole'
+}
+
+@test "dolphin is in packages" {
+    assert_contains "$packages" 'dolphin'
+}
+
+# ── COSMIC packages absent ───────────────────────────────────────────────────
+
+@test "cosmic-session is not in packages" {
+    assert_not_contains "$packages" 'cosmic-session'
+}
+
+@test "cosmic-comp is not in packages" {
+    assert_not_contains "$packages" 'cosmic-comp'
+}
+
+@test "cosmic-greeter is not in packages" {
+    assert_not_contains "$packages" 'cosmic-greeter'
 }
 
 # ── Shell setup (starship, zoxide, direnv) ───────────────────────────────────

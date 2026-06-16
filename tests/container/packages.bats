@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Container tests — run inside the built image
-# Tests: required packages, COSMIC packages, unwanted packages, repos, wrappers
+# Tests: required packages, KDE Plasma packages, unwanted packages, repos, wrappers
 
 setup() {
     load '../helpers/common'
@@ -136,34 +136,30 @@ setup() {
     rpm -q zsh
 }
 
-# ── COSMIC packages ─────────────────────────────────────────────────────────
+# ── KDE Plasma packages ──────────────────────────────────────────────────────
 
-@test "cosmic-comp is installed" {
-    rpm -q cosmic-comp
+@test "plasma-desktop is installed" {
+    rpm -q plasma-desktop
 }
 
-@test "cosmic-session is installed" {
-    rpm -q cosmic-session
+@test "plasma-workspace is installed" {
+    rpm -q plasma-workspace
 }
 
-@test "cosmic-panel is installed" {
-    rpm -q cosmic-panel
+@test "kwin is installed" {
+    rpm -q kwin
 }
 
-@test "cosmic-settings is installed" {
-    rpm -q cosmic-settings
+@test "konsole is installed" {
+    rpm -q konsole
 }
 
-@test "cosmic-greeter is installed" {
-    rpm -q cosmic-greeter
+@test "dolphin is installed" {
+    rpm -q dolphin
 }
 
-@test "cosmic-files is installed" {
-    rpm -q cosmic-files
-}
-
-@test "cosmic-term is installed" {
-    rpm -q cosmic-term
+@test "plasma-login-manager is installed" {
+    rpm -q plasma-login-manager
 }
 
 # ── Unwanted packages ───────────────────────────────────────────────────────
@@ -258,38 +254,18 @@ setup() {
     [ "$status" -ne 0 ]
 }
 
-@test "plasma-desktop is not installed" {
-    run rpm -q plasma-desktop
+@test "cosmic-session is not installed" {
+    run rpm -q cosmic-session
     [ "$status" -ne 0 ]
 }
 
-@test "plasma-workspace is not installed" {
-    run rpm -q plasma-workspace
+@test "cosmic-comp is not installed" {
+    run rpm -q cosmic-comp
     [ "$status" -ne 0 ]
 }
 
-@test "kwin is not installed" {
-    run rpm -q kwin
-    [ "$status" -ne 0 ]
-}
-
-@test "plasma-login-manager is not installed" {
-    run rpm -q plasma-login-manager
-    [ "$status" -ne 0 ]
-}
-
-@test "dolphin is not installed" {
-    run rpm -q dolphin
-    [ "$status" -ne 0 ]
-}
-
-@test "konsole is not installed" {
-    run rpm -q konsole
-    [ "$status" -ne 0 ]
-}
-
-@test "kvantum is not installed" {
-    run rpm -q kvantum
+@test "cosmic-greeter is not installed" {
+    run rpm -q cosmic-greeter
     [ "$status" -ne 0 ]
 }
 
