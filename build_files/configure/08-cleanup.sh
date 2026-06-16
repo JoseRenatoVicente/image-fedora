@@ -71,5 +71,6 @@ echo "::group:: Crypto policy"
 update-crypto-policies --set DEFAULT:CHRONY-NTS
 echo "::endgroup::"
 
-# ─── Tests (após crypto policy para validar FUTURE) ──────────────────────────
-/ctx/shared/tests.sh
+# ─── Tests (testes in-container movidos para BATS) ───────────────────────────
+# Testes in-container movidos para BATS (just test-container).
+# O build valida via bootc container lint (Containerfile).
