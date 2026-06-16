@@ -21,174 +21,32 @@ fi
 # shellcheck source=shared/copr-helpers.sh
 source /ctx/shared/copr-helpers.sh
 
-# ─── sudo → run0 (alias) ──────────────────────────────────────────────────────
-echo "::group:: sudo → run0 (alias)"
-install -Dm644 /ctx/configs/run0-alias.sh /etc/profile.d/run0-alias.sh
-install -Dm644 /ctx/configs/environment-java-wayland.conf \
-    /etc/environment.d/java-wayland.conf
-echo "::endgroup::"
-
 # ─── Remove repos rpmfusion ───────────────────────────────────────────────────
 rm -f /etc/yum.repos.d/rpmfusion-*.repo
 
 # ─── System configs ───────────────────────────────────────────────────────────
 echo "::group:: System configs"
 
-install -Dm644 /ctx/configs/selinux-enforcing.conf /etc/selinux/config
+# Mirrored filesystem tree: each file already lives at its final path under
+# build_files/etc/ and build_files/usr/; cp -aT overlays them in one shot.
+cp -aT /ctx/etc/ /etc/
+cp -aT /ctx/usr/ /usr/
 
-install -Dm644 /ctx/configs/sysctl-hardening.conf \
-    /etc/sysctl.d/60-security-hardening.conf
-install -Dm644 /ctx/configs/sysctl-ptrace.conf \
-    /etc/sysctl.d/61-ptrace-scope.conf
-install -Dm644 /ctx/configs/sysctl-performance.conf \
-    /etc/sysctl.d/99-performance.conf
-
-install -Dm644 /ctx/configs/modprobe-hardening.conf \
-    /etc/modprobe.d/security-hardening.conf
-install -Dm644 /ctx/configs/modprobe-framebuffer-blacklist.conf \
-    /etc/modprobe.d/blacklist-framebuffer.conf
-install -Dm644 /ctx/configs/modprobe-dvb-rc.conf \
-    /etc/modprobe.d/no-dvb-rc.conf
-# IPSec blacklist opcional — não ativo por defeito (quebraria VPNs).
-install -Dm644 /ctx/configs/modprobe-ipsec-blacklist.conf \
-    /usr/share/fedora-hardening/modprobe-ipsec-blacklist.conf
-
-install -Dm644 /ctx/configs/bootc-kargs.toml \
-    /usr/lib/bootc/kargs.d/10-hardening.toml
-install -Dm644 /ctx/configs/bootc-kargs-performance.toml \
-    /usr/lib/bootc/kargs.d/20-performance.toml
-
-# GRUB: hide the boot menu and boot immediately.
-install -Dm644 /ctx/configs/grub-timeout.cfg \
-    /usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg
-
-install -Dm644 /ctx/configs/limits-coredump.conf \
-    /etc/security/limits.d/60-disable-coredump.conf
-install -Dm644 /ctx/configs/systemd-coredump-system.conf \
-    /etc/systemd/system.conf.d/60-disable-coredump.conf
-install -Dm644 /ctx/configs/systemd-coredump-user.conf \
-    /etc/systemd/user.conf.d/60-disable-coredump.conf
-
-install -Dm644 /ctx/configs/resolved-dns.conf \
-    /etc/systemd/resolved.conf.d/60-security-dns.conf
-install -Dm644 /ctx/configs/resolved-disable-llmnr.conf \
-    /etc/systemd/resolved.conf.d/10-disable-llmnr.conf
-
-install -Dm644 /ctx/configs/chrony-nts.conf /etc/chrony.conf
-
-install -Dm644 /ctx/configs/firewalld-workstation.xml \
-    /etc/firewalld/zones/FedoraWorkstation.xml
-
-install -Dm644 /ctx/configs/pwquality.conf /etc/security/pwquality.conf
-install -Dm644 /ctx/configs/faillock.conf /etc/security/faillock.conf
-
-install -Dm644 /ctx/configs/networkmanager-hardening.conf \
-    /usr/lib/NetworkManager/conf.d/40-hardening.conf
-
-install -Dm644 /ctx/configs/dracut-omit-firewire.conf \
-    /etc/dracut.conf.d/99-omit-firewire.conf
-install -Dm644 /ctx/configs/dracut-omit-thunderbolt.conf \
-    /etc/dracut.conf.d/99-omit-thunderbolt.conf
-
-install -Dm644 /ctx/configs/udev-hardening.rules \
-    /usr/lib/udev/rules.d/99-hardening.rules
-
-install -Dm644 /ctx/configs/systemd-preset-desktop.preset \
-    /usr/lib/systemd/system-preset/35-security-desktop.preset
-
-install -Dm644 /ctx/configs/kwinrc-xwayland.conf /etc/xdg/kwinrc
-
-install -Dm644 /ctx/configs/journald-size.conf \
-    /etc/systemd/journald.conf.d/size-limit.conf
-
-install -Dm644 /ctx/configs/fstrim-fix.conf \
-    /etc/systemd/system/fstrim.service.d/quiet-unsupported.conf
-
-install -Dm644 /ctx/configs/earlyoom-override.conf \
-    /etc/systemd/system/earlyoom.service.d/override.conf
-
-# O display manager é o plasma-login-manager (plasmalogin), rebrand do SDDM que
-# lê /etc/plasmalogin.conf.d/ — NÃO /etc/sddm.conf.d/.
-install -Dm644 /ctx/configs/sddm-theme.conf /etc/plasmalogin.conf.d/10-theme.conf
-
-install -Dm644 /ctx/configs/chrony-nts-policy.pmod \
-    /etc/crypto-policies/policies/modules/CHRONY-NTS.pmod
-
-install -Dm644 /ctx/configs/rpm-ostreed.conf /etc/rpm-ostreed.conf
-
-install -Dm644 /ctx/configs/dracut-luks.conf \
-    /etc/dracut.conf.d/90-luks-security.conf
-
-install -Dm644 /ctx/configs/copr-vendor.conf \
-    /usr/share/dnf/plugins/copr.vendor.conf
-
-install -Dm644 /ctx/configs/flatpak-nuke-fedora.service \
-    /usr/lib/systemd/system/flatpak-nuke-fedora.service
-
-install -Dm644 /ctx/configs/flathub-system-setup.service \
-    /usr/lib/systemd/system/flathub-system-setup.service
-
-# ── Bazzite-derived configs ───────────────────────────────────────────────────
-install -Dm644 /ctx/configs/zram-generator.conf \
-    /etc/systemd/zram-generator.conf
-
-install -Dm644 /ctx/configs/udev-io-schedulers.rules \
-    /usr/lib/udev/rules.d/60-io-schedulers.rules
-install -Dm644 /ctx/configs/udev-audio-realtime.rules \
-    /usr/lib/udev/rules.d/61-audio-realtime.rules
-
-# ── cachyos-settings-derived perf configs ─────────────────────────────────────
-# Afinação de THP (defrag + shrinker) via tmpfiles
-install -Dm644 /ctx/configs/tmpfiles-thp.conf \
-    /usr/lib/tmpfiles.d/thp-tuning.conf
-# Delegação de cgroup às sessões de utilizador (podman/distrobox rootless)
-install -Dm644 /ctx/configs/systemd-user-delegate.conf \
-    /etc/systemd/system/user@.service.d/10-delegate.conf
-# Limites de file descriptors
-install -Dm644 /ctx/configs/systemd-nofile-system.conf \
-    /etc/systemd/system.conf.d/10-nofile-limit.conf
-install -Dm644 /ctx/configs/systemd-nofile-user.conf \
-    /etc/systemd/user.conf.d/10-nofile-limit.conf
-
-install -Dm644 /ctx/configs/wireplumber-no-suspend.conf \
-    /usr/share/wireplumber/wireplumber.conf.d/51-disable-suspension.conf
+# Executables from the mirrored tree need explicit permission bits.
+chmod 755 /usr/bin/dnf
+chmod 755 /usr/libexec/fedora-flatpak-setup \
+          /usr/libexec/fedora-shell-setup \
+          /usr/libexec/fedora-dev-setup \
+          /usr/libexec/fedora-brew-setup
 
 # Wireplumber: bloquear Steam de limpar defaults de áudio (equiv. ao patch Nobara)
 mv /usr/bin/wpctl /usr/bin/wpctl.real
 install -Dm755 /ctx/configs/wpctl-steam-wrapper /usr/bin/wpctl
 
-install -Dm644 /ctx/configs/systemd-timeout.conf \
-    /etc/systemd/system.conf.d/timeout.conf
-install -Dm644 /ctx/configs/systemd-timeout.conf \
-    /etc/systemd/user.conf.d/timeout.conf
-
-install -Dm644 /ctx/configs/qtlogging.ini \
-    /usr/share/qt6/qtlogging.ini
-
-install -Dm644 /ctx/configs/udev-gpu-reset.rules \
-    /usr/lib/udev/rules.d/80-gpu-reset.rules
-
-install -Dm755 /ctx/configs/dnf-wrapper /usr/bin/dnf
-
-install -Dm644 /ctx/configs/dnf-no-weak-deps.conf \
-    /etc/dnf/conf.d/no-weak-deps.conf
-
-install -Dm644 /ctx/configs/modules-ntsync.conf \
-    /usr/lib/modules-load.d/wine-ntsync.conf
-
-install -Dm644 /ctx/configs/limits-memlock.conf \
-    /etc/security/limits.d/50-memlock.conf
-
 # login.defs: UMASK 027 (ficheiros novos não são world-readable por defeito)
 # e YESCRYPT_COST_FACTOR 8 (hashing de password mais resistente a brute-force)
 sed -i 's/^UMASK\s\+022/UMASK\t\t027/' /etc/login.defs
 sed -i 's/^#\?YESCRYPT_COST_FACTOR.*/YESCRYPT_COST_FACTOR 8/' /etc/login.defs
-
-# Container image signing: políticas sigstore para registos usados na imagem
-install -Dm644 /ctx/configs/containers-registries-d/quay.io-fedora-ostree-desktops.yaml \
-    /etc/containers/registries.d/quay.io-fedora-ostree-desktops.yaml
-install -Dm644 /ctx/configs/containers-registries-d/quay.io-toolbx-images.yaml \
-    /etc/containers/registries.d/quay.io-toolbx-images.yaml
 
 # Anotar ficheiros de hardening com metadados de componente
 setfattr -n user.component -v "security-hardening" \
@@ -308,7 +166,6 @@ sed -i 's|^SHELL=.*|SHELL=/bin/zsh|' /etc/default/useradd
 mkdir -p /etc/skel/.config/systemd/user/timers.target.wants
 
 for script in fedora-flatpak-setup fedora-shell-setup fedora-dev-setup fedora-brew-setup; do
-    install -Dm755 /ctx/configs/"${script}" /usr/libexec/"${script}"
     install -Dm644 /ctx/skel/.config/systemd/user/"${script}".service \
         /etc/skel/.config/systemd/user/"${script}".service
     install -Dm644 /ctx/skel/.config/systemd/user/"${script}".timer \
@@ -317,9 +174,6 @@ for script in fedora-flatpak-setup fedora-shell-setup fedora-dev-setup fedora-br
         /etc/skel/.config/systemd/user/timers.target.wants/"${script}".timer
 done
 
-install -Dm644 /ctx/configs/tmpfiles-homebrew.conf \
-    /usr/lib/tmpfiles.d/homebrew.conf
-
 install -Dm755 /ctx/skel/.local/bin/kwin-vm-compat.sh \
     /usr/libexec/kwin-vm-compat.sh
 install -Dm644 /ctx/skel/.config/autostart/kwin-vm-compat.desktop \
@@ -327,9 +181,6 @@ install -Dm644 /ctx/skel/.config/autostart/kwin-vm-compat.desktop \
 
 install -Dm644 /ctx/skel/.config/plasma-org.kde.plasma.desktop-appletsrc \
     /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc
-
-install -Dm644 /ctx/configs/tmpfiles-root-kde.conf \
-    /usr/lib/tmpfiles.d/fedora-kde-root-theme.conf
 
 rm -rf /usr/share/plasma/look-and-feel/Mokka/contents/layouts
 
@@ -350,7 +201,6 @@ kwriteconfig6 --file /etc/skel/.config/ksplashrc \
 
 touch /etc/plasma-setup-done
 
-install -Dm644 /ctx/configs/plasma-welcomerc /etc/xdg/plasma-welcomerc
 kwriteconfig6 --file /etc/skel/.config/plasma-welcomerc \
     --group General --key ShowOnStartup "false"
 kwriteconfig6 --file /etc/skel/.config/plasma-welcomerc \
@@ -495,8 +345,6 @@ fi
 systemctl enable flatpak-nuke-fedora.service
 systemctl enable flathub-system-setup.service
 systemctl enable input-remapper.service
-install -Dm644 /ctx/configs/udev-input-remapper.rules \
-    /etc/udev/rules.d/99-input-remapper.rules
 if rpm -q scx-scheds &>/dev/null; then
     install -Dm644 /ctx/configs/scx-default.conf /etc/default/scx
     setfattr -n user.component -v "image-config" /etc/default/scx
@@ -583,7 +431,6 @@ echo "::endgroup::"
 
 # ─── Regenerate initramfs (virtio_gpu para Plymouth em VM) ────────────────────
 echo "::group:: Initramfs"
-install -Dm644 /ctx/configs/dracut-drm-drivers.conf /etc/dracut.conf.d/02-drm-drivers.conf
 KVER=$(ls /usr/lib/modules | sort -V | tail -1)
 INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
 
