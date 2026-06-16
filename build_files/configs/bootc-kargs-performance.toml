@@ -7,4 +7,8 @@ kargs = [
   # além de duplicar compressão. Mantemos vm.swappiness=100 (não subimos a 150
   # como o CachyOS — ver sysctl-performance.conf). Derivado de cachyos-settings.
   "zswap.enabled=0",
+  # Desactiva transições de power state do NVMe (APST). Elimina picos de
+  # latência de 30-100ms causados por wake de PS3/PS4 — crítico para gaming.
+  # Custo: ~1W de consumo idle extra. Derivado de Bazzite-Config.
+  "nvme_core.default_ps_max_latency_us=0",
 ]
