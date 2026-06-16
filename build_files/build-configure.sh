@@ -474,6 +474,8 @@ systemctl enable input-remapper.service
 install -Dm644 /ctx/configs/udev-input-remapper.rules \
     /etc/udev/rules.d/99-input-remapper.rules
 if rpm -q scx-scheds &>/dev/null; then
+    install -Dm644 /ctx/configs/scx-default.conf /etc/default/scx
+    setfattr -n user.component -v "image-config" /etc/default/scx
     systemctl enable scx.service
 fi
 

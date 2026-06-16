@@ -46,6 +46,15 @@ setup() {
     grep -q 'vm.max_map_count' /etc/sysctl.d/99-performance.conf
 }
 
+@test "Cachy Sauce performance tunables are present" {
+    grep -qE '^kernel\.sched_autogroup_enabled\s*=\s*1' /etc/sysctl.d/99-performance.conf
+    grep -qE '^net\.core\.netdev_max_backlog\s*=' /etc/sysctl.d/99-performance.conf
+}
+
+@test "split_lock_mitigate is NOT disabled (would weaken hardening)" {
+    ! grep -qE '^kernel\.split_lock_mitigate\s*=\s*0' /etc/sysctl.d/99-performance.conf
+}
+
 # ── ZRAM ─────────────────────────────────────────────────────────────────────
 
 @test "ZRAM uses zstd compression" {

@@ -132,6 +132,14 @@ setup() {
     systemctl is-enabled scx.service 2>/dev/null | grep -q "^enabled$"
 }
 
+@test "scx scheduler is configured if scx-scheds installed" {
+    if ! rpm -q scx-scheds &>/dev/null; then
+        skip "scx-scheds not installed"
+    fi
+    [ -e /etc/default/scx ]
+    grep -qE '^SCX_SCHEDULER=scx_' /etc/default/scx
+}
+
 # ── keyd ─────────────────────────────────────────────────────────────────────
 
 @test "input-remapper is not present" {
