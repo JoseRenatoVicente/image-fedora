@@ -1,0 +1,6 @@
+# Permissões de dispositivos para áudio realtime/baixa latência.
+# Dá ao grupo "audio" acesso directo aos timers e ao controlador de latência
+# de CPU — necessário para PipeWire com quantum baixo e DAWs/JACK.
+SUBSYSTEM=="misc", KERNEL=="cpu_dma_latency", GROUP="audio", MODE="0660"
+KERNEL=="rtc0", GROUP="audio"
+KERNEL=="hpet", GROUP="audio"

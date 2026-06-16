@@ -132,6 +132,8 @@ install -Dm644 /ctx/configs/zram-generator.conf \
 
 install -Dm644 /ctx/configs/udev-io-schedulers.rules \
     /usr/lib/udev/rules.d/60-io-schedulers.rules
+install -Dm644 /ctx/configs/udev-audio-realtime.rules \
+    /usr/lib/udev/rules.d/61-audio-realtime.rules
 
 # ── cachyos-settings-derived perf configs ─────────────────────────────────────
 # Afinação de THP (defrag + shrinker) via tmpfiles
