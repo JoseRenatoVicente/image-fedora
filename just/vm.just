@@ -123,7 +123,7 @@ run-vm-gl type="qcow2" ram="8G" cpus="4":
     RAM_BYTES=$(echo "{{ ram }}" | numfmt --from=iec)
     RAM_MB=$(( RAM_BYTES / 1024 / 1024 ))
 
-    echo "Iniciando VM COSMIC — janela SDL com OpenGL (virtio-vga-gl/virgl)"
+    echo "Iniciando VM KDE — janela SDL com OpenGL (virtio-vga-gl/virgl)"
     echo "  Imagem : ${image_file}"
     echo "  RAM    : ${RAM_MB}M  CPUs: {{ cpus }}"
     echo "  GPU    : virtio-vga-gl (OpenGL via host; sem Plymouth na VM)"

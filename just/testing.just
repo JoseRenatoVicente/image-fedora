@@ -7,7 +7,7 @@ validate-source:
     ./tests/workflow_policy_test.sh
     ./tests/justfile_sudoif_test.sh
     ./tests/dell_intel_policy_test.sh
-    ./tests/cosmic_shell_dev_policy_test.sh
+    ./tests/kde_shell_dev_policy_test.sh
 
 # Corre os testes estáticos contra a imagem de container já construída (sem boot).
 # Rápido (~30s). Equivalente ao que corre no final do build, mas invocável a qualquer momento.
@@ -112,7 +112,7 @@ test-boot timeout="420":
 
     # Boot headless:
     #   -display none       → descarta output VGA (sem janela)
-    #   -device virtio-vga  → VGA existe (cosmic-greeter/COSMIC precisa de um device)
+    #   -device virtio-vga  → VGA existe (SDDM/KDE precisa de um device)
     #   -serial mon:stdio   → serial (ttyS0) capturado em stdout → log
     # NÃO usar -nographic aqui: implica sem VGA device e redirects serial
     # de forma diferente — conflita com -display none + -serial explícito.
