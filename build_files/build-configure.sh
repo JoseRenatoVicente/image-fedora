@@ -24,6 +24,8 @@ source /ctx/shared/copr-helpers.sh
 # ─── sudo → run0 (alias) ──────────────────────────────────────────────────────
 echo "::group:: sudo → run0 (alias)"
 install -Dm644 /ctx/configs/run0-alias.sh /etc/profile.d/run0-alias.sh
+install -Dm644 /ctx/configs/environment-java-wayland.conf \
+    /etc/environment.d/java-wayland.conf
 echo "::endgroup::"
 
 # ─── Remove repos rpmfusion ───────────────────────────────────────────────────
