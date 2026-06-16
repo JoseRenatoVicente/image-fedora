@@ -53,6 +53,8 @@ install -Dm644 /ctx/configs/modprobe-ipsec-blacklist.conf \
 
 install -Dm644 /ctx/configs/bootc-kargs.toml \
     /usr/lib/bootc/kargs.d/10-hardening.toml
+install -Dm644 /ctx/configs/bootc-kargs-performance.toml \
+    /usr/lib/bootc/kargs.d/20-performance.toml
 
 # GRUB: hide the boot menu and boot immediately.
 install -Dm644 /ctx/configs/grub-timeout.cfg \
@@ -131,6 +133,19 @@ install -Dm644 /ctx/configs/zram-generator.conf \
 install -Dm644 /ctx/configs/udev-io-schedulers.rules \
     /usr/lib/udev/rules.d/60-io-schedulers.rules
 
+# ── cachyos-settings-derived perf configs ─────────────────────────────────────
+# Afinação de THP (defrag + shrinker) via tmpfiles
+install -Dm644 /ctx/configs/tmpfiles-thp.conf \
+    /usr/lib/tmpfiles.d/thp-tuning.conf
+# Delegação de cgroup às sessões de utilizador (podman/distrobox rootless)
+install -Dm644 /ctx/configs/systemd-user-delegate.conf \
+    /etc/systemd/system/user@.service.d/10-delegate.conf
+# Limites de file descriptors
+install -Dm644 /ctx/configs/systemd-nofile-system.conf \
+    /etc/systemd/system.conf.d/10-nofile-limit.conf
+install -Dm644 /ctx/configs/systemd-nofile-user.conf \
+    /etc/systemd/user.conf.d/10-nofile-limit.conf
+
 install -Dm644 /ctx/configs/wireplumber-no-suspend.conf \
     /usr/share/wireplumber/wireplumber.conf.d/51-disable-suspension.conf
 
@@ -182,6 +197,11 @@ setfattr -n user.component -v "security-hardening" \
 
 setfattr -n user.component -v "image-config" \
     /etc/sysctl.d/99-performance.conf \
+    /usr/lib/bootc/kargs.d/20-performance.toml \
+    /usr/lib/tmpfiles.d/thp-tuning.conf \
+    /etc/systemd/system/user@.service.d/10-delegate.conf \
+    /etc/systemd/system.conf.d/10-nofile-limit.conf \
+    /etc/systemd/user.conf.d/10-nofile-limit.conf \
     /etc/systemd/resolved.conf.d/60-security-dns.conf \
     /etc/systemd/resolved.conf.d/10-disable-llmnr.conf \
     /etc/chrony.conf \

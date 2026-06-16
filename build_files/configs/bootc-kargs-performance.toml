@@ -1,0 +1,10 @@
+# Kernel boot parameters de performance.
+# Instalado em /usr/lib/bootc/kargs.d/20-performance.toml (merge com os de hardening).
+
+kargs = [
+  # Desliga o zswap: usamos zram como swap comprimido. zswap activo intercepta
+  # as páginas antes do zram e impede a contabilização correcta (zramctl),
+  # além de duplicar compressão. Mantemos vm.swappiness=100 (não subimos a 150
+  # como o CachyOS — ver sysctl-performance.conf). Derivado de cachyos-settings.
+  "zswap.enabled=0",
+]

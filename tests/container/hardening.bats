@@ -158,6 +158,25 @@ setup() {
     grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml
 }
 
+# ── Performance (cachyos-settings-derived) ───────────────────────────────────
+
+@test "perf kargs disable zswap (zram is the swap backend)" {
+    grep -q 'zswap.enabled=0' /usr/lib/bootc/kargs.d/20-performance.toml
+}
+
+@test "THP tuning tmpfiles configures defrag and shrinker" {
+    grep -q 'transparent_hugepage/defrag' /usr/lib/tmpfiles.d/thp-tuning.conf
+    grep -q 'max_ptes_none' /usr/lib/tmpfiles.d/thp-tuning.conf
+}
+
+@test "user@ sessions delegate cgroup controllers" {
+    grep -qE '^Delegate=.*\bmemory\b' /etc/systemd/system/user@.service.d/10-delegate.conf
+}
+
+@test "systemd raises DefaultLimitNOFILE" {
+    grep -qE '^DefaultLimitNOFILE=' /etc/systemd/system.conf.d/10-nofile-limit.conf
+}
+
 # ── Required files ───────────────────────────────────────────────────────────
 
 @test "/etc/sysctl.d/60-security-hardening.conf exists" {
