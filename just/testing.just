@@ -3,11 +3,7 @@
 # Corre os testes source-level sem construir a imagem.
 [group('Testing')]
 validate-source:
-    ./tests/security_hardening_test.sh
-    ./tests/workflow_policy_test.sh
-    ./tests/justfile_sudoif_test.sh
-    ./tests/dell_intel_policy_test.sh
-    ./tests/kde_shell_dev_policy_test.sh
+    bats tests/source/
 
 # Corre os testes estáticos contra a imagem de container já construída (sem boot).
 # Rápido (~30s). Equivalente ao que corre no final do build, mas invocável a qualquer momento.
@@ -23,12 +19,11 @@ test-container $target_image=image_name $tag=default_tag:
         exit 1
     fi
     echo "A correr testes estáticos em: ${local_ref}"
-    # O tests.sh corre dentro do container com bind-mount do host — não precisa de estar na imagem
     podman run --rm \
         --security-opt label=disable \
-        -v "$(pwd)/build_files/shared/tests.sh:/run/tests.sh:ro,z" \
+        -v "$(pwd)/tests:/tests:ro,z" \
         "${local_ref}" \
-        bash /run/tests.sh
+        bash -c 'dnf5 install -y --setopt=install_weak_deps=False bats 2>/dev/null; bats /tests/container/'
 
 # Constrói a imagem de teste (extensão da produção com health check de boot).
 # A imagem de produção deve existir localmente; `just test-boot` reconstrói-a antes.
