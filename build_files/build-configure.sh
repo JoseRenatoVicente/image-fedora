@@ -72,6 +72,7 @@ setfattr -n user.component -v "image-config" \
     /usr/lib/NetworkManager/conf.d/40-hardening.conf \
     /usr/lib/systemd/system-preset/35-security-desktop.preset \
     /etc/xdg/kwinrc \
+    /etc/xdg/kdeglobals \
     /etc/systemd/journald.conf.d/size-limit.conf \
     /etc/plasmalogin.conf.d/10-theme.conf
 
