@@ -352,6 +352,7 @@ if rpm -q scx-scheds &>/dev/null; then
 fi
 
 systemctl enable thermald.service irqbalance.service
+systemctl enable systemd-oomd
 # bolt e fwupd são D-Bus/udev-activated; o enable não é necessário (nem funciona no container)
 systemctl preset power-profiles-daemon.service 2>/dev/null || true
 

@@ -77,7 +77,7 @@ run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-
 # HW real o Plymouth funciona (rhgb + driver nativo no initramfs). Para ter Plymouth
 # TAMBÉM na VM seria preciso pôr virtio_gpu/simpledrm no initramfs (regenerá-lo).
 [group('Run Virtal Machine')]
-run-vm-gl type="qcow2" ram="8G" cpus="4":
+run-vm-gl type="qcow2" ram="4G" cpus="1":
     #!/usr/bin/env bash
     set -euo pipefail
 
