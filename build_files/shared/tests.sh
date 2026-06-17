@@ -333,13 +333,20 @@ else
 fi
 
 echo "=== Login (plasmalogin) tema ==="
-# O DM é o plasma-login-manager, que lê /etc/plasmalogin.conf.d/ (não sddm.conf.d).
-SDDM_CONF="/etc/plasmalogin.conf.d/10-theme.conf"
-[[ -f "$SDDM_CONF" ]] || fail "Login: ficheiro de config ausente: $SDDM_CONF"
-grep -q '^Current=Catppuccin-Mocha-Mauve$' "$SDDM_CONF" \
-    || fail "SDDM: tema não é Catppuccin-Mocha-Mauve ($(grep '^Current=' "$SDDM_CONF" || echo 'não definido'))"
-[[ -d "/usr/share/sddm/themes/Catppuccin-Mocha-Mauve" ]] \
-    || fail "SDDM: directório do tema Catppuccin-Mocha-Mauve ausente"
+# O DM é o plasma-login-manager (plasmalogin): greeter QML próprio, não usa temas SDDM.
+# Aparência configurada via:
+#   1. /etc/xdg/kdeglobals — LookAndFeelPackage=Mokka (lido por startplasma-login-wayland)
+#   2. /etc/plasmalogin.conf.d/10-theme.conf — WallpaperPluginId + Image (greeter wallpaper)
+PLASMALOGIN_CONF="/etc/plasmalogin.conf.d/10-theme.conf"
+PLASMALOGIN_KDEGLOBALS="/etc/xdg/kdeglobals"
+[[ -f "$PLASMALOGIN_CONF" ]] || fail "Login: ficheiro de config ausente: $PLASMALOGIN_CONF"
+grep -q '^WallpaperPluginId=org.kde.image$' "$PLASMALOGIN_CONF" \
+    || fail "plasmalogin: WallpaperPluginId não é org.kde.image"
+grep -q '^Image=file:///usr/share/wallpapers/Mokka-tree/' "$PLASMALOGIN_CONF" \
+    || fail "plasmalogin: wallpaper Mokka-tree não configurado"
+[[ -f "$PLASMALOGIN_KDEGLOBALS" ]] || fail "Login: kdeglobals ausente: $PLASMALOGIN_KDEGLOBALS"
+grep -q '^LookAndFeelPackage=Mokka$' "$PLASMALOGIN_KDEGLOBALS" \
+    || fail "Login: LookAndFeelPackage não é Mokka em $PLASMALOGIN_KDEGLOBALS"
 
 echo "=== Lock screen ==="
 LOCK_CFG="/etc/skel/.config/kscreenlockerrc"
