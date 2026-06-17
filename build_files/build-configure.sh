@@ -432,6 +432,7 @@ echo "::endgroup::"
 
 # ─── Regenerate initramfs (virtio_gpu para Plymouth em VM) ────────────────────
 echo "::group:: Initramfs"
+# shellcheck disable=SC2012  # nomes de versão de kernel são seguros para ls
 KVER=$(ls /usr/lib/modules | sort -V | tail -1)
 INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
 

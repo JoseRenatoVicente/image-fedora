@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
 # Source-level tests: KDE Plasma desktop, shell, and dev environment policy
+# shellcheck disable=SC2016  # asserts comparam strings literais com ${...}
 
 setup() {
     load '../helpers/common'
     configure="${REPO_ROOT}/build_files/build-configure.sh"
     packages="${REPO_ROOT}/build_files/build-packages.sh"
-    runtime_tests="${REPO_ROOT}/build_files/shared/tests.sh"
-    shell_setup="${REPO_ROOT}/build_files/configs/fedora-shell-setup"
-    dev_setup="${REPO_ROOT}/build_files/configs/fedora-dev-setup"
+    shell_setup="${REPO_ROOT}/build_files/usr/libexec/fedora-shell-setup"
+    dev_setup="${REPO_ROOT}/build_files/usr/libexec/fedora-dev-setup"
 }
 
 # ── KDE theme setup ──────────────────────────────────────────────────────────
@@ -68,68 +68,60 @@ setup() {
     assert_not_contains "$packages" 'cosmic-greeter'
 }
 
-# ── Shell setup (starship, zoxide, direnv) ───────────────────────────────────
+# ── Shell setup (Oh My Zsh + Powerlevel10k + NVM) ────────────────────────────
 
-@test "shell setup has marker block" {
-    assert_contains "$shell_setup" 'MARKER="# >>> fedora-shell-setup >>>"'
+@test "shell setup installs Oh My Zsh" {
+    assert_contains "$shell_setup" 'ohmyzsh/ohmyzsh'
 }
 
-@test "shell setup initializes starship" {
-    assert_contains "$shell_setup" 'starship init zsh'
+@test "shell setup installs Powerlevel10k theme" {
+    assert_contains "$shell_setup" 'powerlevel10k'
 }
 
-@test "shell setup initializes zoxide" {
-    assert_contains "$shell_setup" 'zoxide init zsh'
-}
-
-@test "shell setup hooks direnv" {
-    assert_contains "$shell_setup" 'direnv hook zsh'
-}
-
-@test "shell setup has sudo-command-line widget" {
-    assert_contains "$shell_setup" 'sudo-command-line()'
-}
-
-@test "shell setup has fj helper" {
-    assert_contains "$shell_setup" 'fj()'
-}
-
-@test "shell setup has fgb helper" {
-    assert_contains "$shell_setup" 'fgb()'
-}
-
-@test "shell setup enables zsh-autosuggestions" {
+@test "shell setup installs zsh-autosuggestions" {
     assert_contains "$shell_setup" 'zsh-autosuggestions'
 }
 
-@test "shell setup enables zsh-syntax-highlighting" {
+@test "shell setup installs zsh-syntax-highlighting" {
     assert_contains "$shell_setup" 'zsh-syntax-highlighting'
 }
 
-@test "shell setup does not use oh-my-zsh" {
-    assert_not_contains "$shell_setup" 'oh-my-zsh'
+@test "shell setup installs zsh-completions" {
+    assert_contains "$shell_setup" 'zsh-completions'
 }
 
-@test "shell setup does not use powerlevel10k" {
-    assert_not_contains "$shell_setup" 'powerlevel10k'
+@test "shell setup configures NVM" {
+    assert_contains "$shell_setup" 'NVM_DIR'
 }
 
-# ── Dev setup (distrobox, toolbox) ───────────────────────────────────────────
-
-@test "dev setup creates distrobox" {
-    assert_contains "$dev_setup" 'distrobox create'
+@test "shell setup aliases docker to podman" {
+    assert_contains "$shell_setup" "alias docker='podman'"
 }
 
-@test "dev setup creates toolbox" {
-    assert_contains "$dev_setup" 'toolbox create'
+@test "shell setup verifies downloads by sha256 before running" {
+    assert_contains "$shell_setup" 'sha256sum'
 }
 
-@test "dev setup writes user-scoped guide" {
-    assert_contains "$dev_setup" '.local/share/fedora-dev-setup'
+# ── Dev setup (NVM/Node, pnpm, opencode, lazydocker) ─────────────────────────
+
+@test "dev setup installs Node.js LTS via nvm" {
+    assert_contains "$dev_setup" 'nvm install --lts'
+}
+
+@test "dev setup installs pnpm globally" {
+    assert_contains "$dev_setup" 'npm install -g pnpm'
 }
 
 @test "dev setup installs opencode" {
     assert_contains "$dev_setup" 'opencode-ai@${OPENCODE_NPM_VERSION}'
+}
+
+@test "dev setup installs lazydocker" {
+    assert_contains "$dev_setup" 'lazydocker'
+}
+
+@test "dev setup verifies downloads by sha256 before running" {
+    assert_contains "$dev_setup" 'sha256sum'
 }
 
 # ── Heavy packages excluded from base ───────────────────────────────────────

@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 # Source-level tests: workflow security and reproducibility policy
+# shellcheck disable=SC2016  # asserts comparam strings literais com ${...}
 
 setup() {
     load '../helpers/common'
@@ -67,7 +68,7 @@ setup() {
 }
 
 @test "tests.yml installs just" {
-    assert_contains "$tests_workflow" 'apt-get install -y just'
+    assert_contains "$tests_workflow" 'extractions/setup-just'
 }
 
 # ── Gitleaks ─────────────────────────────────────────────────────────────────

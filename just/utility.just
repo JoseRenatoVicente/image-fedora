@@ -65,8 +65,12 @@ lint:
         echo "shellcheck could not be found. Please install it."
         exit 1
     fi
-    # Run shellcheck on all Bash scripts
-    /usr/bin/find . -iname "*.sh" -type f -exec shellcheck "{}" ';'
+    # Run shellcheck por extensão E por shebang de shell — apanha scripts sem
+    # extensão (ex.: usr/libexec/*, usr/bin/dnf) que de outra forma escapariam.
+    {
+        find build_files tests -type f \( -name "*.sh" -o -name "*.bats" -o -name "*.bash" \)
+        find build_files tests -type f -exec sh -c 'head -1 "$1" | grep -qE "^#!.*\b(ba)?sh\b"' _ {} \; -print
+    } | sort -u | xargs shellcheck -e SC1091 -e SC2154
 
 # Runs shfmt on all Bash scripts
 format:

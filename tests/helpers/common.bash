@@ -1,6 +1,7 @@
 # tests/helpers/common.bash — Shared BATS helpers for all test suites.
 
 # Repo root (works whether bats runs from repo root or tests/ subdir)
+# shellcheck disable=SC2034  # consumido pelos ficheiros de teste que fazem source
 REPO_ROOT="$(cd "$(dirname "${BATS_TEST_FILENAME}")/../.." && pwd)"
 
 # assert_contains FILE PATTERN — fail if fixed-string PATTERN is not in FILE

@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Container tests — run inside the built image
 # Tests: security hardening, crypto, sysctl, ZRAM, login.defs, SELinux, boot, initramfs
+# shellcheck disable=SC2012  # nomes de versão de kernel são seguros para ls
+# shellcheck disable=SC2314  # `! grep` é idiomático para asserção negativa aqui
 
 setup() {
     load '../helpers/common'

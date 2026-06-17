@@ -239,6 +239,7 @@ for f in "${REQUIRED_FILES[@]}"; do
     [[ -e "$f" ]] || fail "Ficheiro/directório ausente: $f"
 done
 # initramfs: determined dynamically from installed kernel version
+# shellcheck disable=SC2012  # nomes de versão de kernel são seguros para ls
 KVER=$(ls /usr/lib/modules 2>/dev/null | sort -V | tail -1)
 if [[ -n "$KVER" ]]; then
     INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"

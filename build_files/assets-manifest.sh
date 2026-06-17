@@ -1,6 +1,8 @@
-#!/bin/bash
+# shellcheck shell=bash
 # assets-manifest.sh — Definições centralizadas de assets KDE.
-# Sourced por install-assets.sh. Versões, URLs e checksums num único sítio.
+# Sourced por install-assets.sh (não executado) — sem shebang nem +x.
+# Versões, URLs e checksums num único sítio.
+# shellcheck disable=SC2034  # ASSETS/*_VERSION consumidos por quem faz source
 #
 # Para atualizar um asset: muda versão/URL/checksum aqui.
 # Para adicionar um asset: acrescenta uma entrada ao array ASSETS.

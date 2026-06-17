@@ -5,9 +5,9 @@
 # Mirrors Nobara's wireplumber patch (block_steam_clear_default).
 
 if [[ "$1" == "clear-default" ]]; then
-    ppid=$(awk '/^PPid:/{print $2}' /proc/$PPID/status 2>/dev/null)
+    ppid=$(awk '/^PPid:/{print $2}' "/proc/$PPID/status" 2>/dev/null)
     if [[ -n "$ppid" ]]; then
-        grandparent=$(cat /proc/$ppid/comm 2>/dev/null)
+        grandparent=$(cat "/proc/$ppid/comm" 2>/dev/null)
         if [[ "$grandparent" == "steam" ]]; then
             echo "wpctl clear-default: blocked (called from Steam)" >&2
             exit 0

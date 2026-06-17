@@ -5,9 +5,8 @@ setup() {
     load '../helpers/common'
     packages="${REPO_ROOT}/build_files/build-packages.sh"
     configure="${REPO_ROOT}/build_files/build-configure.sh"
-    configure_services="${REPO_ROOT}/build_files/configure/05-services.sh"
     runtime_tests="${REPO_ROOT}/build_files/shared/tests.sh"
-    preset="${REPO_ROOT}/build_files/configs/systemd-preset-desktop.preset"
+    preset="${REPO_ROOT}/build_files/usr/lib/systemd/system-preset/35-security-desktop.preset"
 }
 
 # ── Dell/Intel required packages ─────────────────────────────────────────────
@@ -79,35 +78,21 @@ setup() {
 }
 
 # ── ModemManager ─────────────────────────────────────────────────────────────
-
-@test "ModemManager is excluded from packages" {
-    assert_contains "$packages" '--exclude=ModemManager'
-}
-
-@test "runtime tests check for ModemManager" {
-    assert_contains "$runtime_tests" 'ModemManager'
-}
-
-@test "configure disables ModemManager.service" {
-    assert_contains "$configure_services" 'ModemManager.service'
-}
+# Já não é excluído dos pacotes — é instalado mas desativado via preset.
 
 @test "preset disables ModemManager.service" {
     assert_contains "$preset" 'disable ModemManager.service'
 }
 
 # ── Thunderbolt/USB4 ────────────────────────────────────────────────────────
+# Política de hardening: thunderbolt é omitido do initramfs (superfície DMA).
 
-@test "Thunderbolt is not omitted from initramfs" {
-    assert_file_not_exists "${REPO_ROOT}/build_files/configs/dracut-omit-thunderbolt.conf"
+@test "Thunderbolt is omitted from initramfs" {
+    assert_file_exists "${REPO_ROOT}/build_files/etc/dracut.conf.d/99-omit-thunderbolt.conf"
 }
 
-@test "configure does not reference dracut-omit-thunderbolt.conf" {
-    assert_not_contains "$configure" 'dracut-omit-thunderbolt.conf'
-}
-
-@test "runtime tests do not omit thunderbolt dracut config" {
-    assert_not_contains "$runtime_tests" '/etc/dracut.conf.d/99-omit-thunderbolt.conf'
+@test "thunderbolt omit config drops the thunderbolt driver" {
+    assert_contains "${REPO_ROOT}/build_files/etc/dracut.conf.d/99-omit-thunderbolt.conf" 'thunderbolt'
 }
 
 # ── Service presets ──────────────────────────────────────────────────────────
@@ -128,14 +113,10 @@ setup() {
     assert_contains "$preset" 'enable fwupd.service'
 }
 
-@test "configure presets Dell/Intel services" {
-    assert_contains "$configure_services" 'systemctl preset bolt.service thermald.service irqbalance.service tuned.service fwupd.service'
-}
-
 # ── Tuned profile ────────────────────────────────────────────────────────────
 
 @test "configure sets tuned active_profile to balanced" {
-    assert_contains "$configure_services" 'echo "balanced" > /etc/tuned/active_profile'
+    assert_contains "$configure" 'echo "balanced" > /etc/tuned/active_profile'
 }
 
 @test "runtime tests validate tuned profile" {

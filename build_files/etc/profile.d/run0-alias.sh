@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Faz `sudo …` invocar o run0 do systemd (eleva via polkit, sem setuid) em shells
 # interativos (bash e zsh carregam /etc/profile.d/*.sh). O pacote sudo continua
 # instalado (plasma-workspace exige kdesu→sudo), mas o utilizador passa a usar
