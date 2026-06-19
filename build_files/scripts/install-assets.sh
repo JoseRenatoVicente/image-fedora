@@ -26,6 +26,36 @@ verify_checksum() {
     echo "  SHA256 OK: $(basename "$file")"
 }
 
+# ── Funções de instalação ────────────────────────────────────────────────────
+# Cada função instala um asset. Recebem $ARCHIVE (ficheiro descarregado) e
+# $TMPDIR_ASSETS (dir temporário) no ambiente, definidos pelo loop principal.
+# Substituem o antigo eval de strings do manifesto: lintáveis e debugáveis.
+
+_install_starship() {
+    tar -xzf "$ARCHIVE" -C /usr/bin starship
+    chmod 0755 /usr/bin/starship
+    /usr/bin/starship --version
+}
+
+_install_jetbrains_mono() {
+    local dir=/usr/share/fonts/JetBrainsMonoNerdFont
+    mkdir -p "$dir"
+    unzip -qo "$ARCHIVE" -d "$dir"
+    # Mantém só as variantes Nerd Font (remove os .ttf originais sem patch)
+    find "$dir" -name '*.ttf' ! -name '*NerdFont*' -delete 2>/dev/null || true
+    fc-cache -f "$dir"
+}
+
+_install_catppuccin_cursors() {
+    unzip -qo "$ARCHIVE" -d /usr/share/icons/
+}
+
+_install_tela_circle() {
+    tar -xzf "$ARCHIVE" -C "$TMPDIR_ASSETS"
+    bash "$TMPDIR_ASSETS/Tela-circle-icon-theme-${TELA_CIRCLE_VERSION}/install.sh" \
+        -d /usr/share/icons -c dracula
+}
+
 # Complex installer for Garuda Mokka (multiple rsync targets + skel)
 _install_garuda_mokka() {
     tar -xzf "$ARCHIVE" -C "$TMPDIR_ASSETS"
@@ -58,18 +88,38 @@ _install_garuda_mokka() {
     fi
 }
 
+_install_catppuccin_aurorae() {
+    mkdir -p /usr/share/aurorae/themes
+    tar -xzf "$ARCHIVE" -C /usr/share/aurorae/themes/
+}
+
+_install_catppuccin_sddm() {
+    mkdir -p /usr/share/sddm/themes
+    unzip -qo "$ARCHIVE" -d /usr/share/sddm/themes/
+}
+
+_install_catppuccin_gtk() {
+    mkdir -p /usr/share/themes
+    unzip -qo "$ARCHIVE" -d /usr/share/themes/
+}
+
 # Load the asset manifest
-# shellcheck source=assets-manifest.sh
-source "$(dirname "$0")/assets-manifest.sh"
+# shellcheck source=../assets/assets-manifest.sh
+source "$(dirname "$0")/../assets/assets-manifest.sh"
 
 CURRENT_ARCH="$(uname -m)"
 
 for entry in "${ASSETS[@]}"; do
-    IFS='|' read -r name url sha256 arch_filter post_install <<< "$entry"
+    IFS='|' read -r name url sha256 arch_filter install_fn <<< "$entry"
 
     if [[ -n "$arch_filter" && "$CURRENT_ARCH" != "$arch_filter" ]]; then
         warn "Arquitetura $CURRENT_ARCH sem binário pinado para $name — ignorado."
         continue
+    fi
+
+    if ! declare -F "$install_fn" >/dev/null; then
+        echo "FATAL: função de instalação '$install_fn' não definida para o asset '$name'" >&2
+        exit 1
     fi
 
     log "Instalando $name"
@@ -77,9 +127,7 @@ for entry in "${ASSETS[@]}"; do
     fetch -o "$ARCHIVE" "$url"
     verify_checksum "$ARCHIVE" "$sha256"
 
-    if [[ -n "$post_install" ]]; then
-        eval "$post_install"
-    fi
+    "$install_fn"
 done
 
 log "Assets instalados com sucesso."

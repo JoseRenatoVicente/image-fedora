@@ -4,36 +4,36 @@
 
 setup() {
     load '../helpers/common'
-    configure="${REPO_ROOT}/build_files/build-configure.sh"
-    packages="${REPO_ROOT}/build_files/build-packages.sh"
-    shell_setup="${REPO_ROOT}/build_files/usr/libexec/fedora-shell-setup"
-    dev_setup="${REPO_ROOT}/build_files/usr/libexec/fedora-dev-setup"
+    configure_dir="${REPO_ROOT}/build_files/scripts/configure"
+    packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
+    shell_setup="${REPO_ROOT}/build_files/overlay/usr/libexec/fedora-shell-setup"
+    dev_setup="${REPO_ROOT}/build_files/overlay/usr/libexec/fedora-dev-setup"
 }
 
 # ── KDE theme setup ──────────────────────────────────────────────────────────
 
 @test "configure sets Mokka look-and-feel" {
-    assert_contains "$configure" 'Mokka'
+    assert_tree_contains "$configure_dir" 'Mokka'
 }
 
 @test "configure installs SDDM theme" {
-    assert_contains "$configure" 'plasmalogin.conf.d'
+    assert_tree_contains "$configure_dir" 'plasmalogin.conf.d'
 }
 
 @test "configure sets kwin-vm-compat" {
-    assert_contains "$configure" 'kwin-vm-compat'
+    assert_tree_contains "$configure_dir" 'kwin-vm-compat'
 }
 
 @test "configure installs plasma appletsrc" {
-    assert_contains "$configure" 'plasma-org.kde.plasma.desktop-appletsrc'
+    assert_tree_contains "$configure_dir" 'plasma-org.kde.plasma.desktop-appletsrc'
 }
 
 @test "configure sets kvantum widget style" {
-    assert_contains "$configure" 'kvantum'
+    assert_tree_contains "$configure_dir" 'kvantum'
 }
 
 @test "configure sets Catppuccin cursor theme" {
-    assert_contains "$configure" 'catppuccin-mocha-mauve-cursors'
+    assert_tree_contains "$configure_dir" 'catppuccin-mocha-mauve-cursors'
 }
 
 # ── KDE packages present ─────────────────────────────────────────────────────
@@ -68,26 +68,31 @@ setup() {
     assert_not_contains "$packages" 'cosmic-greeter'
 }
 
-# ── Shell setup (Oh My Zsh + Powerlevel10k + NVM) ────────────────────────────
+# ── Shell setup (starship + zoxide + direnv + NVM) ───────────────────────────
 
-@test "shell setup installs Oh My Zsh" {
-    assert_contains "$shell_setup" 'ohmyzsh/ohmyzsh'
+@test "shell setup initializes starship prompt" {
+    assert_contains "$shell_setup" 'starship init zsh'
 }
 
-@test "shell setup installs Powerlevel10k theme" {
-    assert_contains "$shell_setup" 'powerlevel10k'
+@test "shell setup does not use Oh My Zsh/Powerlevel10k" {
+    assert_not_contains "$shell_setup" 'oh-my-zsh'
+    assert_not_contains "$shell_setup" 'powerlevel10k'
 }
 
-@test "shell setup installs zsh-autosuggestions" {
+@test "shell setup sources zsh-autosuggestions" {
     assert_contains "$shell_setup" 'zsh-autosuggestions'
 }
 
-@test "shell setup installs zsh-syntax-highlighting" {
+@test "shell setup sources zsh-syntax-highlighting" {
     assert_contains "$shell_setup" 'zsh-syntax-highlighting'
 }
 
-@test "shell setup installs zsh-completions" {
-    assert_contains "$shell_setup" 'zsh-completions'
+@test "shell setup initializes zoxide" {
+    assert_contains "$shell_setup" 'zoxide init zsh'
+}
+
+@test "shell setup hooks direnv" {
+    assert_contains "$shell_setup" 'direnv hook zsh'
 }
 
 @test "shell setup configures NVM" {
@@ -96,10 +101,6 @@ setup() {
 
 @test "shell setup aliases docker to podman" {
     assert_contains "$shell_setup" "alias docker='podman'"
-}
-
-@test "shell setup verifies downloads by sha256 before running" {
-    assert_contains "$shell_setup" 'sha256sum'
 }
 
 # ── Dev setup (NVM/Node, pnpm, opencode, lazydocker) ─────────────────────────

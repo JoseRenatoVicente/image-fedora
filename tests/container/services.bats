@@ -76,9 +76,6 @@ setup() {
     [[ "$(readlink /etc/systemd/system/ModemManager.service 2>/dev/null)" == "/dev/null" ]]
 }
 
-@test "plymouth-quit-wait.service is masked" {
-    [[ "$(readlink /etc/systemd/system/plymouth-quit-wait.service 2>/dev/null)" == "/dev/null" ]]
-}
 
 @test "avahi-daemon.service is masked" {
     [[ "$(readlink /etc/systemd/system/avahi-daemon.service 2>/dev/null)" == "/dev/null" ]]

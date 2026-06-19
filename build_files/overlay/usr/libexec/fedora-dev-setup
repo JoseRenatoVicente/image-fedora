@@ -53,5 +53,29 @@ if [[ ! -f "$HOME/bin/lazydocker" ]] && [[ ! -f "$HOME/.local/bin/lazydocker" ]]
         "$LAZYDOCKER_SHA256"
 fi
 
+# Guia de desenvolvimento (user-scoped): aponta para containers por projeto em
+# vez de empilhar toolchains na base imutável.
+GUIDE_DIR="$HOME/.local/share/fedora-dev-setup"
+mkdir -p "$GUIDE_DIR"
+cat > "$GUIDE_DIR/guide.md" << 'EOF'
+# Ambiente de desenvolvimento
+
+A base é imutável (bootc/atomic). Mantém toolchains e dependências de projeto em
+containers, não na imagem.
+
+## Container por projeto (distrobox)
+    distrobox create --name dev --image registry.fedoraproject.org/fedora-toolbox:44
+    distrobox enter dev
+
+## Toolbox (alternativa)
+    toolbox create
+    toolbox enter
+
+## Já configurado neste utilizador
+- Node.js LTS via NVM (`nvm use --lts`), pnpm, opencode
+- LazyDocker
+- Shell zsh com starship, zoxide, direnv, fzf (ver ~/.zshrc)
+EOF
+
 notify-send -a 'Fedora' -i 'dialog-information' -u normal \
     'Ferramentas de desenvolvimento instaladas.'

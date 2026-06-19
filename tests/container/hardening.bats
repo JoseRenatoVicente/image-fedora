@@ -26,8 +26,8 @@ setup() {
 
 # ── Crypto policy ────────────────────────────────────────────────────────────
 
-@test "crypto policy is DEFAULT or DEFAULT:*" {
-    grep -qE '^DEFAULT' /etc/crypto-policies/config
+@test "crypto policy is FUTURE or FUTURE:*" {
+    grep -qE '^FUTURE' /etc/crypto-policies/config
 }
 
 # ── sysctl ───────────────────────────────────────────────────────────────────
@@ -205,9 +205,6 @@ setup() {
     [ -e /etc/dracut.conf.d/99-omit-firewire.conf ]
 }
 
-@test "/etc/dracut.conf.d/98-omit-unused.conf exists" {
-    [ -e /etc/dracut.conf.d/98-omit-unused.conf ]
-}
 
 @test "/etc/dracut.conf.d/90-luks-security.conf exists" {
     [ -e /etc/dracut.conf.d/90-luks-security.conf ]

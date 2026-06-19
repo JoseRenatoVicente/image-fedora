@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 echo "::group:: ===$(basename "$0")==="
-set -eoux pipefail
+set -euox pipefail
 
 IMAGE_NAME="${IMAGE_NAME:-fedora}"
 IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME:-Fedora}"

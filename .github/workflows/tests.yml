@@ -48,9 +48,9 @@ jobs:
       - name: Check executable bits on scripts
         run: |
           # Um *.sh COM shebang `#!` é executado directamente e tem de ter +x.
-          # *.sh SEM shebang são sourced (profile.d, assets-manifest) e não
-          # precisam. Scripts em /usr/libexec recebem chmod no build-configure;
-          # ficheiros .bats correm via `bats` — nenhum entra aqui.
+          # *.sh SEM shebang são sourced (profile.d, assets-manifest, package-lists)
+          # e não precisam. Scripts em /usr/libexec recebem chmod nos módulos de
+          # configuração; ficheiros .bats correm via `bats` — nenhum entra aqui.
           FAILED=0
           check_exec() {
             local f="$1"
@@ -66,8 +66,8 @@ jobs:
             esac
           done < <(find build_files tests -name "*.sh" -print0)
           # Wrappers instalados como binários (sem extensão .sh)
-          check_exec build_files/usr/bin/dnf
-          check_exec build_files/configs/wpctl-steam-wrapper
+          check_exec build_files/overlay/usr/bin/dnf
+          check_exec build_files/assets/configs/wpctl-steam-wrapper
           [[ $FAILED -eq 0 ]] || exit 1
           echo "All executable bits OK"
 

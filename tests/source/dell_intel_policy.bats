@@ -3,10 +3,10 @@
 
 setup() {
     load '../helpers/common'
-    packages="${REPO_ROOT}/build_files/build-packages.sh"
-    configure="${REPO_ROOT}/build_files/build-configure.sh"
-    runtime_tests="${REPO_ROOT}/build_files/shared/tests.sh"
-    preset="${REPO_ROOT}/build_files/usr/lib/systemd/system-preset/35-security-desktop.preset"
+    packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
+    configure_dir="${REPO_ROOT}/build_files/scripts/configure"
+    runtime_tests="${REPO_ROOT}/build_files/scripts/shared/tests.sh"
+    preset="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset"
 }
 
 # ── Dell/Intel required packages ─────────────────────────────────────────────
@@ -77,22 +77,17 @@ setup() {
     assert_contains "$runtime_tests" 'nvidia-gpu-firmware'
 }
 
-# ── ModemManager ─────────────────────────────────────────────────────────────
-# Já não é excluído dos pacotes — é instalado mas desativado via preset.
 
-@test "preset disables ModemManager.service" {
-    assert_contains "$preset" 'disable ModemManager.service'
-}
 
 # ── Thunderbolt/USB4 ────────────────────────────────────────────────────────
 # Política de hardening: thunderbolt é omitido do initramfs (superfície DMA).
 
 @test "Thunderbolt is omitted from initramfs" {
-    assert_file_exists "${REPO_ROOT}/build_files/etc/dracut.conf.d/99-omit-thunderbolt.conf"
+    assert_file_exists "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/99-omit-thunderbolt.conf"
 }
 
 @test "thunderbolt omit config drops the thunderbolt driver" {
-    assert_contains "${REPO_ROOT}/build_files/etc/dracut.conf.d/99-omit-thunderbolt.conf" 'thunderbolt'
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/99-omit-thunderbolt.conf" 'thunderbolt'
 }
 
 # ── Service presets ──────────────────────────────────────────────────────────
@@ -116,7 +111,7 @@ setup() {
 # ── Tuned profile ────────────────────────────────────────────────────────────
 
 @test "configure sets tuned active_profile to balanced" {
-    assert_contains "$configure" 'echo "balanced" > /etc/tuned/active_profile'
+    assert_tree_contains "$configure_dir" 'echo "balanced" > /etc/tuned/active_profile'
 }
 
 @test "runtime tests validate tuned profile" {

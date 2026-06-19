@@ -6,9 +6,10 @@ COPY build_files /
 # O Layer 1 só invalida o cache quando ESTES ficheiros mudam — alterações
 # a configs/skel/theming não tocam este stage e não re-correm o dnf.
 FROM scratch AS ctx-pkgs
-COPY build_files/build-packages.sh /build-packages.sh
-COPY build_files/shared/copr-helpers.sh /shared/copr-helpers.sh
-COPY build_files/configs/dnf-performance.conf /configs/dnf-performance.conf
+COPY build_files/scripts/build-packages.sh /build-packages.sh
+COPY build_files/scripts/shared/copr-helpers.sh /shared/copr-helpers.sh
+COPY build_files/scripts/shared/package-lists.sh /shared/package-lists.sh
+COPY build_files/assets/configs/dnf-performance.conf /configs/dnf-performance.conf
 
 # Build-time metadata (passável via --build-arg)
 ARG IMAGE_NAME="fedora"
@@ -50,6 +51,6 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     IMAGE_VENDOR="${IMAGE_VENDOR}" \
     SHA_HEAD_SHORT="${SHA_HEAD_SHORT}" \
     SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}" \
-    /ctx/build-configure.sh
+    /ctx/scripts/build-configure.sh
 
 RUN bootc container lint

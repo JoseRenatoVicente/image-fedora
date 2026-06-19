@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Configuração do shell zsh do utilizador (primeiro arranque).
+# Sem downloads: o prompt (starship), plugins (zsh-autosuggestions/-syntax),
+# zoxide, direnv e fzf vêm de RPMs do sistema. Apenas escreve ~/.zshrc.
+set -euo pipefail
+
+notify-send -a 'Fedora' -i 'dialog-information' -u normal \
+    'A configurar shell (starship, zoxide, direnv)...'
+
+ZSHRC="$HOME/.zshrc"
+[[ -f "$ZSHRC" ]] || touch "$ZSHRC"
+
+# Bloco idempotente, delimitado por marcadores — só escrito uma vez.
+if ! grep -q 'FEDORA-SHELL-SETUP' "$ZSHRC"; then
+    cat >> "$ZSHRC" << 'EOF'
+
+# >>> FEDORA-SHELL-SETUP >>>
+# Plugins zsh (RPMs do sistema)
+[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] \
+    && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] \
+    && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+# Prompt
+command -v starship >/dev/null && eval "$(starship init zsh)"
+
+# zoxide — cd inteligente (z <dir>)
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
+
+# direnv — ambientes por diretório (.envrc)
+command -v direnv >/dev/null && eval "$(direnv hook zsh)"
+
+# fzf — keybindings e completion
+[ -f /usr/share/fzf/shell/key-bindings.zsh ] && source /usr/share/fzf/shell/key-bindings.zsh
+[ -f /usr/share/fzf/shell/completion.zsh ]   && source /usr/share/fzf/shell/completion.zsh
+
+# NVM (instalado pelo fedora-dev-setup)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+
+# Homebrew
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null || true)"
+
+# Aliases
+alias docker='podman'
+alias docker-compose='podman-compose'
+alias ls='eza --icons'
+alias ll='eza -la --icons'
+alias lt='eza --tree --icons'
+
+# sudo-command-line: Esc-Esc adiciona/remove 'sudo ' no início da linha
+sudo-command-line() {
+    [[ -z $BUFFER ]] && zle up-history
+    if [[ $BUFFER == sudo\ * ]]; then
+        LBUFFER="${LBUFFER#sudo }"
+    else
+        LBUFFER="sudo $LBUFFER"
+    fi
+}
+zle -N sudo-command-line
+bindkey '\e\e' sudo-command-line
+
+# fj: salta para um diretório conhecido (zoxide) via fzf
+fj() {
+    local dir
+    dir=$(zoxide query -l 2>/dev/null | fzf) && cd "$dir" || return
+}
+
+# fgb: faz checkout de uma branch git escolhida via fzf
+fgb() {
+    local branch
+    branch=$(git branch --all | grep -v HEAD | sed 's/^[* ]*//; s#remotes/[^/]*/##' \
+        | sort -u | fzf) && git checkout "$branch"
+}
+# <<< FEDORA-SHELL-SETUP <<<
+EOF
+fi
+
+notify-send -a 'Fedora' -i 'dialog-information' -u normal \
+    'Shell configurada com sucesso.'

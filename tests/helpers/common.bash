@@ -22,6 +22,15 @@ assert_not_contains() {
     fi
 }
 
+# assert_tree_contains DIR PATTERN — fail if fixed-string PATTERN is in no file under DIR
+assert_tree_contains() {
+    local dir="$1" pattern="$2"
+    if ! grep -RFq -- "$pattern" "$dir"; then
+        echo "expected '$pattern' somewhere under $dir" >&2
+        return 1
+    fi
+}
+
 # assert_file_exists PATH
 assert_file_exists() {
     if [[ ! -e "$1" ]]; then

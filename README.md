@@ -1,6 +1,6 @@
-# Fedora Kinoite Secure Dev Image
+# Fedora KDE Secure Dev Image
 
-Custom Fedora Kinoite bootc image for a secure development workstation.
+Custom Fedora bootc image (KDE Plasma on the minimal `base-atomic` base) for a secure development workstation.
 
 The image keeps the base OS focused on boot, security hardening, KDE integration, container workflow support, and hardware/security-key support. Development stacks and user applications should live in Flatpak, Distrobox, Toolbox, or user-scoped setup instead of being layered into the immutable base.
 
@@ -14,7 +14,7 @@ The image keeps the base OS focused on boot, security hardening, KDE integration
 
 ## Base OS Contents
 
-- Fedora Kinoite bootc base pinned by digest in `Containerfile`.
+- Fedora `base-atomic` bootc base pinned by digest in `Containerfile`, with a minimal KDE Plasma install layered on top.
 - SELinux enforcing configuration.
 - Firewalld, hardened sysctl settings, bootc kernel arguments, coredump restrictions, and module blacklists.
 - Podman, Distrobox, Podman Compose, and Docker-compatible Podman wrappers for container workflows.
@@ -24,7 +24,7 @@ The image keeps the base OS focused on boot, security hardening, KDE integration
 
 ## Development Workflow
 
-On first login, the image offers an interactive user setup script from `~/setup-user.sh`. It can install user-scoped Flatpaks, shell conveniences, NVM/Node.js, Oh My Zsh, Homebrew, and selected infrastructure tools.
+On first boot, per-user systemd services and timers (`fedora-flatpak-setup`, `fedora-shell-setup`, `fedora-dev-setup`, `fedora-brew-setup`, installed via `/etc/skel`) run automatically to install user-scoped Flatpaks, shell conveniences (Oh My Zsh / zsh), NVM/Node.js, and Homebrew.
 
 Prefer a per-project development container for toolchains:
 
@@ -48,12 +48,10 @@ Run static tests against a built local image:
 just test-container
 ```
 
-Run source-level policy tests:
+Run source-level policy tests (BATS):
 
 ```bash
-./tests/security_hardening_test.sh
-./tests/workflow_policy_test.sh
-./tests/justfile_sudoif_test.sh
+just validate-source   # runs: bats tests/source/
 ```
 
 Build a QCOW2 disk image:
@@ -66,7 +64,7 @@ Local disk-image builds use `bootc-image-builder` in a privileged container and 
 
 ## Supply Chain
 
-- CI verifies the real Fedora Kinoite base image signature, ignoring the `scratch` build-context stage.
+- CI verifies the real Fedora `base-atomic` base image signature, ignoring the `scratch` build-context stage.
 - Published images are signed with keyless Cosign using GitHub Actions OIDC.
 - CI generates and publishes SBOM/provenance artifacts.
 - `bootc-image-builder` is pinned by digest for local and CI disk-image builds.
@@ -111,10 +109,12 @@ Podman auto-update is also enabled for containers that opt in through their labe
 
 ## Repository Layout
 
-- `Containerfile`: bootc image definition and build entrypoint.
-- `build_files/build.sh`: host/base image package and system configuration.
-- `build_files/configs/`: system configuration files installed into the image.
+- `Containerfile`: bootc image definition and build entrypoint (two cached layers: packages, then configuration).
+- `build_files/scripts/`: build logic — `build-packages.sh` (Layer 1: dnf/COPR), `build-configure.sh` (Layer 2 driver), `configure/` (numbered configuration modules), and `shared/` (helpers, `package-lists.sh`, in-build `tests.sh`).
+- `build_files/overlay/`: filesystem tree (`etc/`, `usr/`) overlaid onto the image as-is.
+- `build_files/assets/`: build-time inputs — `assets-manifest.sh` (themes/fonts with pinned checksums), `configs/`, and `selinux/` CIL policies.
 - `build_files/skel/`: default user files copied through `/etc/skel`.
+- `build_files/test/`: local-only boot-test helpers (see `Containerfile.test`).
 - `disk_config/`: bootc-image-builder disk and ISO configuration.
 - `.github/workflows/`: CI, image publication, scanning, signing, and disk-image workflows.
-- `tests/`: source-level policy tests.
+- `tests/source/` and `tests/container/`: source-level (BATS, pre-build) and container (post-build) policy tests.

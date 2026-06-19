@@ -1,49 +1,16 @@
 #!/usr/bin/bash
 echo "::group:: ===$(basename "$0")==="
-set -eou pipefail
+set -euo pipefail
 
 FAILED=0
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
 
+# Listas de pacotes (REQUIRED_PACKAGES, KDE_REQUIRED, UNWANTED_PACKAGES) vêm da
+# fonte única partilhada com o build — evita drift entre instalar e verificar.
+# shellcheck source=package-lists.sh
+source "$(dirname "$0")/package-lists.sh"
+
 echo "=== Pacotes obrigatórios ==="
-REQUIRED_PACKAGES=(
-    distrobox
-    earlyoom
-    fastfetch
-    ffmpeg
-    firewalld
-    gamemode
-    git-credential-libsecret
-    input-remapper
-    kitty
-    ksshaskpass
-    ksystemlog
-    kwin-effect-roundcorners
-    lm_sensors
-    neovim
-    nvtop
-    pam-u2f
-    plasma-firewall
-    podman-docker
-    tuned
-    # Dell/Intel laptop support
-    fprintd
-    libfprint
-    bolt
-    iio-sensor-proxy
-    thermald
-    irqbalance
-    tuned-ppd
-    alsa-sof-firmware
-    alsa-ucm
-    pipewire
-    wireplumber
-    fwupd
-    libsmbios
-    dmidecode
-    yubikey-manager
-    zsh
-)
 for pkg in "${REQUIRED_PACKAGES[@]}"; do
     if [[ "$pkg" == "ffmpeg" ]]; then
         # Fedora repos ship 'ffmpeg-free'; RPM Fusion ships 'ffmpeg'. Accept either.
@@ -55,44 +22,11 @@ for pkg in "${REQUIRED_PACKAGES[@]}"; do
 done
 
 echo "=== Pacotes KDE essenciais ==="
-KDE_REQUIRED=(
-    plasma-desktop
-    plasma-workspace
-    kwin
-    plasma-login-manager
-    dolphin
-    konsole
-)
 for pkg in "${KDE_REQUIRED[@]}"; do
     rpm -q "$pkg" > /dev/null 2>&1 || fail "Pacote KDE ausente: $pkg"
 done
 
 echo "=== Pacotes indesejados ==="
-UNWANTED_PACKAGES=(
-    code
-    firefox
-    # Impressoras (removidas da base-atomic)
-    cups hplip gutenprint
-    # Acessibilidade (removida)
-    orca brltty speech-dispatcher
-    # Firmware não-Intel (removido)
-    amd-gpu-firmware
-    # Power stack conflicts / NVIDIA out of scope
-    power-profiles-daemon
-    nvidia-gpu-firmware
-    xorg-x11-drv-nvidia
-    akmod-nvidia
-    kmod-nvidia
-    nvidia-driver
-    # VM guest agents (removidos)
-    open-vm-tools-desktop virtualbox-guest-additions
-    # KDE bloat que não deve estar presente
-    plasma-discover
-    plasma-workspace-wallpapers
-    kde-connect
-    akonadi-server
-    mariadb-server
-)
 for pkg in "${UNWANTED_PACKAGES[@]}"; do
     if rpm -q "$pkg" > /dev/null 2>&1; then
         fail "Pacote indesejado presente: $pkg"
@@ -122,7 +56,6 @@ REQUIRED_UNITS=(
     chronyd.service
     flatpak-nuke-fedora.service
     flathub-system-setup.service
-    input-remapper.service
     fedora-kinoite-plasmalogin-workaround.service
     thermald.service
     irqbalance.service
@@ -138,6 +71,15 @@ for unit in "${REQUIRED_UNITS[@]}"; do
     systemctl is-enabled "$unit" 2>/dev/null | grep -q "^enabled$" \
         || fail "Serviço não habilitado: $unit"
 done
+# keyd é best-effort (não está nos repos Fedora; instalado via COPR quando disponível).
+# A config /etc/keyd/default.conf vem sempre via overlay; o serviço só é exigido se
+# o pacote estiver instalado.
+if rpm -q keyd &>/dev/null; then
+    systemctl is-enabled keyd.service 2>/dev/null | grep -q "^enabled$" \
+        || fail "keyd instalado mas keyd.service não habilitado"
+else
+    echo "INFO: keyd não instalado (COPR indisponível); apenas a config é garantida"
+fi
 
 echo "=== Dell/Intel laptop support ==="
 systemctl list-unit-files fprintd.service &>/dev/null \
@@ -219,7 +161,7 @@ REQUIRED_FILES=(
     /usr/lib/systemd/system/flathub-system-setup.service
     /usr/share/flatpak/flathub.flatpakrepo
     /etc/plasma-setup-done
-    /etc/udev/rules.d/99-input-remapper.rules
+    /etc/keyd/default.conf
     /etc/locale.conf
     /usr/bin/run0
     /etc/profile.d/run0-alias.sh

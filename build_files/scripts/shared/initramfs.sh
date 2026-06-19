@@ -13,7 +13,7 @@
 # correctamente (ex: dentro do sistema já instalado via "bootc update").
 
 echo "::group:: ===$(basename "$0")==="
-set -eoux pipefail
+set -euox pipefail
 
 KERNEL_VERSION=$(rpm -q --queryformat="%{evr}.%{arch}" kernel-core)
 

@@ -51,7 +51,7 @@ run_capture appletsrc-focused bash -lc 'grep -nE "^\[Containments\]|^\[Containme
 run_capture missing-applets bash -lc 'while IFS= read -r plugin; do [ -z "$plugin" ] && continue; [ -d "/usr/share/plasma/plasmoids/$plugin" ] || [ -d "/usr/share/kpackage/genericqml/$plugin" ] || echo "MISSING: $plugin"; done < <(sed -n "s/^plugin=//p" ~/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null | sort -u)'
 run_capture skel-focused bash -lc 'grep -nE "SystrayContainmentId|org\.kde\.plasma\.private\.systemtray|^\[Containments\].*Applets|^plugin=|extraItems=|knownItems=" /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null || true'
 run_capture look-and-feel bash -lc 'find /usr/share/plasma/look-and-feel/Mokka ~/.local/share/plasma/look-and-feel/Mokka -maxdepth 4 -type f 2>/dev/null | sort; printf "\n--- defaults ---\n"; cat /usr/share/plasma/look-and-feel/Mokka/contents/defaults 2>/dev/null || true'
-run_capture input-remapper journalctl -b --no-pager -o short-iso -u input-remapper.service
+run_capture keyd journalctl -b --no-pager -o short-iso -u keyd.service
 
 copy_if_exists "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" "home/.config/plasma-org.kde.plasma.desktop-appletsrc"
 copy_if_exists "$HOME/.config/plasmashellrc" "home/.config/plasmashellrc"

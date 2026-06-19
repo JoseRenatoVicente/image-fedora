@@ -58,9 +58,6 @@ disable cups.path
 disable cups.service
 disable cups.socket
 
-# Desabilitar ModemManager
-disable ModemManager.service
-
 # Desabilitar iSCSI
 disable iscsid.service
 disable iscsid.socket
