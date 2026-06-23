@@ -178,6 +178,8 @@ REQUIRED_FILES=(
     /usr/bin/dnf
     /usr/lib/tmpfiles.d/fedora-kde-root-theme.conf
     /usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg
+    /etc/udisks2/mount_options.conf
+    /etc/tmpfiles.d/99-proc-hardening.conf
 )
 for f in "${REQUIRED_FILES[@]}"; do
     [[ -e "$f" ]] || fail "Ficheiro/directório ausente: $f"
@@ -429,6 +431,12 @@ authselect current 2>/dev/null | grep -q 'with-faillock' \
     || grep -rqs 'pam_faillock\.so' /etc/pam.d \
     || fail "PAM/authselect sem faillock activo"
 
+echo "=== Root account lockout ==="
+passwd -S root 2>/dev/null | grep -q ' L ' \
+    || fail "root: password não está bloqueada (passwd -l root não aplicado)"
+grep -E '^root:' /etc/passwd | cut -d: -f7 | grep -q 'nologin' \
+    || fail "root: shell não é nologin (usermod -s /usr/sbin/nologin root não aplicado)"
+
 echo "=== SUID removal ==="
 [[ ! -f /usr/bin/chsh ]]   || fail "chsh deve ter sido removido (SUID desnecessário)"
 [[ ! -f /usr/bin/chfn ]]   || fail "chfn deve ter sido removido (SUID desnecessário)"
@@ -454,12 +462,74 @@ grep -qE '^kernel\.sysrq\s*=\s*0' /etc/sysctl.d/60-security-hardening.conf \
     || fail "sysctl: kernel.sysrq não é 0"
 grep -qE '^net\.ipv4\.icmp_echo_ignore_all\s*=\s*1' /etc/sysctl.d/60-security-hardening.conf \
     || fail "sysctl: net.ipv4.icmp_echo_ignore_all não é 1"
+grep -qE '^dev\.tty\.legacy_tiocsti\s*=\s*0' /etc/sysctl.d/60-security-hardening.conf \
+    || fail "sysctl: dev.tty.legacy_tiocsti não é 0 (TIOCSTI)"
+grep -qE '^net\.ipv4\.tcp_synack_retries\s*=\s*2' /etc/sysctl.d/60-security-hardening.conf \
+    || fail "sysctl: net.ipv4.tcp_synack_retries não é 2"
+grep -qE '^net\.ipv4\.tcp_challenge_ack_limit\s*=' /etc/sysctl.d/60-security-hardening.conf \
+    || fail "sysctl: net.ipv4.tcp_challenge_ack_limit ausente (CVE-2016-5696)"
 
 echo "=== modprobe DVB/RC ==="
 [[ -f /etc/modprobe.d/no-dvb-rc.conf ]] \
     || fail "modprobe: blacklist DVB/RC ausente"
 grep -q 'dvb-core' /etc/modprobe.d/no-dvb-rc.conf \
     || fail "modprobe: dvb-core não está blacklisted"
+
+echo "=== modprobe AF_ALG ==="
+for _mod in af_alg algif_hash algif_skcipher algif_rng algif_aead; do
+    grep -qE "^install ${_mod} /bin/false" /etc/modprobe.d/security-hardening.conf \
+        || fail "modprobe: ${_mod} não está desativado (AF_ALG)"
+done
+
+echo "=== sshd hardening drop-in ==="
+[[ -f /etc/ssh/sshd_config.d/60-hardening.conf ]] \
+    || fail "ssh: drop-in de hardening ausente"
+grep -qE '^PermitRootLogin no' /etc/ssh/sshd_config.d/60-hardening.conf \
+    || fail "ssh: PermitRootLogin no ausente no drop-in"
+
+echo "=== kargs extra (cipherblue-derived) ==="
+for _karg in 'spec_rstack_overflow=safe-ret' 'page_poison=1' 'ftrace=off'; do
+    grep -qF "\"${_karg}\"" /usr/lib/bootc/kargs.d/10-hardening.toml \
+        || fail "kargs: '${_karg}' ausente"
+done
+
+echo "=== udisks2 mount hardening ==="
+grep -qE '^defaults=.*noexec' /etc/udisks2/mount_options.conf \
+    || fail "udisks2: noexec ausente nos defaults de mount"
+grep -qE '^allow=nosuid,nodev,noexec' /etc/udisks2/mount_options.conf \
+    || fail "udisks2: allow= não restringe a nosuid,nodev,noexec"
+
+echo "=== NetworkManager privacidade ==="
+grep -qE '^hostname-mode=none' /usr/lib/NetworkManager/conf.d/40-hardening.conf \
+    || fail "NM: hostname-mode=none ausente"
+grep -qE '^ipv4\.dhcp-send-hostname=0' /usr/lib/NetworkManager/conf.d/40-hardening.conf \
+    || fail "NM: dhcp-send-hostname não desativado"
+grep -qE '^enabled=false' /usr/lib/NetworkManager/conf.d/40-hardening.conf \
+    || fail "NM: connectivity check não desativado"
+
+echo "=== usbguard presente mas desabilitado ==="
+rpm -q usbguard &>/dev/null \
+    || fail "usbguard: pacote não instalado"
+if systemctl list-unit-files usbguard.service &>/dev/null; then
+    systemctl is-enabled usbguard.service 2>/dev/null | grep -q '^enabled$' \
+        && fail "usbguard.service NÃO deve estar habilitado (trava USB sem política)"
+fi
+
+echo "=== FDE: LUKS2 + TPM2 + Secure Boot ==="
+for _pkg in cryptsetup tpm2-tools mokutil; do
+    rpm -q "$_pkg" &>/dev/null || fail "FDE: pacote ausente: $_pkg"
+done
+# systemd-cryptenroll vem com o systemd
+command -v systemd-cryptenroll &>/dev/null \
+    || fail "FDE: systemd-cryptenroll ausente"
+# Módulos dracut de LUKS/TPM2 declarados na config
+grep -qE '(^|[[:space:]])crypt([[:space:]]|")' /etc/dracut.conf.d/90-luks-security.conf \
+    || fail "FDE: módulo dracut 'crypt' ausente em 90-luks-security.conf"
+grep -q 'tpm2-tss' /etc/dracut.conf.d/90-luks-security.conf \
+    || fail "FDE: módulo dracut 'tpm2-tss' ausente em 90-luks-security.conf"
+# Helper de enrollment presente e executável
+[[ -x /usr/bin/tpm2-luks-enroll ]] \
+    || fail "FDE: /usr/bin/tpm2-luks-enroll ausente ou não executável"
 
 if [[ $FAILED -eq 1 ]]; then
     echo "::endgroup::"

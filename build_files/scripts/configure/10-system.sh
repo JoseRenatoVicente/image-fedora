@@ -19,6 +19,7 @@ chmod 755 /usr/libexec/fedora-flatpak-setup \
           /usr/libexec/fedora-shell-setup \
           /usr/libexec/fedora-dev-setup \
           /usr/libexec/fedora-brew-setup
+chmod 755 /usr/bin/tpm2-luks-enroll
 
 # Wireplumber: bloquear Steam de limpar defaults de áudio (equiv. ao patch Nobara)
 mv /usr/bin/wpctl /usr/bin/wpctl.real
@@ -28,6 +29,10 @@ install -Dm755 /ctx/assets/configs/wpctl-steam-wrapper /usr/bin/wpctl
 # e YESCRYPT_COST_FACTOR 8 (hashing de password mais resistente a brute-force)
 sed -i 's/^UMASK\s\+022/UMASK\t\t027/' /etc/login.defs
 sed -i 's/^#\?YESCRYPT_COST_FACTOR.*/YESCRYPT_COST_FACTOR 8/' /etc/login.defs
+# Envelhecimento de passwords (NSA/STIG)
+sed -i 's/^#\?PASS_MAX_DAYS.*/PASS_MAX_DAYS\t60/'  /etc/login.defs
+sed -i 's/^#\?PASS_MIN_DAYS.*/PASS_MIN_DAYS\t1/'   /etc/login.defs
+sed -i 's/^#\?PASS_WARN_AGE.*/PASS_WARN_AGE\t7/'   /etc/login.defs
 
 # Anotar ficheiros de hardening com metadados de componente
 setfattr -n user.component -v "security-hardening" \

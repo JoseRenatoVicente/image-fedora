@@ -33,6 +33,12 @@ disable sshd-keygen.target
 disable low-memory-monitor.service
 disable uresourced.service
 
+# usbguard: instalado mas desabilitado por padrão. Política vazia bloquearia
+# teclado/rato no boot. Ativar manualmente após gerar política (ver
+# package-lists.sh). Disable explícito para anular qualquer preset upstream.
+disable usbguard.service
+disable usbguard-dbus.service
+
 # Dell/Intel laptop support
 enable bolt.service
 enable thermald.service
@@ -47,6 +53,9 @@ disable sssd-kcm.socket
 
 # Desabilitar ALSA state daemon
 disable alsa-state.service
+
+# Bloquear reboot físico via Ctrl+Alt+Delete (NSA/STIG — previne abuso de consola)
+mask ctrl-alt-del.target
 
 # Desabilitar Avahi (mDNS/DNS-SD discovery)
 disable avahi-daemon.service

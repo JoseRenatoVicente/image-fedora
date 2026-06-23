@@ -158,6 +158,16 @@ INSTALL_PACKAGES=(
     solaar-udev
     # Security keys (U2F / YubiKey)
     pam-u2f pam_yubico pamu2fcfg yubikey-manager
+    # USB device authorization (defesa BadUSB). Serviço NÃO é habilitado por
+    # padrão: política vazia bloquearia teclado/rato no boot. Para ativar:
+    #   sudo usbguard generate-policy > /etc/usbguard/rules.conf
+    #   sudo systemctl enable --now usbguard.service
+    usbguard
+    # FDE: LUKS2 + TPM2 + Secure Boot. cryptsetup já costuma vir na base, mas
+    # explicitamos. tpm2-tools p/ inspeção de PCRs; mokutil p/ verificar estado
+    # do Secure Boot. systemd-cryptenroll já vem com o systemd. Enroll real é
+    # pós-install: ver /usr/bin/tpm2-luks-enroll.
+    cryptsetup tpm2-tools mokutil
 )
 
 # ── Build deps (instaladas no Layer 1, removidas no Layer 2 70-build-deps.sh) ─
@@ -213,6 +223,10 @@ REQUIRED_PACKAGES=(
     libsmbios
     dmidecode
     yubikey-manager
+    usbguard
+    cryptsetup
+    tpm2-tools
+    mokutil
     zsh
 )
 

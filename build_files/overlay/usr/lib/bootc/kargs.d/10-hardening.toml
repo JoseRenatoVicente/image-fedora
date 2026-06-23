@@ -8,16 +8,51 @@ kargs = [
   "quiet",
   "rhgb",
   "splash",
+  # debugfs=off: desactiva o debugfs completamente, evitando fuga de informação
+  # do kernel via /sys/kernel/debug/ (endereços internos, estado de hardware).
+  "debugfs=off",
   "hash_pointers=always",
+  # lsm=: define explicitamente a ordem do stack LSM, activando Landlock.
+  # Landlock é um LSM de sandboxing que permite a processos restringirem o seu
+  # próprio acesso ao filesystem (semelhante a seccomp mas para ficheiros).
+  # A ordem importa: capability é implícito e não listado; selinux e bpf devem
+  # estar presentes ou o MAC e o BPF LSM ficam inativos.
+  "lsm=landlock,lockdown,yama,integrity,selinux,bpf",
   "init_on_alloc=1",
+  "init_on_free=1",
+  # IOMMU: intel e amd cobertos; efi=disable_early_pci_dma bloqueia DMA de PCI
+  # antes do IOMMU estar activo (janela de ataque durante boot EFI).
+  "amd_iommu=force_isolation",
+  "efi=disable_early_pci_dma",
   "intel_iommu=on",
   "iommu.passthrough=0",
   "iommu.strict=1",
   "iommu=force",
+  # bdev_allow_write_mounted=0: proíbe escrita directa a block devices com
+  # filesystems montados (ex: dd if=/dev/zero of=/dev/sda enquanto / está montado).
+  # Bloqueia bypass das abstrações do filesystem. Marcado como "unstable" pelo
+  # secureblue (pode afetar ferramentas de backup que fazem raw I/O), mas seguro
+  # num desktop standard.
+  "bdev_allow_write_mounted=0",
   "l1d_flush=on",
   "l1tf=full,force",
   "lockdown=integrity",
   "loglevel=0",
+  # oops=panic: converte qualquer kernel oops num panic imediato.
+  # Sem isto o kernel tenta continuar após um oops, deixando uma janela de
+  # exploração num estado inconsistente. Combinado com kernel.panic=-1
+  # (sysctl) o sistema reinicia imediatamente. Complementa kernel.oops_limit.
+  "oops=panic",
+  # rd.shell=0 + rd.emergency=halt: bloqueiam o debug shell e o modo emergency
+  # do initramfs. Sem isto, certas falhas de boot (ex: LUKS timeout) atiram
+  # um shell root antes do pivot — vetor de injeção de malware no initramfs.
+  # Ver CVE/blog 2025-07 insinuator.net/insecure-boot-injecting-initramfs.
+  "rd.shell=0",
+  "rd.emergency=halt",
+  "extra_latent_entropy",
+  # KFENCE: amostrador de segurança do heap do kernel (UAF, OOB, double-free).
+  # 100ms = ~10 amostras/seg; overhead ~1% — bom rácio segurança/performance.
+  "kfence.sample_interval=100",
   "mitigations=auto",
   # module.sig_enforce=1: rejeita módulos de kernel não assinados.
   # Drivers NVIDIA via rpm-ostree install (kmod-nvidia) são assinados pelo
@@ -31,9 +66,30 @@ kargs = [
   "random.trust_cpu=off",
   "randomize_kstack_offset=on",
   "slab_nomerge",
+  # slab_debug=FZ: F=sanity checks (deteta corrupção de free lists),
+  # Z=red zones (deteta OOB writes). Detecção determinística vs. KFENCE que é
+  # probabilístico (sampling). secureblue promoveu a standard em 2025.
+  # Overhead ~3-5% em slab-heavy workloads; aceite dado o perfil de segurança.
+  "slab_debug=FZ",
+  "gather_data_sampling=force",
+  "reg_file_data_sampling=on",
   "spec_store_bypass_disable=on",
+  "spectre_bhi=on",
   "spectre_v2=on",
+  # spec_rstack_overflow=safe-ret: mitigação do AMD Inception (SRSO,
+  # CVE-2023-20569) — envenenamento da return stack. safe-ret é o modo
+  # recomendado pela AMD (overhead baixo vs. ibpb). No-op em CPUs Intel.
+  "spec_rstack_overflow=safe-ret",
   "ssbd=force-on",
+  # page_poison=1: preenche páginas libertadas com um padrão venenoso, ajudando
+  # a detetar use-after-free e a impedir reaproveitamento de dados sensíveis.
+  # Complementa init_on_free=1.
+  "page_poison=1",
+  # ftrace=off: desativa o framework de function tracing do kernel, removendo
+  # uma superfície de introspeção/abuso. Sem impacto num desktop (só afeta
+  # debugging avançado com ftrace/perf trace).
+  "ftrace=off",
+  "tsx=off",
   "systemd.ssh_auto=no",
   "vdso32=0",
   "vsyscall=none",

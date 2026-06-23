@@ -43,6 +43,13 @@ find /usr -type f -perm /6000 -print0 | while IFS= read -r -d '' binary; do
 done
 # Remover binários desnecessários com histórico de vulnerabilidades SUID
 rm -f /usr/bin/chsh /usr/bin/chfn /usr/bin/pkexec
+# ─── Root account hardening ──────────────────────────────────────────────────
+# Bloqueia a password root (já sem password no build bootc, mas torna explícito)
+# e muda o shell para nologin — impede login directo mesmo com emergency console PAM.
+# Não fazemos chage -E0 (expiry absoluta) para não interferir com scripts de sistema.
+passwd -l root
+usermod -s /usr/sbin/nologin root
+
 # Substituir SUID por capabilities mínimas onde necessário
 setcap cap_sys_admin=ep /usr/bin/fusermount3 2>/dev/null \
     || echo "WARN: setcap fusermount3 falhou"
