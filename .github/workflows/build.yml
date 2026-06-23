@@ -32,6 +32,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     permissions:
+      actions: read
       contents: read
       packages: write
       id-token: write
@@ -133,7 +134,7 @@ jobs:
 
       - name: Build Image
         id: build_image
-        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2
+        uses: redhat-actions/buildah-build@061ffd31bb5c3f8733a6f9bbdf00a9fb02eb708c # v2 (node24)
         with:
           containerfiles: |
             ./Containerfile
@@ -164,6 +165,7 @@ jobs:
           exit-code: '0'
           ignore-unfixed: true
           timeout: '10m'
+          skip-files: 'sysroot/ostree/repo/objects/**'
 
       - name: Run Trivy vulnerability scanner (main gate)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -176,9 +178,10 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           timeout: '10m'
+          skip-files: 'sysroot/ostree/repo/objects/**'
 
       - name: Upload Trivy scan results to GitHub Security
-        uses: github/codeql-action/upload-sarif@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
+        uses: github/codeql-action/upload-sarif@1a818fd5f97ed0ee9a823421bd5b171add01227f # v4.36.2
         if: always() && github.event_name != 'pull_request' && hashFiles('trivy-results.sarif') != ''
         continue-on-error: true
         with:
