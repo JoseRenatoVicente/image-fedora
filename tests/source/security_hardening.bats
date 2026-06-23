@@ -24,8 +24,8 @@ setup() {
 
 # ── Crypto policy ────────────────────────────────────────────────────────────
 
-@test "crypto policy set to FUTURE:CHRONY-NTS" {
-    assert_tree_contains "$configure_dir" 'update-crypto-policies --set FUTURE:CHRONY-NTS'
+@test "crypto policy set to DEFAULT:CHRONY-NTS" {
+    assert_tree_contains "$configure_dir" 'update-crypto-policies --set DEFAULT:CHRONY-NTS'
 }
 
 # ── SELinux ───────────────────────────────────────────────────────────────────

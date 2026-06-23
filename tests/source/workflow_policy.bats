@@ -61,6 +61,11 @@ setup() {
     assert_contains "$build_workflow" "hashFiles('trivy-results.sarif')"
 }
 
+@test "build.yml uses lowercase image registry for build cache" {
+    assert_contains "$build_workflow" '--cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest'
+    assert_not_contains "$build_workflow" '--cache-from=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest'
+}
+
 # ── Static analysis ─────────────────────────────────────────────────────────
 
 @test "tests.yml runs shellcheck" {

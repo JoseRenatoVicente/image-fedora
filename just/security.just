@@ -127,8 +127,8 @@ audit-security $target_image=image_name $tag=default_tag:
 
     check "SELinux enforcing config" \
         podman run --rm "${local_ref}" bash -lc "grep -qx 'SELINUX=enforcing' /etc/selinux/config"
-    check "Crypto policy FUTURE" \
-        podman run --rm "${local_ref}" bash -lc "grep -qE '^FUTURE' /etc/crypto-policies/config"
+    check "Crypto policy DEFAULT" \
+        podman run --rm "${local_ref}" bash -lc "grep -qE '^DEFAULT' /etc/crypto-policies/config"
     check "Sysctl hardening" \
         podman run --rm "${local_ref}" bash -lc "test \$(grep -c '=' /etc/sysctl.d/60-security-hardening.conf 2>/dev/null) -gt 0"
     check "Kernel module blacklist" \

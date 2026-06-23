@@ -210,8 +210,8 @@ grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml \
 echo "=== Hardening ==="
 grep -qx 'SELINUX=enforcing' /etc/selinux/config \
     || fail "SELinux não está em modo enforcing"
-grep -qE '^FUTURE' /etc/crypto-policies/config 2>/dev/null \
-    || fail "Crypto policy não é FUTURE (ou FUTURE:*)"
+grep -qE '^DEFAULT' /etc/crypto-policies/config 2>/dev/null \
+    || fail "Crypto policy não é DEFAULT (ou DEFAULT:*)"
 
 echo "=== Performance / ZRAM ==="
 grep -q 'vm.swappiness = 100' /etc/sysctl.d/99-performance.conf \

@@ -26,8 +26,8 @@ setup() {
 
 # ── Crypto policy ────────────────────────────────────────────────────────────
 
-@test "crypto policy is FUTURE or FUTURE:*" {
-    grep -qE '^FUTURE' /etc/crypto-policies/config
+@test "crypto policy is DEFAULT or DEFAULT:*" {
+    grep -qE '^DEFAULT' /etc/crypto-policies/config
 }
 
 # ── sysctl ───────────────────────────────────────────────────────────────────

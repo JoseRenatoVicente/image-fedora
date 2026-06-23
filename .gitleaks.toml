@@ -1,0 +1,15 @@
+title = "image-fedora gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Flathub public repository signing key"
+condition = "AND"
+paths = [
+  '''^build_files/overlay/usr/share/flatpak/flathub\.flatpakrepo$''',
+]
+regexTarget = "line"
+regexes = [
+  '''^GPGKey=''',
+]

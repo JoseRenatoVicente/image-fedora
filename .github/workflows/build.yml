@@ -147,7 +147,7 @@ jobs:
             SHA_HEAD_SHORT=${{ env.SHA_HEAD_SHORT }}
           extra-args: |
             --layers
-            --cache-from=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+            --cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
       - name: Export image for scanning
