@@ -10,6 +10,7 @@ ConditionPathExists=!%E/fedora/fedora-dev-setup.stamp
 Type=oneshot
 ExecStart=/usr/libexec/fedora-dev-setup
 ExecStartPost=/bin/bash -c 'cfg="${XDG_CONFIG_HOME:-$HOME/.config}/fedora"; mkdir -p "$cfg" && touch "$cfg/fedora-dev-setup.stamp"'
+TimeoutStartSec=600
 Restart=on-failure
 RestartSec=30s
 RestartMaxDelaySec=1800s

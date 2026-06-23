@@ -27,10 +27,17 @@ setsebool -P deny_ptrace=on container_allow_ptrace=off || \
 restorecon -FRv /usr 2>/dev/null || true
 
 # ─── SUID removal ────────────────────────────────────────────────────────────
-# Strip SUID/SGID de todos os binários em /usr excepto sudo (KDE/kdesu precisa)
+# Strip SUID/SGID de todos os binários em /usr excepto:
+#   sudo/su               — kdesu + escalada normal
+#   polkit-agent-helper-1 — autentica via PAM para polkit (sem SUID, TODA a
+#                           autenticação administrativa falha no KDE)
+#   passwd                — necessita SUID para escrever /etc/shadow
 find /usr -type f -perm /6000 -print0 | while IFS= read -r -d '' binary; do
     case "$binary" in
-        /usr/bin/sudo|/usr/bin/su) continue ;;
+        /usr/bin/sudo|\
+        /usr/bin/su|\
+        /usr/lib/polkit-1/polkit-agent-helper-1|\
+        /usr/bin/passwd) continue ;;
         *) chmod ug-s "$binary" && echo "Stripped: $binary" ;;
     esac
 done

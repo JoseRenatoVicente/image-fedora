@@ -163,6 +163,8 @@ REQUIRED_FILES=(
     /etc/plasma-setup-done
     /etc/keyd/default.conf
     /etc/locale.conf
+    /etc/vconsole.conf
+    /etc/timezone
     /usr/bin/run0
     /etc/profile.d/run0-alias.sh
     /usr/lib/udev/rules.d/60-io-schedulers.rules
@@ -213,6 +215,18 @@ PLYMOUTHD_CONF="/etc/plymouth/plymouthd.conf"
     || fail "Plymouth: $PLYMOUTHD_CONF ausente"
 grep -qE '^Theme=spinner$' "$PLYMOUTHD_CONF" \
     || fail "Plymouth: tema não é 'spinner' em $PLYMOUTHD_CONF"
+
+echo "=== Locale, teclado e timezone ==="
+grep -qx 'LANG=pt_BR.UTF-8' /etc/locale.conf \
+    || fail "locale.conf: LANG não é pt_BR.UTF-8"
+grep -qx 'KEYMAP=br-abnt2' /etc/vconsole.conf \
+    || fail "vconsole.conf: KEYMAP não é br-abnt2"
+grep -qx 'America/Sao_Paulo' /etc/timezone \
+    || fail "/etc/timezone: não é America/Sao_Paulo"
+[[ -L /etc/localtime ]] \
+    || fail "/etc/localtime não é symlink (timezone não configurado)"
+readlink /etc/localtime | grep -q 'America/Sao_Paulo' \
+    || fail "/etc/localtime não aponta para America/Sao_Paulo"
 
 echo "=== Hardening ==="
 grep -qx 'SELINUX=enforcing' /etc/selinux/config \

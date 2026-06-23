@@ -3,7 +3,7 @@ Description=Fedora Dev First-Boot Setup Timer
 ConditionUser=!@system
 
 [Timer]
-OnStartupSec=5s
+OnStartupSec=30s
 
 [Install]
 WantedBy=timers.target

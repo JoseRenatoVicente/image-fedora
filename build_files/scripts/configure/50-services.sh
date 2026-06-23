@@ -55,7 +55,8 @@ systemctl mask \
     NetworkManager-wait-online.service \
     ModemManager.service \
     avahi-daemon.service \
-    avahi-daemon.socket
+    avahi-daemon.socket \
+    systemd-remount-fs.service
 
 mkdir -p /etc/tuned
 echo "balanced" > /etc/tuned/active_profile
