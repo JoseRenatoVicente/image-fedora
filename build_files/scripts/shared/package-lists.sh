@@ -110,7 +110,7 @@ INSTALL_PACKAGES=(
     # Extras Kinoite
     plasma-keyboard
     vulkan-tools mobile-broadband-provider-info NetworkManager-ppp
-    plymouth-system-theme
+    plymouth-system-theme plymouth-theme-spinner
 
     # ── Ferramentas do utilizador ─────────────────────────────────────────────
     # Dev tools (git-core já vem na base-atomic; full git entra via git-credential-libsecret)

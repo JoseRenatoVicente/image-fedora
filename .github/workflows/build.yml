@@ -147,7 +147,7 @@ jobs:
             SHA_HEAD_SHORT=${{ env.SHA_HEAD_SHORT }}
           extra-args: |
             --layers
-            --cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            --cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
       - name: Export image for scanning

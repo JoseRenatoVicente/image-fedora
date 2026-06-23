@@ -207,6 +207,13 @@ grep -q '"rhgb"' /usr/lib/bootc/kargs.d/10-hardening.toml \
 grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml \
     || fail "kargs: 'splash' ausente (necessário para Plymouth)"
 
+echo "=== Plymouth theme ==="
+PLYMOUTHD_CONF="/etc/plymouth/plymouthd.conf"
+[[ -f "$PLYMOUTHD_CONF" ]] \
+    || fail "Plymouth: $PLYMOUTHD_CONF ausente"
+grep -qE '^Theme=spinner$' "$PLYMOUTHD_CONF" \
+    || fail "Plymouth: tema não é 'spinner' em $PLYMOUTHD_CONF"
+
 echo "=== Hardening ==="
 grep -qx 'SELINUX=enforcing' /etc/selinux/config \
     || fail "SELinux não está em modo enforcing"
