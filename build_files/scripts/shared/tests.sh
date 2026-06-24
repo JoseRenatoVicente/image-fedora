@@ -145,6 +145,8 @@ REQUIRED_FILES=(
     /etc/dracut.conf.d/99-omit-firewire.conf
     /etc/dracut.conf.d/99-omit-thunderbolt.conf
     /etc/dracut.conf.d/90-luks-security.conf
+    /etc/dracut.conf.d/10-boot-performance.conf
+    /etc/systemd/system/tuned.service.d/deferred.conf
     /usr/libexec/fedora-flatpak-setup
     /usr/libexec/fedora-shell-setup
     /usr/libexec/fedora-dev-setup
@@ -190,7 +192,9 @@ REQUIRED_FILES=(
     /etc/fstab
     /etc/audit/rules.d/60-cis-hardening.rules
     /etc/tmpfiles.d/audit-log-dir.conf
+    /etc/tmpfiles.d/home.conf
     /etc/security/pwhistory.conf
+    /etc/xdg/kdedrc
     /usr/lib/bootc/kargs.d/30-audit.toml
     # STIG Tier A
     /etc/xdg/kscreenlockerrc
@@ -570,6 +574,22 @@ DEVSHM_FSTAB="/etc/fstab"
 grep -qE '^tmpfs[[:space:]]+/dev/shm.*nosuid' "$DEVSHM_FSTAB" || fail "fstab: /dev/shm sem nosuid (CIS 1.1.2.3)"
 grep -qE '^tmpfs[[:space:]]+/dev/shm.*nodev'  "$DEVSHM_FSTAB" || fail "fstab: /dev/shm sem nodev (CIS 1.1.2.3)"
 grep -qE '^tmpfs[[:space:]]+/dev/shm.*noexec' "$DEVSHM_FSTAB" || fail "fstab: /dev/shm sem noexec (CIS 1.1.2.3)"
+
+# kded6 módulos problemáticos desabilitados (kdedrc)
+KDEDRC="/etc/xdg/kdedrc"
+grep -qE '^\[Module-wpad-detector\]'  "$KDEDRC" || fail "kdedrc: seção [Module-wpad-detector] ausente"
+grep -qE '^autoload=false' <(grep -A2 '\[Module-wpad-detector\]' "$KDEDRC") \
+    || fail "kdedrc: wpad-detector autoload=false ausente"
+
+# tmpfiles OSTree: home.conf override usa caminhos reais (/var/home, /var/srv)
+HOMECF="/etc/tmpfiles.d/home.conf"
+grep -qE '^[Qq][[:space:]]+/var/home' "$HOMECF" || fail "tmpfiles home.conf: entrada /var/home ausente"
+grep -qE '^q[[:space:]]+/var/srv'     "$HOMECF" || fail "tmpfiles home.conf: entrada /var/srv ausente"
+
+# /etc/group deve ter grupos padrão do sistema (audio, disk, kvm, video, tty)
+for grp in audio disk kvm video tty render input; do
+    grep -q "^${grp}:" /etc/group || fail "/etc/group: grupo '${grp}' ausente (udev/tmpfiles falhariam no boot)"
+done
 
 # auditd (CIS 6.3): pacote + kargs + regras + diretório de log
 rpm -q audit &>/dev/null || fail "auditd: pacote audit ausente"

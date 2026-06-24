@@ -13,6 +13,20 @@ rm -f /etc/yum.repos.d/rpmfusion-*.repo
 cp -aT /ctx/overlay/etc/ /etc/
 cp -aT /ctx/overlay/usr/ /usr/
 
+# Popula /etc/group com os grupos padrão do sistema definidos em /usr/lib/group
+# (sysusers.d altfiles). No OSTree, /etc/group tem apenas as contas de serviço
+# criadas durante a build; os grupos de legacy Unix (audio, disk, kvm, tty, video,
+# render, input, lp, etc.) ficam em /usr/lib/group e são resolvidos pelo módulo NSS
+# "altfiles". Porém systemd-tmpfiles-setup-dev-early e systemd-udevd tentam resolver
+# grupos antes do stack NSS completo, gerando erros "Failed to resolve group".
+# A solução é garantir que esses grupos também existam em /etc/group.
+echo "Sincronizando grupos padrão de /usr/lib/group para /etc/group..."
+while IFS=: read -r name _ gid _; do
+    [[ -z "$name" || "$name" == \#* ]] && continue
+    grep -q "^${name}:" /etc/group 2>/dev/null || echo "${name}:x:${gid}:" >> /etc/group
+done < /usr/lib/group
+echo "Grupos em /etc/group após sync: $(wc -l < /etc/group)"
+
 # Executables from the mirrored tree need explicit permission bits.
 chmod 755 /usr/bin/dnf
 chmod 755 /usr/libexec/fedora-flatpak-setup \
@@ -59,10 +73,12 @@ setfattr -n user.component -v "security-hardening" \
     /etc/audit/rules.d/60-cis-hardening.rules \
     /etc/tmpfiles.d/audit-log-dir.conf \
     /etc/security/pwhistory.conf \
-    /etc/systemd/system/dev-shm.mount \
+    /etc/fstab \
     /usr/lib/bootc/kargs.d/30-audit.toml
 
 setfattr -n user.component -v "image-config" \
+    /etc/dracut.conf.d/10-boot-performance.conf \
+    /etc/systemd/system/tuned.service.d/deferred.conf \
     /etc/sysctl.d/99-performance.conf \
     /etc/sysctl.d/100-low-resource.conf \
     /etc/systemd/zram-generator.conf \

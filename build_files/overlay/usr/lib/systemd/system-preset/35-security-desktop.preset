@@ -89,3 +89,8 @@ disable sshd-vsock.socket
 disable mdmonitor.service
 disable vgauthd.service
 disable vmtoolsd.service
+
+# Desabilitar mcelog: obsoleto em kernels modernos (>= 4.12). O kernel
+# processa MCEs internamente via /dev/mcelog e rasdaemon. Em AMD Ryzen não
+# faz nada útil e gera mensagens de "device not found" no journal.
+disable mcelog.service
