@@ -130,6 +130,8 @@ INSTALL_PACKAGES=(
     plasma-breeze breeze-icon-theme aurorae
     # Extras Kinoite
     plasma-keyboard
+    # Pesquisa/Overview kwin: org.kde.milou QML module
+    plasma-milou
     vulkan-tools mobile-broadband-provider-info NetworkManager-ppp
 
     # ── Ferramentas do utilizador ─────────────────────────────────────────────

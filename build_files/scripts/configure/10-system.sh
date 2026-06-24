@@ -27,6 +27,18 @@ while IFS=: read -r name _ gid _; do
 done < /usr/lib/group
 echo "Grupos em /etc/group após sync: $(wc -l < /etc/group)"
 
+# Popula /etc/passwd com os utilizadores padrão do sistema definidos em /usr/lib/passwd.
+# Análogo ao sync de grupos: utilizadores de serviço como tss (TPM2) são definidos
+# em sysusers.d e ficam em /usr/lib/passwd, mas não em /etc/passwd na build OSTree.
+# udev e tmpfiles-setup-dev-early falham ao resolver "Failed to resolve user 'tss'"
+# se /etc/passwd não tiver a entrada no momento do arranque.
+echo "Sincronizando utilizadores padrão de /usr/lib/passwd para /etc/passwd..."
+while IFS=: read -r name _ uid gid gecos home shell; do
+    [[ -z "$name" || "$name" == \#* ]] && continue
+    grep -q "^${name}:" /etc/passwd 2>/dev/null || echo "${name}:x:${uid}:${gid}:${gecos}:${home}:${shell}" >> /etc/passwd
+done < /usr/lib/passwd
+echo "Utilizadores em /etc/passwd após sync: $(wc -l < /etc/passwd)"
+
 # Executables from the mirrored tree need explicit permission bits.
 chmod 755 /usr/bin/dnf
 chmod 755 /usr/libexec/fedora-flatpak-setup \
