@@ -64,6 +64,8 @@ setfattr -n user.component -v "security-hardening" \
 
 setfattr -n user.component -v "image-config" \
     /etc/sysctl.d/99-performance.conf \
+    /etc/sysctl.d/100-low-resource.conf \
+    /etc/systemd/zram-generator.conf \
     /usr/lib/bootc/kargs.d/20-performance.toml \
     /usr/lib/tmpfiles.d/thp-tuning.conf \
     /etc/systemd/system/user@.service.d/10-delegate.conf \

@@ -61,6 +61,9 @@ disable ctrl-alt-del.target
 disable avahi-daemon.service
 disable avahi-daemon.socket
 
+# Desabilitar Bluetooth (já desativado no perfil seguro; reforço explícito)
+disable bluetooth.service
+
 # Desabilitar serviços de impressão
 disable cups-browsed.service
 disable cups.path
