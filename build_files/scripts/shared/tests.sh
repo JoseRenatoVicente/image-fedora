@@ -68,6 +68,7 @@ for unit in bolt.service fwupd.service; do
         || fail "Serviço ausente ou mascarado: $unit"
 done
 for unit in "${REQUIRED_UNITS[@]}"; do
+    echo "  verificando: $unit"
     systemctl is-enabled "$unit" 2>/dev/null | grep -q "^enabled$" \
         || fail "Serviço não habilitado: $unit"
 done
