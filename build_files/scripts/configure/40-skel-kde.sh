@@ -112,6 +112,10 @@ kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group "org.kde.kdecoration2" --key library "org.kde.kwin.aurorae"
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group "org.kde.kdecoration2" --key theme "__aurorae__svg__CatppuccinMocha-Classic"
+kwriteconfig6 --file /etc/skel/.config/kwinrc \
+    --group "org.kde.kdecoration2" --key BorderSizeAuto "false"
+kwriteconfig6 --file /etc/skel/.config/kwinrc \
+    --group "org.kde.kdecoration2" --key BorderSize "None"
 
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group "org.kde.kdecoration2" --key ButtonsOnLeft ""
@@ -119,11 +123,19 @@ kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group "org.kde.kdecoration2" --key ButtonsOnRight "IAX"
 
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
-    --group Plugins --key blurEnabled "true"
+    --group Plugins --key blurEnabled "false"
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
-    --group Plugins --key roundcornersEnabled "true"
+    --group Plugins --key roundcornersEnabled "false"
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
-    --group Plugins --key kwin4_effect_roundcornersEnabled "true"
+    --group Plugins --key kwin4_effect_roundcornersEnabled "false"
+
+if [[ -f /usr/share/Kvantum/Mokka/Mokka.kvconfig ]]; then
+    sed -i \
+        -e 's/^composite=.*/composite=false/' \
+        -e 's/^translucent_windows=.*/translucent_windows=false/' \
+        -e 's/^blurring=.*/blurring=false/' \
+        /usr/share/Kvantum/Mokka/Mokka.kvconfig
+fi
 
 kwriteconfig6 --file /etc/skel/.config/kwinrc \
     --group NightColor --key Active "true"

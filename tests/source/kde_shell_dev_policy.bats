@@ -36,6 +36,28 @@ setup() {
     assert_tree_contains "$configure_dir" 'catppuccin-mocha-mauve-cursors'
 }
 
+@test "configure keeps host KDE theme family" {
+    assert_tree_contains "$configure_dir" 'LookAndFeelPackage "Mokka"'
+    assert_tree_contains "$configure_dir" 'widgetStyle "kvantum-dark"'
+    assert_tree_contains "$configure_dir" '__aurorae__svg__CatppuccinMocha-Classic'
+}
+
+@test "configure disables window blur and rounded-corner effects" {
+    assert_tree_contains "$configure_dir" '--group Plugins --key blurEnabled "false"'
+    assert_tree_contains "$configure_dir" '--group Plugins --key roundcornersEnabled "false"'
+    assert_tree_contains "$configure_dir" '--group Plugins --key kwin4_effect_roundcornersEnabled "false"'
+    assert_tree_contains "$configure_dir" '--group "org.kde.kdecoration2" --key BorderSize "None"'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key blurEnabled "true"'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key roundcornersEnabled "true"'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key kwin4_effect_roundcornersEnabled "true"'
+}
+
+@test "configure disables Kvantum Mokka transparency" {
+    assert_tree_contains "$configure_dir" 'translucent_windows=false'
+    assert_tree_contains "$configure_dir" 'blurring=false'
+    assert_tree_contains "$configure_dir" 'composite=false'
+}
+
 # ── KDE packages present ─────────────────────────────────────────────────────
 
 @test "plasma-desktop is in packages" {

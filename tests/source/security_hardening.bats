@@ -44,6 +44,10 @@ setup() {
     assert_contains "$configure_dir/50-services.sh" 'ctrl-alt-del.target'
 }
 
+@test "configure force-masks ctrl-alt-del target" {
+    assert_contains "$configure_dir/50-services.sh" 'systemctl mask --force ctrl-alt-del.target'
+}
+
 # ── LUKS dracut ───────────────────────────────────────────────────────────────
 
 @test "LUKS dracut config has add_dracutmodules" {

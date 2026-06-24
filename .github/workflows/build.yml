@@ -151,6 +151,7 @@ jobs:
             SHA_HEAD_SHORT=${{ env.SHA_HEAD_SHORT }}
           extra-args: |
             --layers
+            --source-date-epoch=${{ env.SOURCE_DATE_EPOCH }}
             --cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
@@ -224,16 +225,25 @@ jobs:
         run: |
           echo "image_full=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
 
-      # ── SBOM generation (after push, scans remote image) ─────────────────
+      # ── SBOM generation from the local build archive ─────────────────────
+      - name: Download Syft
+        id: download_syft
+        uses: anchore/sbom-action/download-syft@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.20.0
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+
       - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         continue-on-error: true
+        run: |
+          sudo install -m 0755 "${{ steps.download_syft.outputs.cmd }}" /usr/local/bin/syft
+          syft /tmp/image-scan.tar --from docker-archive -o spdx-json=sbom.spdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && hashFiles('sbom.spdx.json') != ''
         with:
-          image: '${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}'
-          artifact-name: sbom-${{ env.IMAGE_NAME }}.spdx.json
-          output-file: sbom.spdx.json
-          format: spdx-json
+          name: sbom-${{ env.IMAGE_NAME }}.spdx.json
+          path: sbom.spdx.json
 
       # ── Cosign image signing ────────────────────────────────────────────
       - name: Sign container image (keyless)

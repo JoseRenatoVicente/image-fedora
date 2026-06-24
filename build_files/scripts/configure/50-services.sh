@@ -57,8 +57,8 @@ systemctl mask \
     ModemManager.service \
     avahi-daemon.service \
     avahi-daemon.socket \
-    ctrl-alt-del.target \
     systemd-remount-fs.service
+systemctl mask --force ctrl-alt-del.target
 
 mkdir -p /etc/tuned
 echo "balanced" > /etc/tuned/active_profile
