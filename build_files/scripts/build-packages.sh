@@ -47,6 +47,7 @@ echo "::group:: Install packages"
 # INSTALL_PACKAGES, INSTALL_EXCLUDES e BUILD_DEPS vêm de shared/package-lists.sh.
 # BUILD_DEPS são instaladas aqui e removidas no Layer 2 (configure/70-build-deps.sh).
 dnf5 install -y --allowerasing \
+    --setopt=install_weak_deps=False \
     "${INSTALL_EXCLUDES[@]/#/--exclude=}" \
     "${INSTALL_PACKAGES[@]}" \
     "${BUILD_DEPS[@]}"

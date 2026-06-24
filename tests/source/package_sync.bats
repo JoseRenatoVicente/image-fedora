@@ -34,6 +34,16 @@ setup() {
     done
 }
 
+@test "pacotes instalados não puxam bloat indesejado conhecido" {
+    for pkg in kdeplasma-addons kio-gdrive spectacle; do
+        if in_list "$pkg" "${INSTALL_PACKAGES[@]}"; then
+            echo "'$pkg' puxa pacotes marcados como UNWANTED"
+            return 1
+        fi
+    done
+    assert_contains "${REPO_ROOT}/build_files/scripts/build-packages.sh" '--setopt=install_weak_deps=False'
+}
+
 @test "nenhum pacote requerido está na lista de remoção" {
     for pkg in "${REQUIRED_PACKAGES[@]}" "${KDE_REQUIRED[@]}"; do
         if in_list "$pkg" "${REMOVE_PACKAGES[@]}"; then

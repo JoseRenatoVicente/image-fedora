@@ -116,14 +116,14 @@ INSTALL_PACKAGES=(
     # Core desktop
     plasma-desktop plasma-workspace kwin kscreenlocker kscreen
     plasma-login-manager kde-settings-plasmalogin kcm-plasmalogin
-    # Painel e widgets
-    kdeplasma-addons plasma-pa plasma-nm plasma-nm-openvpn
+    # Painel e rede. Evitar kdeplasma-addons: puxa qt6-qtwebengine.
+    plasma-pa plasma-nm plasma-nm-openvpn
     bluedevil polkit-kde plasma-drkonqi kinfocenter plasma-systemmonitor
     # Integração
     kde-gtk-config flatpak-kcm kio-admin pam-kwallet pinentry-qt
     libappindicator-gtk3
     # File manager e utilitários
-    dolphin kio-gdrive konsole kwrite spectacle ark kdialog
+    dolphin konsole kwrite ark kdialog
     ffmpegthumbs kdegraphics-thumbnailers audiocd-kio kamera
     # Display
     xorg-x11-server-Xwayland xwaylandvideobridge
