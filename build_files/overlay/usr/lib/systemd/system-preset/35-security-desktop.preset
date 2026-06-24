@@ -55,7 +55,7 @@ disable sssd-kcm.socket
 disable alsa-state.service
 
 # Bloquear reboot físico via Ctrl+Alt+Delete (NSA/STIG — previne abuso de consola)
-mask ctrl-alt-del.target
+disable ctrl-alt-del.target
 
 # Desabilitar Avahi (mDNS/DNS-SD discovery)
 disable avahi-daemon.service

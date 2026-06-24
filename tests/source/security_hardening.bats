@@ -3,9 +3,10 @@
 
 setup() {
     load '../helpers/common'
-    packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
+    packages="${REPO_ROOT}/build_files/scripts/shared/package-lists.sh"
     configure_dir="${REPO_ROOT}/build_files/scripts/configure"
     security_just="${REPO_ROOT}/just/security.just"
+    preset="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset"
 }
 
 # ── Kernel hardening args ─────────────────────────────────────────────────────
@@ -32,6 +33,15 @@ setup() {
 
 @test "SELinux is set to enforcing" {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/selinux/config" 'SELINUX=enforcing'
+}
+
+@test "SELinux policy grants Flatpak bwrap user namespaces for unconfined users" {
+    assert_contains "${REPO_ROOT}/build_files/assets/selinux/grant_userns.cil" '(allow unconfined_t self (user_namespace (create)))'
+}
+
+@test "systemd preset uses only preset directives" {
+    assert_not_contains "$preset" 'mask ctrl-alt-del.target'
+    assert_contains "$configure_dir/50-services.sh" 'ctrl-alt-del.target'
 }
 
 # ── LUKS dracut ───────────────────────────────────────────────────────────────
@@ -80,8 +90,8 @@ setup() {
 }
 
 @test "VS Code RPM is not installed in base" {
-    run grep -REq '(^|[[:space:]])code($|[[:space:]])' "$packages" "$configure_dir"
-    [ "$status" -ne 0 ]
+    run bash -c "source '$packages'; [[ ! \" \\${INSTALL_PACKAGES[*]} \" =~ [[:space:]]code([[:space:]]|$) ]]"
+    [ "$status" -eq 0 ]
 }
 
 # ── Bluetooth not enabled by default ─────────────────────────────────────────

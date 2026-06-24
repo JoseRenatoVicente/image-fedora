@@ -35,12 +35,11 @@ fi
 set +u
 source "$NVM_DIR/nvm.sh"
 
-# Node.js LTS
-if ! nvm ls --no-colors 2>/dev/null | grep -qE '\->' ; then
-    nvm install --lts
-fi
-nvm use --lts
-nvm alias default node
+# Node.js LTS. Install always resolves the remote LTS line and selects it;
+# avoid using the unresolved LTS alias before it exists locally.
+nvm install --lts --latest-npm
+nvm alias default 'lts/*'
+nvm use default
 set -u
 
 # npm globals
@@ -74,7 +73,7 @@ containers, não na imagem.
     toolbox enter
 
 ## Já configurado neste utilizador
-- Node.js LTS via NVM (`nvm use --lts`), pnpm, opencode
+- Node.js LTS via NVM (`nvm use default`), pnpm, opencode
 - LazyDocker
 - Shell zsh com starship, zoxide, direnv, fzf (ver ~/.zshrc)
 EOF

@@ -53,6 +53,31 @@ REMOVE_PACKAGES=(
 
     # Outros
     hunspell sos fpaste words pinfo lrzsz kmscon
+
+    # ── Bloat órfão da base-atomic (confirmado: nada requer) ~650 MB ──
+    # qt6-qtwebengine: 290 MB (Chromium embutido, nenhum app daqui exige).
+    # python3-botocore: SDK AWS (sem uso). nodejs*: Node é via nvm em runtime.
+    # openblas-openmp: backend BLAS órfão. buildah: usamos podman (distrobox
+    # não precisa). NÃO incluir skopeo — é exigido por bootc + rpm-ostree.
+    qt6-qtwebengine
+    python3-botocore
+    nodejs nodejs22-libs nodejs22-docs nodejs22-full-i18n npm
+    openblas-openmp
+    buildah
+
+    # ── Fontes/IME desnecessários em pt_BR (~240 MB) ──
+    # Fontes CJK (chinês/japonês/coreano) + serif latino (não usado na UI) e
+    # dados de IME órfãos (já removemos os ibus-* correspondentes).
+    google-noto-sans-cjk-vf-fonts google-noto-serif-cjk-vf-fonts
+    google-noto-sans-mono-cjk-vf-fonts google-noto-serif-fonts
+    libpinyin-data anthy-unicode
+
+    # ── ibus + Unicode DB (~197 MB) ──
+    # ibus é exigido só por ibus-setup (removido junto). KDE/Plasma não precisa
+    # de ibus para digitação Latin (XKB). Perde-se IME CJK / emoji-via-ibus —
+    # irrelevante em pt_BR. unicode-ucd é órfão (nada o requer).
+    ibus ibus-setup ibus-libs ibus-gtk2 ibus-gtk3 ibus-gtk4 ibus-data
+    unicode-ucd
 )
 
 # ── Excludes da transação de install ─────────────────────────────────────────
@@ -138,7 +163,7 @@ INSTALL_PACKAGES=(
     zram-generator
 
     # Dell/Intel laptop support
-    fprintd libfprint
+    fprintd fprintd-pam libfprint
     bolt iio-sensor-proxy irqbalance
     thermald
     alsa-sof-firmware alsa-ucm
@@ -208,6 +233,7 @@ REQUIRED_PACKAGES=(
     tuned
     # Dell/Intel laptop support
     fprintd
+    fprintd-pam
     libfprint
     bolt
     iio-sensor-proxy
@@ -268,4 +294,12 @@ UNWANTED_PACKAGES=(
     kde-connect
     akonadi-server
     mariadb-server
+    # Bloat órfão removido por tamanho (~650 MB) — regressão se voltar
+    qt6-qtwebengine
+    python3-botocore
+    nodejs22-libs
+    openblas-openmp
+    buildah
+    ibus
+    unicode-ucd
 )

@@ -5,7 +5,7 @@
 setup() {
     load '../helpers/common'
     configure_dir="${REPO_ROOT}/build_files/scripts/configure"
-    packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
+    packages="${REPO_ROOT}/build_files/scripts/shared/package-lists.sh"
     shell_setup="${REPO_ROOT}/build_files/overlay/usr/libexec/fedora-shell-setup"
     dev_setup="${REPO_ROOT}/build_files/overlay/usr/libexec/fedora-dev-setup"
 }
@@ -109,6 +109,11 @@ setup() {
     assert_contains "$dev_setup" 'nvm install --lts'
 }
 
+@test "dev setup does not call nvm use with an unresolved LTS alias" {
+    assert_not_contains "$dev_setup" 'nvm use --lts'
+    assert_contains "$dev_setup" "nvm alias default 'lts/*'"
+}
+
 @test "dev setup installs pnpm globally" {
     assert_contains "$dev_setup" 'npm install -g pnpm'
 }
@@ -148,8 +153,8 @@ setup() {
 }
 
 @test "nodejs not in base packages" {
-    run grep -Eq '^[[:space:]]*nodejs([[:space:]]|$)' "$packages"
-    [ "$status" -ne 0 ]
+    run bash -c "source '$packages'; [[ ! \" \\${INSTALL_PACKAGES[*]} \" =~ [[:space:]]nodejs([[:space:]]|$) ]]"
+    [ "$status" -eq 0 ]
 }
 
 @test "golang not in base packages" {

@@ -49,6 +49,7 @@ systemctl preset power-profiles-daemon.service 2>/dev/null || true
 #   NetworkManager-wait-online — bloqueia o boot à espera da rede
 #   ModemManager               — sem modem celular neste hardware (pacote removido)
 #   avahi-daemon(.socket)      — mDNS/zeroconf não usado no perfil seguro
+#   ctrl-alt-del.target        — bloqueia reboot físico via consola
 # plymouth-quit-wait NÃO é mascarado (preservar o splash Plymouth afinado).
 # Mascarar funciona mesmo para units de pacotes ausentes (symlink → /dev/null).
 systemctl mask \
@@ -56,6 +57,7 @@ systemctl mask \
     ModemManager.service \
     avahi-daemon.service \
     avahi-daemon.socket \
+    ctrl-alt-del.target \
     systemd-remount-fs.service
 
 mkdir -p /etc/tuned

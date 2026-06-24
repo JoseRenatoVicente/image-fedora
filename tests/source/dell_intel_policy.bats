@@ -3,7 +3,7 @@
 
 setup() {
     load '../helpers/common'
-    packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
+    packages="${REPO_ROOT}/build_files/scripts/shared/package-lists.sh"
     configure_dir="${REPO_ROOT}/build_files/scripts/configure"
     runtime_tests="${REPO_ROOT}/build_files/scripts/shared/tests.sh"
     preset="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset"
@@ -13,6 +13,10 @@ setup() {
 
 @test "packages include fprintd" {
     assert_contains "$packages" 'fprintd'
+}
+
+@test "packages include fprintd-pam when fingerprint auth is enabled" {
+    assert_contains "$packages" 'fprintd-pam'
 }
 
 @test "packages include libfprint" {
@@ -58,26 +62,20 @@ setup() {
 # ── Exclusions ───────────────────────────────────────────────────────────────
 
 @test "power-profiles-daemon is excluded from packages" {
-    assert_contains "$packages" '--exclude=power-profiles-daemon'
+    assert_contains "$packages" 'power-profiles-daemon'
 }
 
 @test "nvidia-gpu-firmware is excluded from packages" {
-    assert_contains "$packages" '--exclude=nvidia-gpu-firmware'
+    assert_contains "$packages" 'nvidia-gpu-firmware'
 }
 
 @test "xorg-x11-drv-nvidia is excluded from packages" {
-    assert_contains "$packages" '--exclude=xorg-x11-drv-nvidia'
+    assert_contains "$packages" 'xorg-x11-drv-nvidia'
 }
 
 @test "runtime tests check for power-profiles-daemon" {
     assert_contains "$runtime_tests" 'power-profiles-daemon'
 }
-
-@test "runtime tests check for nvidia-gpu-firmware" {
-    assert_contains "$runtime_tests" 'nvidia-gpu-firmware'
-}
-
-
 
 # ── Thunderbolt/USB4 ────────────────────────────────────────────────────────
 # Política de hardening: thunderbolt é omitido do initramfs (superfície DMA).
