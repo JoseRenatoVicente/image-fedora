@@ -187,7 +187,7 @@ REQUIRED_FILES=(
     /etc/issue.net
     /etc/motd
     /etc/sudoers.d/10-cis-hardening
-    /etc/systemd/system/dev-shm.mount
+    /etc/fstab
     /etc/audit/rules.d/60-cis-hardening.rules
     /etc/tmpfiles.d/audit-log-dir.conf
     /etc/security/pwhistory.conf
@@ -565,11 +565,11 @@ grep -qE '^Defaults[[:space:]]+use_pty' "$SUDO_CIS"  || fail "sudo: use_pty ause
 grep -qE '^Defaults[[:space:]]+logfile' "$SUDO_CIS"  || fail "sudo: logfile ausente (CIS 5.2.3)"
 visudo -cf "$SUDO_CIS" &>/dev/null                   || fail "sudo: 10-cis-hardening não passa no visudo -c"
 
-# /dev/shm hardening (CIS 1.1.2.3)
-DEVSHM="/etc/systemd/system/dev-shm.mount"
-grep -qE '^Options=.*nosuid' "$DEVSHM" || fail "dev-shm.mount: nosuid ausente"
-grep -qE '^Options=.*nodev'  "$DEVSHM" || fail "dev-shm.mount: nodev ausente"
-grep -qE '^Options=.*noexec' "$DEVSHM" || fail "dev-shm.mount: noexec ausente"
+# /dev/shm hardening (CIS 1.1.2.3) — via /etc/fstab (systemd recusa .mount para API filesystems)
+DEVSHM_FSTAB="/etc/fstab"
+grep -qE '^tmpfs[[:space:]]+/dev/shm.*nosuid' "$DEVSHM_FSTAB" || fail "fstab: /dev/shm sem nosuid (CIS 1.1.2.3)"
+grep -qE '^tmpfs[[:space:]]+/dev/shm.*nodev'  "$DEVSHM_FSTAB" || fail "fstab: /dev/shm sem nodev (CIS 1.1.2.3)"
+grep -qE '^tmpfs[[:space:]]+/dev/shm.*noexec' "$DEVSHM_FSTAB" || fail "fstab: /dev/shm sem noexec (CIS 1.1.2.3)"
 
 # auditd (CIS 6.3): pacote + kargs + regras + diretório de log
 rpm -q audit &>/dev/null || fail "auditd: pacote audit ausente"

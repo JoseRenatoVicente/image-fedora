@@ -35,13 +35,14 @@ enable_unit \
     thermald.service \
     irqbalance.service \
     systemd-oomd.service \
-    auditd.service \
-    dev-shm.mount
+    auditd.service
 
 # /tmp como tmpfs (CIS 1.1.2.1) — a unit upstream já traz nosuid,nodev nas Options.
 # Fora do enable_unit: se a base marcar tmp.mount como 'static', o `enable` falha e
 # NÃO deve abortar o build; nesse caso /tmp continua no rootfs (protegido pelos
-# fs.protected_* sysctls). dev-shm.mount/auditd têm [Install] e vão pelo enable_unit.
+# fs.protected_* sysctls). auditd tem [Install] e vai pelo enable_unit.
+# NOTA: /dev/shm é configurado via /etc/fstab (CIS 1.1.2.3) — systemd recusa
+# unidades .mount para API filesystems gerenciados pelo kernel.
 systemctl enable tmp.mount 2>/dev/null \
     || echo "INFO: tmp.mount não habilitável (static/ausente); /tmp permanece no rootfs"
 

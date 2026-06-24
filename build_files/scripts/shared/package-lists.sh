@@ -49,7 +49,7 @@ REMOVE_PACKAGES=(
     ModemManager
 
     # Outros
-    hunspell sos fpaste words pinfo lrzsz kmscon
+    sos fpaste words pinfo lrzsz kmscon
 
     # ── Bloat órfão da base-atomic (confirmado: nada requer) ~650 MB ──
     # qt6-qtwebengine: 290 MB (Chromium embutido, nenhum app daqui exige).
@@ -139,7 +139,7 @@ INSTALL_PACKAGES=(
     bat btop fd-find ripgrep fastfetch eza
     neovim
     inotify-tools xsel numlockx
-    util-linux-user zsh
+    util-linux-user zsh fish
     # Zsh: plugins via RPM (sistema), prompt via starship; zoxide/direnv/fzf
     zsh-autosuggestions zsh-syntax-highlighting
     zoxide fzf direnv
@@ -151,6 +151,8 @@ INSTALL_PACKAGES=(
     ffmpeg
     gstreamer1-plugins-base gstreamer1-plugins-good
     gstreamer1-plugin-openh264
+    # Dicionários / verificação ortográfica
+    hunspell hunspell-pt-BR
     # Gaming
     gamemode
     # Sistema
@@ -251,6 +253,8 @@ REQUIRED_PACKAGES=(
     tpm2-tools
     mokutil
     zsh
+    fish
+    hunspell-pt-BR
     audit
 )
 

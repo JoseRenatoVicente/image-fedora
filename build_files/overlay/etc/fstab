@@ -1,0 +1,10 @@
+# /etc/fstab — gerado pela imagem personalizada
+#
+# CIS RHEL9 §1.1.2.3 — /dev/shm com nosuid,nodev,noexec.
+# systemd não permite unidades .mount para API filesystems (/dev/shm é
+# gerenciado internamente pelo kernel). A forma correta de aplicar as opções
+# de hardening é via fstab, que o kernel/systemd processa antes do userspace.
+# noexec impede staging de payloads em RAM; nosuid/nodev fecham escalada via
+# binários SUID ou device nodes falsos. Chrome/PostgreSQL/Python multiprocessing
+# só fazem mmap de dados — não são afetados.
+tmpfs /dev/shm tmpfs mode=1777,strictatime,nosuid,nodev,noexec 0 0
