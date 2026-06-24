@@ -65,10 +65,6 @@ setup() {
     assert_contains "$packages" 'power-profiles-daemon'
 }
 
-@test "nvidia-gpu-firmware is excluded from packages" {
-    assert_contains "$packages" 'nvidia-gpu-firmware'
-}
-
 @test "xorg-x11-drv-nvidia is excluded from packages" {
     assert_contains "$packages" 'xorg-x11-drv-nvidia'
 }

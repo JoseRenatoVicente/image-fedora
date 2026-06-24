@@ -204,11 +204,6 @@ setup() {
     [ "$status" -ne 0 ]
 }
 
-@test "amd-gpu-firmware is not installed" {
-    run rpm -q amd-gpu-firmware
-    [ "$status" -ne 0 ]
-}
-
 @test "power-profiles-daemon is not installed" {
     run rpm -q power-profiles-daemon
     [ "$status" -ne 0 ]
@@ -216,11 +211,6 @@ setup() {
 
 @test "ModemManager is not installed" {
     run rpm -q ModemManager
-    [ "$status" -ne 0 ]
-}
-
-@test "nvidia-gpu-firmware is not installed" {
-    run rpm -q nvidia-gpu-firmware
     [ "$status" -ne 0 ]
 }
 

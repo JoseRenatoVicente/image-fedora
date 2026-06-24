@@ -77,8 +77,9 @@ setup() {
     assert_contains "$kargs" 'iommu.strict=1'
     assert_contains "$kargs" 'random.trust_bootloader=off'
     assert_contains "$kargs" 'random.trust_cpu=off'
-    assert_contains "$kargs" 'slab_debug=FZ'
-    assert_contains "$kargs" 'page_poison=1'
+    assert_contains "$kargs" 'slab_nomerge'
+    # slab_debug=FZ e page_poison=1 removidos por overhead — mantêm-se init_on_free
+    # e slab_nomerge como defesas contra corrupção de heap.
 }
 
 # ── Image signing (Justfile) ─────────────────────────────────────────────────

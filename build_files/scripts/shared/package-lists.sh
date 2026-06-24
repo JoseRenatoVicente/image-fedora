@@ -23,12 +23,9 @@ REMOVE_PACKAGES=(
     # Acessibilidade (~121 MB)
     orca brltty speech-dispatcher
 
-    # Firmware não-Intel (~224 MB)
-    nvidia-gpu-firmware amd-gpu-firmware amd-ucode-firmware
-    atheros-firmware mt7xxx-firmware realtek-firmware
-    brcmfmac-firmware libertas-firmware tiwilink-firmware
-    nxpwireless-firmware b43-fwcutter b43-openfwwf
-    qcom-wwan-firmware
+    # NOTA: firmwares wireless e GPU são mantidos. A remoção anterior quebrava
+    # WiFi (Realtek/Atheros/MediaTek/Broadcom) e causava stalls gráficos em
+    # GPUs AMD/NVIDIA. Custo de tamanho aceitável para funcionamento geral.
 
     # Fontes desnecessárias
     default-fonts-cjk-mono default-fonts-cjk-sans default-fonts-cjk-serif
@@ -101,7 +98,6 @@ INSTALL_EXCLUDES=(
     speech-dispatcher
     plasma-discover
     power-profiles-daemon
-    nvidia-gpu-firmware
     xorg-x11-drv-nvidia
     akmod-nvidia
     kmod-nvidia
@@ -276,11 +272,8 @@ UNWANTED_PACKAGES=(
     cups hplip gutenprint
     # Acessibilidade (removida)
     orca brltty speech-dispatcher
-    # Firmware não-Intel (removido)
-    amd-gpu-firmware
     # Power stack conflicts / NVIDIA out of scope
     power-profiles-daemon
-    nvidia-gpu-firmware
     xorg-x11-drv-nvidia
     akmod-nvidia
     kmod-nvidia

@@ -42,20 +42,20 @@ setup() {
     assert_tree_contains "$configure_dir" '__aurorae__svg__CatppuccinMocha-Classic'
 }
 
-@test "configure disables window blur and rounded-corner effects" {
-    assert_tree_contains "$configure_dir" '--group Plugins --key blurEnabled "false"'
-    assert_tree_contains "$configure_dir" '--group Plugins --key roundcornersEnabled "false"'
-    assert_tree_contains "$configure_dir" '--group Plugins --key kwin4_effect_roundcornersEnabled "false"'
+@test "configure keeps window blur and rounded-corner effects enabled" {
+    assert_tree_contains "$configure_dir" '--group Plugins --key blurEnabled "true"'
+    assert_tree_contains "$configure_dir" '--group Plugins --key roundcornersEnabled "true"'
+    assert_tree_contains "$configure_dir" '--group Plugins --key kwin4_effect_roundcornersEnabled "true"'
     assert_tree_contains "$configure_dir" '--group "org.kde.kdecoration2" --key BorderSize "None"'
-    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key blurEnabled "true"'
-    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key roundcornersEnabled "true"'
-    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key kwin4_effect_roundcornersEnabled "true"'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key blurEnabled "false"'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key roundcornersEnabled "false"'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key kwin4_effect_roundcornersEnabled "false"'
 }
 
-@test "configure disables Kvantum Mokka transparency" {
-    assert_tree_contains "$configure_dir" 'translucent_windows=false'
-    assert_tree_contains "$configure_dir" 'blurring=false'
-    assert_tree_contains "$configure_dir" 'composite=false'
+@test "configure does not disable Kvantum Mokka transparency system-wide" {
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" 'translucent_windows=false'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" 'blurring=false'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" 'composite=false'
 }
 
 # ── KDE packages present ─────────────────────────────────────────────────────

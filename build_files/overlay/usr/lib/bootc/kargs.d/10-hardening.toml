@@ -51,8 +51,9 @@ kargs = [
   "rd.emergency=halt",
   "extra_latent_entropy",
   # KFENCE: amostrador de segurança do heap do kernel (UAF, OOB, double-free).
-  # 100ms = ~10 amostras/seg; overhead ~1% — bom rácio segurança/performance.
-  "kfence.sample_interval=100",
+  # Desactivado por defeito para evitar overhead e stalls em desktop/gaming.
+  # Para activar em modo diagnóstico, use kfence.sample_interval=100.
+  # "kfence.sample_interval=100",
   "mitigations=auto",
   # module.sig_enforce=1: rejeita módulos de kernel não assinados.
   # Drivers NVIDIA via rpm-ostree install (kmod-nvidia) são assinados pelo
@@ -66,11 +67,9 @@ kargs = [
   "random.trust_cpu=off",
   "randomize_kstack_offset=on",
   "slab_nomerge",
-  # slab_debug=FZ: F=sanity checks (deteta corrupção de free lists),
-  # Z=red zones (deteta OOB writes). Detecção determinística vs. KFENCE que é
-  # probabilístico (sampling). secureblue promoveu a standard em 2025.
-  # Overhead ~3-5% em slab-heavy workloads; aceite dado o perfil de segurança.
-  "slab_debug=FZ",
+  # NOTA: slab_debug=FZ removido — sanity checks/red zones determinísticos
+  # causavam overhead 3-5% e stalls visíveis no desktop. KFENCE também desactivado.
+  # "slab_debug=FZ",
   "gather_data_sampling=force",
   "reg_file_data_sampling=on",
   "spec_store_bypass_disable=on",
@@ -81,10 +80,9 @@ kargs = [
   # recomendado pela AMD (overhead baixo vs. ibpb). No-op em CPUs Intel.
   "spec_rstack_overflow=safe-ret",
   "ssbd=force-on",
-  # page_poison=1: preenche páginas libertadas com um padrão venenoso, ajudando
-  # a detetar use-after-free e a impedir reaproveitamento de dados sensíveis.
-  # Complementa init_on_free=1.
-  "page_poison=1",
+  # NOTA: page_poison=1 removido — init_on_free=1 já zera páginas libertadas;
+  # page_poison adicionava overhead de preenchimento sem ganho prático no desktop.
+  # "page_poison=1",
   # ftrace=off: desativa o framework de function tracing do kernel, removendo
   # uma superfície de introspeção/abuso. Sem impacto num desktop (só afeta
   # debugging avançado com ftrace/perf trace).
