@@ -39,6 +39,10 @@ sed -i 's/^#\?PASS_MAX_DAYS.*/PASS_MAX_DAYS\t60/'  /etc/login.defs
 sed -i 's/^#\?PASS_MIN_DAYS.*/PASS_MIN_DAYS\t1/'   /etc/login.defs
 sed -i 's/^#\?PASS_WARN_AGE.*/PASS_WARN_AGE\t7/'   /etc/login.defs
 
+# STIG RHEL-09-411050 — desativa contas após 35 dias de inatividade. Aplica-se a
+# contas criadas depois (default em /etc/default/useradd).
+useradd -D -f 35
+
 # Anotar ficheiros de hardening com metadados de componente
 setfattr -n user.component -v "security-hardening" \
     /etc/sysctl.d/60-security-hardening.conf \
@@ -47,6 +51,7 @@ setfattr -n user.component -v "security-hardening" \
     /etc/modprobe.d/blacklist-framebuffer.conf \
     /usr/lib/bootc/kargs.d/10-hardening.toml \
     /usr/lib/udev/rules.d/99-hardening.rules \
+    /etc/dracut.conf.d/03-storage-drivers.conf \
     /etc/issue \
     /etc/issue.net \
     /etc/motd \
@@ -74,4 +79,6 @@ setfattr -n user.component -v "image-config" \
     /etc/xdg/kwinrc \
     /etc/xdg/kdeglobals \
     /etc/systemd/journald.conf.d/size-limit.conf \
-    /etc/plasmalogin.conf.d/10-theme.conf
+    /etc/plasmalogin.conf.d/10-theme.conf \
+    /etc/xdg/kscreenlockerrc \
+    /etc/profile.d/tmout.sh

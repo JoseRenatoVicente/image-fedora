@@ -140,6 +140,7 @@ REQUIRED_FILES=(
     /usr/lib/bootc/kargs.d/10-hardening.toml
     /etc/dracut.conf.d/01-ostree-required.conf
     /etc/dracut.conf.d/02-drm-drivers.conf
+    /etc/dracut.conf.d/03-storage-drivers.conf
     /etc/dracut.conf.d/99-omit-firewire.conf
     /etc/dracut.conf.d/99-omit-thunderbolt.conf
     /etc/dracut.conf.d/90-luks-security.conf
@@ -190,6 +191,9 @@ REQUIRED_FILES=(
     /etc/tmpfiles.d/audit-log-dir.conf
     /etc/security/pwhistory.conf
     /usr/lib/bootc/kargs.d/30-audit.toml
+    # STIG Tier A
+    /etc/xdg/kscreenlockerrc
+    /etc/profile.d/tmout.sh
 )
 for f in "${REQUIRED_FILES[@]}"; do
     [[ -e "$f" ]] || fail "Ficheiro/directório ausente: $f"
@@ -540,11 +544,13 @@ grep -q 'tpm2-tss' /etc/dracut.conf.d/90-luks-security.conf \
     || fail "FDE: /usr/bin/tpm2-luks-enroll ausente ou não executável"
 
 echo "=== CIS Tier 1+2: banners, sudo, mounts, auditd, pwhistory ==="
-# Banners de aviso (CIS 1.7): não devem vazar info de OS (\\m \\r \\s \\v) e devem
-# conter o aviso de uso autorizado.
+# Banners de aviso (CIS 1.7 / STIG 211020/255025): aviso de uso autorizado +
+# consentimento de monitorização, sem leak de info de OS (\\m \\r \\s \\v).
 for banner in /etc/issue /etc/issue.net; do
     grep -q 'authorized users only' "$banner" \
-        || fail "Banner $banner sem aviso de uso autorizado (CIS 1.7)"
+        || fail "Banner $banner sem aviso de uso autorizado (CIS 1.7 / STIG 211020)"
+    grep -qi 'monitored' "$banner" \
+        || fail "Banner $banner sem aviso de monitorização (STIG 211020)"
     grep -qE '\\[mrsv]' "$banner" \
         && fail "Banner $banner vaza info de OS via escapes \\m/\\r/\\s/\\v (CIS 1.7)"
 done
@@ -592,6 +598,25 @@ grep -qE '^remember[[:space:]]*=[[:space:]]*5' /etc/security/pwhistory.conf \
 # journald (CIS 6.2)
 grep -qE '^Compress=yes' /etc/systemd/journald.conf.d/size-limit.conf \
     || fail "journald: Compress=yes ausente (CIS 6.2)"
+
+echo "=== STIG Tier A: lock de ecrã, TMOUT, inatividade de contas ==="
+# Bloqueio de ecrã KDE (STIG 271055/271065/271075) — imutável via [$i]
+KSL="/etc/xdg/kscreenlockerrc"
+grep -qE '^\[Daemon\]\[\$i\]' "$KSL" || fail "kscreenlockerrc: grupo [Daemon] não é imutável ([\$i]) (STIG 271060/271070/271080)"
+grep -qE '^Autolock=true' "$KSL"     || fail "kscreenlockerrc: Autolock!=true (STIG 271055)"
+grep -qE '^Timeout=10$' "$KSL"       || fail "kscreenlockerrc: Timeout!=10 min (STIG 271065)"
+grep -qE '^LockOnResume=true' "$KSL" || fail "kscreenlockerrc: LockOnResume!=true (STIG 271075)"
+grep -qE '^Theme=Mokka' "$KSL"       && fail "kscreenlockerrc: Theme=Mokka inválido (Mokka não tem QML de lockscreen)"
+
+# Timeout de shell interativo (STIG 412035)
+grep -qE 'TMOUT=600' /etc/profile.d/tmout.sh \
+    || fail "tmout.sh: TMOUT=600 ausente (STIG 412035)"
+grep -qE 'readonly TMOUT' /etc/profile.d/tmout.sh \
+    || fail "tmout.sh: TMOUT não é readonly (utilizador poderia desativar) (STIG 412035)"
+
+# Inatividade de contas 35 dias (STIG 411050)
+useradd -D 2>/dev/null | grep -qE '^INACTIVE=35$' \
+    || fail "useradd defaults: INACTIVE!=35 (STIG 411050)"
 
 if [[ $FAILED -eq 1 ]]; then
     echo "::endgroup::"

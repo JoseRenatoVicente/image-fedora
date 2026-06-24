@@ -7,8 +7,12 @@
 # /sys nem /dev reais, por isso só "vê" o storage do container (overlayfs). Em
 # modo host-only o initramfs sai SEM os drivers de storage do alvo real
 # (virtio_blk, nvme, ahci, virtio_scsi) → na VM/máquina real o root nunca monta
-# → rd.emergency=halt → "boot has failed ... Halting". --no-hostonly inclui todos
-# os drivers genéricos, que é o que uma imagem bootc precisa.
+# → rd.emergency=halt → "boot has failed ... Halting".
+#
+# Mesmo com --no-hostonly, sem /sys o modo genérico pode não enumerar os
+# controladores de disco — por isso os drivers de storage são FORÇADOS via
+# /etc/dracut.conf.d/03-storage-drivers.conf (add_drivers). A verificação no fim
+# confirma que ficaram no initramfs.
 set -euo pipefail
 trap 'printf "\033[1;31mERRO linha %s: %s\033[0m\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
@@ -33,5 +37,5 @@ echo "✓ ostree presente no initramfs"
 # Falha cedo no build em vez de produzir uma imagem que dá "boot has failed".
 INITRD_DRIVERS=$(lsinitrd "$INITRAMFS" 2>/dev/null)
 printf '%s\n' "$INITRD_DRIVERS" | grep -qE '(virtio_blk|virtio_scsi|nvme|ahci|sd_mod)\.ko' \
-    || { echo "FATAL: nenhum driver de storage no initramfs — boot falharia (não usar --hostonly no container)!"; exit 1; }
+    || { echo "FATAL: nenhum driver de storage no initramfs — boot falharia (verificar add_drivers em /etc/dracut.conf.d/03-storage-drivers.conf)!"; exit 1; }
 echo "✓ drivers de storage presentes no initramfs"
