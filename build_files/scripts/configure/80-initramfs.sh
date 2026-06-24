@@ -35,7 +35,32 @@ echo "✓ ostree presente no initramfs"
 
 # Sanity dos drivers de storage: sem pelo menos um, o root não monta no alvo real.
 # Falha cedo no build em vez de produzir uma imagem que dá "boot has failed".
-INITRD_DRIVERS=$(lsinitrd "$INITRAMFS" 2>/dev/null)
-printf '%s\n' "$INITRD_DRIVERS" | grep -qE '(virtio_blk|virtio_scsi|nvme|ahci|sd_mod)\.ko' \
-    || { echo "FATAL: nenhum driver de storage no initramfs — boot falharia (verificar add_drivers em /etc/dracut.conf.d/03-storage-drivers.conf)!"; exit 1; }
-echo "✓ drivers de storage presentes no initramfs"
+#
+# Um driver conta como presente se estiver no initramfs (módulo .ko) OU compilado
+# no kernel (modules.builtin) — um driver builtin monta o root sem precisar de
+# estar no initramfs. Em fc44 virtio_blk/ahci/sd_mod/libahci são BUILTIN, por isso
+# uma verificação que só aceita .ko dá falso-negativo (era a causa do "boot has
+# failed" no check, não no boot real).
+STORAGE_RE='virtio_blk|virtio_scsi|nvme|ahci|sd_mod'
+BUILTIN_FILE="/usr/lib/modules/$KVER/modules.builtin"
+
+STORAGE_IN_INITRD=$(lsinitrd "$INITRAMFS" 2>/dev/null \
+    | grep -oE "($STORAGE_RE)\.ko" | sort -u || true)
+STORAGE_BUILTIN=$(grep -oE "($STORAGE_RE)\.ko" "$BUILTIN_FILE" 2>/dev/null \
+    | sort -u || true)
+
+# Diagnóstico (sempre visível no log do build).
+echo "── drivers de storage ──"
+echo "  módulos no initramfs : ${STORAGE_IN_INITRD//$'\n'/ }"
+echo "  builtin no kernel    : ${STORAGE_BUILTIN//$'\n'/ }"
+echo "  .ko de storage em disco para $KVER:"
+find "/usr/lib/modules/$KVER" -regextype posix-extended \
+    -regex ".*($STORAGE_RE)\.ko.*" -printf '    %p\n' 2>/dev/null | sort || true
+
+if [[ -z "$STORAGE_IN_INITRD" && -z "$STORAGE_BUILTIN" ]]; then
+    echo "FATAL: nenhum driver de storage (nem módulo no initramfs nem builtin no" \
+         "kernel) — boot falharia! Verificar add_drivers em" \
+         "/etc/dracut.conf.d/03-storage-drivers.conf e a presença de kernel-modules."
+    exit 1
+fi
+echo "✓ drivers de storage cobertos (módulo no initramfs e/ou builtin no kernel)"
