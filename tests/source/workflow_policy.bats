@@ -47,6 +47,10 @@ setup() {
     assert_contains "$build_workflow" 'cosign download sbom'
 }
 
+@test "build.yml generates SBOM from local image archive" {
+    assert_contains "$build_workflow" 'syft /tmp/image-scan.tar --from docker-archive -o spdx-json=sbom.spdx.json'
+}
+
 @test "integration_tests.yml has cosign verify" {
     assert_contains "$integration_workflow" 'cosign verify'
 }
@@ -103,8 +107,9 @@ setup() {
     assert_contains "$containerfile" 'SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}"'
 }
 
-@test "build.yml passes source-date-epoch flag" {
-    assert_contains "$build_workflow" '--source-date-epoch=${{ env.SOURCE_DATE_EPOCH }}'
+@test "build.yml passes SOURCE_DATE_EPOCH as build arg" {
+    assert_contains "$build_workflow" 'SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}'
+    assert_not_contains "$build_workflow" '--source-date-epoch=${{ env.SOURCE_DATE_EPOCH }}'
 }
 
 # ── Disk image build ────────────────────────────────────────────────────────

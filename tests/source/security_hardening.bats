@@ -48,10 +48,37 @@ setup() {
     assert_contains "$configure_dir/50-services.sh" 'systemctl mask --force ctrl-alt-del.target'
 }
 
-# ── LUKS dracut ───────────────────────────────────────────────────────────────
+# ── Boot speed/security policy ────────────────────────────────────────────────
 
-@test "LUKS dracut config has add_dracutmodules" {
+@test "LUKS dracut security config stays active by default" {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/90-luks-security.conf" 'add_dracutmodules'
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/90-luks-security.conf" 'tpm2-tss'
+}
+
+@test "DRM dracut config stays active by default" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/02-drm-drivers.conf" 'virtio_gpu'
+}
+
+@test "initramfs generation uses host-only hardware defaults" {
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--no-hostonly'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--force-drivers'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/shared/initramfs.sh" '--no-hostonly'
+}
+
+@test "fast default does not disable native GPU drivers" {
+    ! grep -RFq -- 'nomodeset' "${REPO_ROOT}/build_files"
+    ! grep -RFq -- 'modprobe.blacklist=nouveau' "${REPO_ROOT}/build_files"
+    ! grep -RFq -- 'rd.driver.blacklist=nouveau' "${REPO_ROOT}/build_files"
+}
+
+@test "security kargs stay active by default" {
+    local kargs="${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml"
+    assert_contains "$kargs" 'init_on_free=1'
+    assert_contains "$kargs" 'iommu.strict=1'
+    assert_contains "$kargs" 'random.trust_bootloader=off'
+    assert_contains "$kargs" 'random.trust_cpu=off'
+    assert_contains "$kargs" 'slab_debug=FZ'
+    assert_contains "$kargs" 'page_poison=1'
 }
 
 # ── Image signing (Justfile) ─────────────────────────────────────────────────

@@ -151,7 +151,6 @@ jobs:
             SHA_HEAD_SHORT=${{ env.SHA_HEAD_SHORT }}
           extra-args: |
             --layers
-            --source-date-epoch=${{ env.SOURCE_DATE_EPOCH }}
             --cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
