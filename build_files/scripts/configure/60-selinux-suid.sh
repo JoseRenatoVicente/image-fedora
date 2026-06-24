@@ -13,8 +13,17 @@ CIL_FILES=(
     /ctx/assets/selinux/secureblue_deny_alg_sockets.cil
     /ctx/assets/selinux/secureblue_deny_packet_radio_sockets.cil
     /ctx/assets/selinux/container-ptrace.cil
-    /ctx/assets/selinux/harden_userns.cil
-    /ctx/assets/selinux/harden_container_userns.cil
+    # REMOVIDOS: harden_userns.cil + harden_container_userns.cil.
+    # O `deny ... (user_namespace (create))` quebrava dois fluxos centrais:
+    #   • bwrap (unconfined_t) → sandbox interno dos navegadores flatpak
+    #     (Firefox, Tor Browser), que criam user namespaces aninhados;
+    #   • podman (container_runtime_t) → rootless podman/distrobox.
+    # No Fedora esses processos rodam sob domínios não-privilegiados
+    # (unconfined_t / container_runtime_t) e não há domínio SELinux por-app,
+    # então não dá para liberar só o navegador/container sem afrouxar tudo.
+    # Como esta imagem usa Firefox/Tor flatpak + distrobox, mantemos o userns
+    # não-privilegiado (padrão do Fedora). Electron (Discord/Teams/Obsidian)
+    # não é afetado — usa zypak, sem userns aninhado.
     /ctx/assets/selinux/grant_userns.cil
     /ctx/assets/selinux/userns_deny_unconfined_relabels.cil
 )

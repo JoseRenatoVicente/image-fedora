@@ -1,6 +1,0 @@
-;; Denies container domains from creating user namespaces.
-;; Containers that need user namespaces must be explicitly permitted via policy.
-;; Source: https://github.com/secureblue/secureblue (Apache-2.0 OR MIT)
-
-(deny container_domain self (user_namespace (create)))
-(deny container_runtime_domain self (user_namespace (create)))

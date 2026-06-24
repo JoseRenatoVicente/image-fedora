@@ -53,6 +53,9 @@ jobs:
         run: |
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+          # GHCR exige owner em minúsculas; IMAGE_VENDOR alimenta o IMAGE_REF
+          # gravado no os-release (usado por bootc/Discover para o pull).
+          echo "IMAGE_VENDOR=${GITHUB_REPOSITORY_OWNER,,}" >> ${GITHUB_ENV}
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -114,7 +117,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/blob/${{ github.sha }}/Containerfile
             org.opencontainers.image.title=${{ env.IMAGE_NAME }}
             org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/tree/${{ github.sha }}
-            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.vendor=${{ env.IMAGE_VENDOR }}
             org.opencontainers.image.version=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
             io.artifacthub.package.deprecated=false
             io.artifacthub.package.keywords=${{ env.IMAGE_KEYWORDS }}
@@ -144,7 +147,7 @@ jobs:
           oci: false
           build-args: |
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
-            IMAGE_VENDOR=${{ github.repository_owner }}
+            IMAGE_VENDOR=${{ env.IMAGE_VENDOR }}
             SHA_HEAD_SHORT=${{ env.SHA_HEAD_SHORT }}
           extra-args: |
             --layers

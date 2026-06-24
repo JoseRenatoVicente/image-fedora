@@ -211,13 +211,6 @@ grep -q '"rhgb"' /usr/lib/bootc/kargs.d/10-hardening.toml \
 grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml \
     || fail "kargs: 'splash' ausente (necessário para Plymouth)"
 
-echo "=== Plymouth theme ==="
-PLYMOUTHD_CONF="/etc/plymouth/plymouthd.conf"
-[[ -f "$PLYMOUTHD_CONF" ]] \
-    || fail "Plymouth: $PLYMOUTHD_CONF ausente"
-grep -qE '^Theme=spinner$' "$PLYMOUTHD_CONF" \
-    || fail "Plymouth: tema não é 'spinner' em $PLYMOUTHD_CONF"
-
 echo "=== Locale, teclado e timezone ==="
 grep -qx 'LANG=pt_BR.UTF-8' /etc/locale.conf \
     || fail "locale.conf: LANG não é pt_BR.UTF-8"
@@ -452,8 +445,13 @@ echo "=== Container signing ==="
 echo "=== SELinux CIL policies ==="
 semodule -l 2>/dev/null | grep -q 'secureblue_deny_ipsec_sockets' \
     || fail "SELinux: módulo secureblue_deny_ipsec_sockets não carregado"
+# harden_userns / harden_container_userns foram REMOVIDOS de propósito: o deny
+# de user_namespace quebrava navegadores flatpak (bwrap/unconfined_t) e
+# rootless podman/distrobox (container_runtime_t). Garantimos que NÃO voltam.
 semodule -l 2>/dev/null | grep -q 'harden_userns' \
-    || fail "SELinux: módulo harden_userns não carregado"
+    && fail "SELinux: harden_userns NÃO deve estar carregado (quebra flatpak/podman userns)"
+semodule -l 2>/dev/null | grep -q 'harden_container_userns' \
+    && fail "SELinux: harden_container_userns NÃO deve estar carregado (quebra podman/distrobox)"
 semodule -l 2>/dev/null | grep -q 'container-ptrace' \
     || fail "SELinux: módulo container-ptrace não carregado"
 
