@@ -161,6 +161,8 @@ INSTALL_PACKAGES=(
     earlyoom
     tuned tuned-ppd
     zram-generator
+    # Auditoria (CIS §6.3): auditd + augenrules. Regras em /etc/audit/rules.d/.
+    audit
 
     # Dell/Intel laptop support
     fprintd fprintd-pam libfprint
@@ -253,6 +255,7 @@ REQUIRED_PACKAGES=(
     tpm2-tools
     mokutil
     zsh
+    audit
 )
 
 # ── Verificação runtime: pacotes KDE essenciais ──────────────────────────────

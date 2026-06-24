@@ -21,6 +21,11 @@ chmod 755 /usr/libexec/fedora-flatpak-setup \
           /usr/libexec/fedora-brew-setup
 chmod 755 /usr/bin/tpm2-luks-enroll
 
+# sudoers.d TÊM de ser 0440 (git só preserva 0644): um drop-in group/world-writable
+# é ignorado pelo sudo e gera aviso em cada invocação. Validar a sintaxe também.
+chmod 0440 /etc/sudoers.d/10-cis-hardening
+visudo -cf /etc/sudoers.d/10-cis-hardening
+
 # Wireplumber: bloquear Steam de limpar defaults de áudio (equiv. ao patch Nobara)
 mv /usr/bin/wpctl /usr/bin/wpctl.real
 install -Dm755 /ctx/assets/configs/wpctl-steam-wrapper /usr/bin/wpctl
@@ -41,7 +46,16 @@ setfattr -n user.component -v "security-hardening" \
     /etc/modprobe.d/security-hardening.conf \
     /etc/modprobe.d/blacklist-framebuffer.conf \
     /usr/lib/bootc/kargs.d/10-hardening.toml \
-    /usr/lib/udev/rules.d/99-hardening.rules
+    /usr/lib/udev/rules.d/99-hardening.rules \
+    /etc/issue \
+    /etc/issue.net \
+    /etc/motd \
+    /etc/sudoers.d/10-cis-hardening \
+    /etc/audit/rules.d/60-cis-hardening.rules \
+    /etc/tmpfiles.d/audit-log-dir.conf \
+    /etc/security/pwhistory.conf \
+    /etc/systemd/system/dev-shm.mount \
+    /usr/lib/bootc/kargs.d/30-audit.toml
 
 setfattr -n user.component -v "image-config" \
     /etc/sysctl.d/99-performance.conf \

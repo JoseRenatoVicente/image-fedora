@@ -34,7 +34,16 @@ enable_unit \
     keyd.service \
     thermald.service \
     irqbalance.service \
-    systemd-oomd.service
+    systemd-oomd.service \
+    auditd.service \
+    dev-shm.mount
+
+# /tmp como tmpfs (CIS 1.1.2.1) — a unit upstream já traz nosuid,nodev nas Options.
+# Fora do enable_unit: se a base marcar tmp.mount como 'static', o `enable` falha e
+# NÃO deve abortar o build; nesse caso /tmp continua no rootfs (protegido pelos
+# fs.protected_* sysctls). dev-shm.mount/auditd têm [Install] e vão pelo enable_unit.
+systemctl enable tmp.mount 2>/dev/null \
+    || echo "INFO: tmp.mount não habilitável (static/ausente); /tmp permanece no rootfs"
 
 if rpm -q scx-scheds &>/dev/null; then
     install -Dm644 /ctx/assets/configs/scx-default.conf /etc/default/scx
@@ -68,6 +77,11 @@ if command -v authselect >/dev/null 2>&1; then
     authselect current --raw &>/dev/null || authselect select minimal --force
     authselect enable-feature with-fingerprint || true
     authselect enable-feature with-faillock || true
+    # CIS §5.3.3.4 — histórico de passwords. with-pwhistory pode não existir em
+    # todas as versões do authselect; é best-effort. Se falhar, o pwhistory.conf
+    # fica presente mas inativo no stack (sem quebrar o PAM/login).
+    authselect enable-feature with-pwhistory 2>/dev/null \
+        || echo "INFO: authselect sem with-pwhistory; pwhistory.conf presente mas inativo no stack"
 fi
 
 # flathub.flatpakrepo é um ficheiro estático: vem da árvore espelhada

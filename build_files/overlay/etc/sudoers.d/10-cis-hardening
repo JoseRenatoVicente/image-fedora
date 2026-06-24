@@ -1,0 +1,15 @@
+# CIS RHEL9 §5.2 — endurecimento do sudo.
+# Permissões TÊM de ser 0440 (aplicadas em 10-system.sh) — um ficheiro
+# group/world-writable em sudoers.d é IGNORADO e gera aviso em cada sudo.
+#
+#  use_pty            (5.2.2) corre o comando num pseudo-tty dedicado, impedindo
+#                     que um processo filho sequestre o terminal do sudo.
+#  logfile            (5.2.3) trilho de auditoria dedicado, complementa o auditd.
+#  !pwfeedback        evita o leak do tamanho da password (sem asteriscos).
+#  timestamp_timeout  (5.2.6) re-autentica após 15 min de inatividade.
+#  passwd_timeout     aborta o prompt de password ao fim de 1 min.
+Defaults use_pty
+Defaults logfile="/var/log/sudo.log"
+Defaults !pwfeedback
+Defaults timestamp_timeout=15
+Defaults passwd_timeout=1

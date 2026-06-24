@@ -1,0 +1,8 @@
+# CIS RHEL9 §6.3.1 — auditoria desde o boot precoce.
+# audit=1 activa o subsistema de audit do kernel antes do auditd assumir;
+# audit_backlog_limit aumenta a fila de eventos enfileirados nesse intervalo
+# (sem isto, eventos do boot precoce são descartados silenciosamente).
+kargs = [
+  "audit=1",
+  "audit_backlog_limit=8192",
+]

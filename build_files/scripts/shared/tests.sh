@@ -180,6 +180,16 @@ REQUIRED_FILES=(
     /usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg
     /etc/udisks2/mount_options.conf
     /etc/tmpfiles.d/99-proc-hardening.conf
+    # CIS extras (Tier 1+2)
+    /etc/issue
+    /etc/issue.net
+    /etc/motd
+    /etc/sudoers.d/10-cis-hardening
+    /etc/systemd/system/dev-shm.mount
+    /etc/audit/rules.d/60-cis-hardening.rules
+    /etc/tmpfiles.d/audit-log-dir.conf
+    /etc/security/pwhistory.conf
+    /usr/lib/bootc/kargs.d/30-audit.toml
 )
 for f in "${REQUIRED_FILES[@]}"; do
     [[ -e "$f" ]] || fail "Ficheiro/directório ausente: $f"
@@ -528,6 +538,60 @@ grep -q 'tpm2-tss' /etc/dracut.conf.d/90-luks-security.conf \
 # Helper de enrollment presente e executável
 [[ -x /usr/bin/tpm2-luks-enroll ]] \
     || fail "FDE: /usr/bin/tpm2-luks-enroll ausente ou não executável"
+
+echo "=== CIS Tier 1+2: banners, sudo, mounts, auditd, pwhistory ==="
+# Banners de aviso (CIS 1.7): não devem vazar info de OS (\\m \\r \\s \\v) e devem
+# conter o aviso de uso autorizado.
+for banner in /etc/issue /etc/issue.net; do
+    grep -q 'authorized users only' "$banner" \
+        || fail "Banner $banner sem aviso de uso autorizado (CIS 1.7)"
+    grep -qE '\\[mrsv]' "$banner" \
+        && fail "Banner $banner vaza info de OS via escapes \\m/\\r/\\s/\\v (CIS 1.7)"
+done
+
+# sudo hardening (CIS 5.2)
+SUDO_CIS="/etc/sudoers.d/10-cis-hardening"
+PERM=$(stat -c '%a' "$SUDO_CIS" 2>/dev/null || echo '')
+[[ "$PERM" == "440" ]] || fail "sudoers.d/10-cis-hardening: permissões não são 0440 (são ${PERM:-?}) — seria ignorado pelo sudo"
+grep -qE '^Defaults[[:space:]]+use_pty' "$SUDO_CIS"  || fail "sudo: use_pty ausente (CIS 5.2.2)"
+grep -qE '^Defaults[[:space:]]+logfile' "$SUDO_CIS"  || fail "sudo: logfile ausente (CIS 5.2.3)"
+visudo -cf "$SUDO_CIS" &>/dev/null                   || fail "sudo: 10-cis-hardening não passa no visudo -c"
+
+# /dev/shm hardening (CIS 1.1.2.3)
+DEVSHM="/etc/systemd/system/dev-shm.mount"
+grep -qE '^Options=.*nosuid' "$DEVSHM" || fail "dev-shm.mount: nosuid ausente"
+grep -qE '^Options=.*nodev'  "$DEVSHM" || fail "dev-shm.mount: nodev ausente"
+grep -qE '^Options=.*noexec' "$DEVSHM" || fail "dev-shm.mount: noexec ausente"
+
+# auditd (CIS 6.3): pacote + kargs + regras + diretório de log
+rpm -q audit &>/dev/null || fail "auditd: pacote audit ausente"
+grep -qF '"audit=1"' /usr/lib/bootc/kargs.d/30-audit.toml \
+    || fail "kargs: audit=1 ausente (CIS 6.3.1)"
+grep -qF '"audit_backlog_limit=8192"' /usr/lib/bootc/kargs.d/30-audit.toml \
+    || fail "kargs: audit_backlog_limit ausente (CIS 6.3.1)"
+AUDIT_RULES="/etc/audit/rules.d/60-cis-hardening.rules"
+grep -qE '^-w /etc/passwd -p wa -k identity' "$AUDIT_RULES" \
+    || fail "audit: regra identity (/etc/passwd) ausente"
+grep -qE '^-a always,exit .* -k time-change' "$AUDIT_RULES" \
+    || fail "audit: regra time-change ausente"
+# As regras só podem referenciar binários presentes — chsh/chfn/pkexec foram
+# removidos e NÃO devem ser auditados (geraria erro de load no boot).
+for removed in chsh chfn pkexec; do
+    grep -qE "path=/usr/bin/${removed}\b" "$AUDIT_RULES" \
+        && fail "audit: regra referencia binário removido (/usr/bin/${removed}) — erro de load no boot"
+done
+if systemctl list-unit-files auditd.service &>/dev/null; then
+    systemctl is-enabled auditd.service 2>/dev/null | grep -q '^enabled$' \
+        || fail "auditd.service não habilitado"
+fi
+
+# pwhistory (CIS 5.3.3.4): config presente (ativação no stack é best-effort)
+grep -qE '^remember[[:space:]]*=[[:space:]]*5' /etc/security/pwhistory.conf \
+    || fail "pwhistory: remember=5 ausente (CIS 5.3.3.4)"
+
+# journald (CIS 6.2)
+grep -qE '^Compress=yes' /etc/systemd/journald.conf.d/size-limit.conf \
+    || fail "journald: Compress=yes ausente (CIS 6.2)"
 
 if [[ $FAILED -eq 1 ]]; then
     echo "::endgroup::"

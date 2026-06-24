@@ -1,0 +1,21 @@
+# CIS RHEL9 §1.1.2.3 — /dev/shm com nosuid,nodev,noexec.
+# /dev/shm é memória partilhada (mmap) — nada legítimo precisa de exec, setuid ou
+# device nodes lá. noexec impede staging de payloads em RAM; nosuid/nodev fecham
+# escalada via binários SUID ou device nodes falsos. Chrome/PostgreSQL/Python
+# multiprocessing só fazem mmap de dados, não são afetados.
+[Unit]
+Description=Hardened /dev/shm (nosuid,nodev,noexec)
+Documentation=man:tmpfs(5)
+DefaultDependencies=no
+Conflicts=umount.target
+Before=local-fs.target umount.target
+After=swap.target
+
+[Mount]
+What=tmpfs
+Where=/dev/shm
+Type=tmpfs
+Options=mode=1777,strictatime,nosuid,nodev,noexec,inode64
+
+[Install]
+WantedBy=local-fs.target

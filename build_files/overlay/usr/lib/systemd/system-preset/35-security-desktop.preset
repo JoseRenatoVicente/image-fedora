@@ -82,3 +82,7 @@ disable rpm-ostree-countme.timer
 
 # Desabilitar SSH via vsock
 disable sshd-vsock.socket
+
+disable mdmonitor.service
+disable vgauthd.service
+disable vmtoolsd.service
