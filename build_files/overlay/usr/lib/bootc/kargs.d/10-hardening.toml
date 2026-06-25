@@ -20,9 +20,6 @@ kargs = [
   "lsm=landlock,lockdown,yama,integrity,selinux,bpf",
   "init_on_alloc=1",
   "init_on_free=1",
-  # IOMMU: intel e amd cobertos; efi=disable_early_pci_dma bloqueia DMA de PCI
-  # antes do IOMMU estar activo (janela de ataque durante boot EFI).
-  "amd_iommu=force_isolation",
   "efi=disable_early_pci_dma",
   "intel_iommu=on",
   "iommu.passthrough=0",
