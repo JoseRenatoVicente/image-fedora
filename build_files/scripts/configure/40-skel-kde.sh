@@ -56,6 +56,11 @@ sed -i 's/^Theme=Catppuccin-Mocha-Mauve-splash$/Theme=Mokka/' \
 sed -i 's|^Image=file:///usr/share/wallpapers/garuda-mokka/Mokka-tree\.jpg$|Image=file:///usr/share/wallpapers/Mokka-tree/|' \
     /usr/share/plasma/look-and-feel/Mokka/contents/defaults
 
+# O tema Mokka herdou o nome do cursor do Catppuccin original (CamelCase com dashes),
+# mas o pacote instala o diretório em lowercase. Corrigir para evitar falha no greeter.
+sed -i 's/^cursorTheme=Catppuccin-Mocha-Mauve-Cursors$/cursorTheme=catppuccin-mocha-mauve-cursors/' \
+    /usr/share/plasma/look-and-feel/Mokka/contents/defaults
+
 kwriteconfig6 --file /etc/skel/.config/ksplashrc \
     --group KSplash --key Theme "Mokka"
 

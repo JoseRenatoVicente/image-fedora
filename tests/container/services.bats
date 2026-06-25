@@ -44,8 +44,8 @@ setup() {
     systemctl is-enabled thermald.service 2>/dev/null | grep -q "^enabled$"
 }
 
-@test "irqbalance.service is enabled" {
-    systemctl is-enabled irqbalance.service 2>/dev/null | grep -q "^enabled$"
+@test "irqbalance.service is masked" {
+    [[ "$(readlink /etc/systemd/system/irqbalance.service 2>/dev/null)" == "/dev/null" ]]
 }
 
 @test "rpm-ostreed-automatic.timer is enabled" {
@@ -83,6 +83,10 @@ setup() {
 
 @test "avahi-daemon.socket is masked" {
     [[ "$(readlink /etc/systemd/system/avahi-daemon.socket 2>/dev/null)" == "/dev/null" ]]
+}
+
+@test "lm_sensors.service is masked" {
+    [[ "$(readlink /etc/systemd/system/lm_sensors.service 2>/dev/null)" == "/dev/null" ]]
 }
 
 # ── Dell/Intel laptop support ───────────────────────────────────────────────

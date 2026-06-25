@@ -33,7 +33,6 @@ enable_unit \
     flathub-system-setup.service \
     keyd.service \
     thermald.service \
-    irqbalance.service \
     systemd-oomd.service \
     auditd.service \
     sd-boot-migrate.service
@@ -68,8 +67,13 @@ systemctl mask \
     ModemManager.service \
     avahi-daemon.service \
     avahi-daemon.socket \
-    systemd-remount-fs.service
+    systemd-remount-fs.service \
+    irqbalance.service \
+    lm_sensors.service
 systemctl mask --force ctrl-alt-del.target
+
+# bluetoothd ConfigurationDirectoryMode=0555 exige este modo; o pacote cria com 755.
+chmod 555 /etc/bluetooth
 
 mkdir -p /etc/tuned
 echo "balanced" > /etc/tuned/active_profile

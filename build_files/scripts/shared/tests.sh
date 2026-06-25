@@ -58,7 +58,6 @@ REQUIRED_UNITS=(
     flathub-system-setup.service
     fedora-kinoite-plasmalogin-workaround.service
     thermald.service
-    irqbalance.service
     rpm-ostreed-automatic.timer
     podman-auto-update.timer
 )
@@ -363,6 +362,8 @@ grep -q 'Catppuccin-Mocha-Mauve-splash' "$MOKKA_DEFAULTS" && \
     fail "Mokka defaults: KSplash ainda referencia 'Catppuccin-Mocha-Mauve-splash' (patch não aplicado)"
 grep -q 'garuda-mokka' "$MOKKA_DEFAULTS" && \
     fail "Mokka defaults: ainda referencia path 'garuda-mokka' (wallpaper lock screen não corrigido)"
+grep -q 'Catppuccin-Mocha-Mauve-Cursors' "$MOKKA_DEFAULTS" && \
+    fail "Mokka defaults: cursorTheme ainda referencia 'Catppuccin-Mocha-Mauve-Cursors' (patch não aplicado; quebra cursor no greeter)"
 
 # layout.js deve ter sido removido — a sua existência activa o pipeline de layout
 # do Plasma, que pode criar containments fantasma com plugin vazio.
@@ -517,6 +518,16 @@ grep -qE '^defaults=.*noexec' /etc/udisks2/mount_options.conf \
     || fail "udisks2: noexec ausente nos defaults de mount"
 grep -qE '^allow=nosuid,nodev,noexec' /etc/udisks2/mount_options.conf \
     || fail "udisks2: allow= não restringe a nosuid,nodev,noexec"
+
+echo "=== Serviços mascarados ==="
+for masked_svc in irqbalance.service lm_sensors.service; do
+    [[ "$(readlink /etc/systemd/system/${masked_svc} 2>/dev/null)" == "/dev/null" ]] \
+        || fail "${masked_svc} deve estar mascarado (inútil com lockdown=integrity / sem sensores configurados)"
+done
+
+echo "=== bluetooth dir mode ==="
+stat -c '%a' /etc/bluetooth 2>/dev/null | grep -q '^555$' \
+    || fail "/etc/bluetooth: modo deve ser 555 (bluetoothd ConfigurationDirectoryMode=0555)"
 
 echo "=== NetworkManager privacidade ==="
 grep -qE '^hostname-mode=none' /usr/lib/NetworkManager/conf.d/40-hardening.conf \
