@@ -1,0 +1,108 @@
+#!/bin/bash
+# Migra de GRUB para systemd-boot em sistemas UEFI com OSTree/bootc.
+# Corre uma vez (verifica stamp em /boot/efi). Seguro para re-runs.
+set -euo pipefail
+
+STAMP=/boot/efi/.sd-boot-migrated
+ESP=/boot/efi
+BOOT=/boot
+XBOOTLDR_GUID="bc13c2ff-59e6-4262-a352-b275fd6f7172"
+
+log() { echo "[sd-boot-migrate] $*"; }
+
+# Já migrado
+[[ -f "$STAMP" ]] && { log "já migrado, nada a fazer"; exit 0; }
+
+# Só UEFI
+[[ -d /sys/firmware/efi ]] || { log "sistema não é UEFI, ignorar"; exit 0; }
+
+# systemd-boot já instalado?
+if bootctl --path="$ESP" is-installed 2>/dev/null; then
+    log "systemd-boot já instalado"
+    touch "$STAMP"
+    exit 0
+fi
+
+# BLS entries necessários para o boot funcionar com systemd-boot
+if ! ls "$BOOT/loader/entries/"*.conf &>/dev/null; then
+    log "ERRO: sem BLS entries em $BOOT/loader/entries/ — abortar"
+    exit 1
+fi
+
+log "a migrar de GRUB para systemd-boot…"
+
+# Descobre dispositivo e número de partição de /boot
+BOOT_PART=$(findmnt -n -o SOURCE "$BOOT")
+if [[ -z "$BOOT_PART" ]]; then
+    log "ERRO: não foi possível determinar dispositivo de /boot"
+    exit 1
+fi
+DISK_NAME=$(lsblk -no PKNAME "$BOOT_PART")
+DISK="/dev/$DISK_NAME"
+PARTNO=$(lsblk -no PARTNO "$BOOT_PART")
+
+log "disco: $DISK  partição /boot: $PARTNO"
+
+# Verifica se já tem XBOOTLDR GUID
+CURRENT_TYPE=$(lsblk -no PARTTYPE "$BOOT_PART" | tr '[:upper:]' '[:lower:]')
+if [[ "$CURRENT_TYPE" != "$XBOOTLDR_GUID" ]]; then
+    log "a alterar partition type de $BOOT_PART para XBOOTLDR ($XBOOTLDR_GUID)…"
+    # sfdisk dump → modifica o tipo da partição → reimporta
+    PTDUMP=$(sfdisk --dump "$DISK")
+    # Substitui o type= da linha que corresponde à partição /boot
+    # A linha termina em ,  type=<guid>, attrs=... — substituímos só o guid da partição certa
+    NEWDUMP=$(echo "$PTDUMP" | awk -v partno="$PARTNO" -v newtype="$XBOOTLDR_GUID" '
+        /^\/dev\// {
+            # extrai número da partição (último dígito(s) antes de :)
+            match($0, /p?([0-9]+) *:/, arr)
+            if (arr[1] == partno) {
+                gsub(/type=[0-9a-fA-F-]+/, "type=" newtype)
+            }
+        }
+        { print }
+    ')
+    echo "$NEWDUMP" | sfdisk --no-reread --force "$DISK"
+    partprobe "$DISK" 2>/dev/null || true
+    udevadm settle
+    log "partition type alterado com sucesso"
+else
+    log "partição /boot já tem XBOOTLDR GUID"
+fi
+
+# Instala systemd-boot no ESP
+log "a instalar systemd-boot em $ESP…"
+bootctl install --path="$ESP" --no-variables 2>&1 | while read -r line; do log "  $line"; done
+
+# Configura loader.conf (timeout 0 = boot imediato, sem menu)
+mkdir -p "$ESP/loader"
+if [[ ! -f "$ESP/loader/loader.conf" ]]; then
+    cat > "$ESP/loader/loader.conf" << 'EOF'
+timeout 0
+console-mode max
+editor no
+EOF
+    log "loader.conf criado"
+fi
+
+# Adiciona entrada EFI e coloca systemd-boot em primeiro
+bootctl set-default "" 2>/dev/null || true
+efibootmgr --create \
+    --disk "$DISK" \
+    --part 1 \
+    --label "Linux Boot Manager" \
+    --loader '\EFI\systemd\systemd-bootx64.efi' \
+    --unicode '' \
+    2>&1 | while read -r line; do log "  $line"; done
+
+# Coloca a nova entrada como primeira (a efibootmgr já o faz, mas confirmamos)
+NEW_ENTRY=$(efibootmgr | grep "Linux Boot Manager" | grep -oP '(?<=Boot)[0-9A-F]+' | head -1)
+if [[ -n "$NEW_ENTRY" ]]; then
+    OLD_ORDER=$(efibootmgr | grep BootOrder | cut -d: -f2 | tr -d ' ')
+    # Remove a entrada nova da posição actual (se presente) e coloca à frente
+    NEW_ORDER="${NEW_ENTRY},${OLD_ORDER//${NEW_ENTRY},/}"
+    efibootmgr --bootorder "$NEW_ORDER"
+    log "EFI boot order actualizado: $NEW_ENTRY primeiro"
+fi
+
+touch "$STAMP"
+log "migração para systemd-boot concluída — próximo boot usa systemd-boot"

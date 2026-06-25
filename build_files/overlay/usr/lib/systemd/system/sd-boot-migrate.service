@@ -1,0 +1,21 @@
+[Unit]
+Description=Migrate bootloader from GRUB to systemd-boot
+Documentation=man:bootctl(1)
+# Corre cedo, antes do display manager, mas depois do ESP estar montado
+After=local-fs.target
+Before=display-manager.service
+# Só em sistemas UEFI com OSTree
+ConditionFirmware=uefi
+ConditionPathExists=/run/ostree-booted
+# Não repetir após sucesso (stamp em /boot/efi)
+ConditionPathExists=!/boot/efi/.sd-boot-migrated
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/usr/libexec/sd-boot-migrate
+# Falha não impede o boot
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=multi-user.target
