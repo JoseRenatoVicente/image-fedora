@@ -71,3 +71,27 @@ copr_install_isolated "alternateved/keyd" \
     keyd \
     || echo "WARN: keyd não instalado (COPR indisponível); apenas a config é aplicada"
 echo "::endgroup::"
+
+# ─── Remove weak deps / orphan bloat ───────────────────────────────────────────
+echo "::group:: Remove weak deps e pacotes órfãos"
+# Estes pacotes são puxados como recommends/weak-deps de outras partes do stack
+# (ex.: qt6-qtspeech → flite) e não são requeridos por nada na imagem final.
+# A remoção explícita evita que o bloat de TTS (text-to-speech) fique na ISO.
+ORPHAN_BLOAT=(
+    qt6-qtspeech
+    qt6-qtspeech-flite
+    espeak-ng
+    flite
+    lpcnetfreedv
+)
+FOUND_ORPHAN=()
+for pkg in "${ORPHAN_BLOAT[@]}"; do
+    rpm -q "$pkg" &>/dev/null && FOUND_ORPHAN+=("$pkg")
+done
+if [[ ${#FOUND_ORPHAN[@]} -gt 0 ]]; then
+    dnf5 remove -y --setopt=clean_requirements_on_remove=True "${FOUND_ORPHAN[@]}"
+    echo "Removidos ${#FOUND_ORPHAN[@]} pacotes órfãos: ${FOUND_ORPHAN[*]}"
+else
+    echo "Nenhum pacote órfão de TTS encontrado."
+fi
+echo "::endgroup::"

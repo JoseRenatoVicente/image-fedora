@@ -33,6 +33,11 @@ semodule -v -X 300 -i "${CIL_FILES[@]}"
 # container_allow_ptrace é definido no container-ptrace.cil acima
 setsebool -P deny_ptrace=on container_allow_ptrace=off || \
     echo "WARN: setsebool falhou (SELinux não activo no build container; booleans aplicados no arranque)"
+# Fedora 44 atribui install_exec_t a /usr/bin/bootc por erro de política.
+# Esse tipo bloqueia execução via run0 (unconfined_t não aceita install_exec_t
+# como entrypoint). Corrigimos para bin_t antes do restorecon abaixo.
+semanage fcontext -m -t bin_t '/usr/bin/bootc' 2>/dev/null || \
+    echo "WARN: semanage fcontext para bootc falhou (política ausente no container de build)"
 restorecon -FRv /usr 2>/dev/null || true
 
 # ─── SUID removal ────────────────────────────────────────────────────────────

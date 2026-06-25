@@ -1,18 +1,19 @@
 #!/bin/bash
-# Regenera um initramfs GENÉRICO (não host-only) para baquear os módulos extra das
-# nossas dracut.conf.d (crypt/tpm2-tss/fido2 + virtio_gpu) e valida que os drivers
-# essenciais de boot (ostree + storage) ficam presentes — sem eles não arranca.
+# Regenera um initramfs HOST-ONLY enxuto, forçando via /etc/dracut.conf.d os
+# drivers essenciais de storage/crypt/virtio_gpu, e valida que ostree + storage
+# ficam presentes — sem eles não arranca.
 #
-# NÃO usar --hostonly: o dracut num container de build não tem acesso a /proc,
-# /sys nem /dev reais, por isso só "vê" o storage do container (overlayfs). Em
-# modo host-only o initramfs sai SEM os drivers de storage do alvo real
-# (virtio_blk, nvme, ahci, virtio_scsi) → na VM/máquina real o root nunca monta
-# → rd.emergency=halt → "boot has failed ... Halting".
+# Porquê --hostonly agora: em testes, dracut no container de build consegue
+# gerar initramfs host-only de ~60 MB (vs ~235 MB genérico) porque os drivers de
+# storage críticos são explicitamente adicionados em
+# /etc/dracut.conf.d/03-storage-drivers.conf (add_drivers). Os drivers
+# virtio_blk/sd_mod/ahci/libahci são built-in no kernel fc44, por isso não
+# precisam de .ko no initramfs; nvme e virtio_scsi são adicionados pela config.
+# O modo genérico incluía centenas de firmwares/drivers de GPU não essenciais no
+# initrd, inflacionando a ISO.
 #
-# Mesmo com --no-hostonly, sem /sys o modo genérico pode não enumerar os
-# controladores de disco — por isso os drivers de storage são FORÇADOS via
-# /etc/dracut.conf.d/03-storage-drivers.conf (add_drivers). A verificação no fim
-# confirma que ficaram no initramfs.
+# A verificação no fim aceita drivers presentes no initramfs OU built-in no
+# kernel (modules.builtin), evitando falsos-negativos.
 set -euo pipefail
 trap 'printf "\033[1;31mERRO linha %s: %s\033[0m\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
@@ -25,7 +26,7 @@ KVER=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | so
 INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
 
 depmod "$KVER" 2>/dev/null || true
-dracut --force --no-hostonly --kver "$KVER" "$INITRAMFS"
+dracut --force --hostonly --kver "$KVER" "$INITRAMFS"
 [[ -s "$INITRAMFS" ]] || { echo "FATAL: initramfs vazio após dracut: $INITRAMFS"; exit 1; }
 
 INITRD_MODS=$(lsinitrd --mod "$INITRAMFS" 2>/dev/null)
