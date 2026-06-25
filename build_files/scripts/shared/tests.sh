@@ -147,6 +147,7 @@ REQUIRED_FILES=(
     /etc/dracut.conf.d/90-luks-security.conf
     /etc/dracut.conf.d/10-boot-performance.conf
     /etc/systemd/system/tuned.service.d/deferred.conf
+    /etc/systemd/system/tuned-ppd.service.d/no-block-multiuser.conf
     /usr/libexec/fedora-flatpak-setup
     /usr/libexec/fedora-shell-setup
     /usr/libexec/fedora-dev-setup

@@ -112,7 +112,9 @@ INSTALL_PACKAGES=(
     # Core desktop
     plasma-desktop plasma-workspace kwin kscreenlocker kscreen
     plasma-login-manager kde-settings-plasmalogin kcm-plasmalogin
-    # Painel e rede. Evitar kdeplasma-addons: puxa qt6-qtwebengine.
+    # Painel e rede. kdeplasma-addons exclui-se: hard-dep em qt6-qtwebengine (290 MB).
+    # O kameleon kded (accent color dinâmico) vem do kdeplasma-addons; sem ele o
+    # plasma_accentcolor_service usa AccentColor fixo do skel — kded6rc desativa autoload.
     plasma-pa plasma-nm plasma-nm-openvpn
     bluedevil polkit-kde plasma-drkonqi kinfocenter plasma-systemmonitor
     # Integração
@@ -258,6 +260,8 @@ REQUIRED_PACKAGES=(
     fish
     hunspell-pt-BR
     audit
+    # KDE pesquisa/Overview (kwin): org.kde.milou QML module
+    plasma-milou
 )
 
 # ── Verificação runtime: pacotes KDE essenciais ──────────────────────────────

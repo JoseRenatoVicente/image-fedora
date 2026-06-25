@@ -83,6 +83,12 @@ kwriteconfig6 --file /etc/skel/.config/plasmarc \
 
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
     --group General --key ColorScheme "Mokka"
+# Cor de realce fixa (Catppuccin Mocha Mauve). Sem este valor, o plasma_accentcolor_service
+# tenta usar o módulo kded "kameleon" (de kdeplasma-addons) para extrair a cor do papel
+# de parede — kameleon não está instalado (kdeplasma-addons puxa qt6-qtwebengine, 290 MB),
+# gerando o aviso "could not find kded module id 'kameleon'" a cada boot.
+kwriteconfig6 --file /etc/skel/.config/kdeglobals \
+    --group General --key AccentColor "203,166,247"
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \
     --group KDE --key LookAndFeelPackage "Mokka"
 kwriteconfig6 --file /etc/skel/.config/kdeglobals \

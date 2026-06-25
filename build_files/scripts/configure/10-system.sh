@@ -91,6 +91,7 @@ setfattr -n user.component -v "security-hardening" \
 setfattr -n user.component -v "image-config" \
     /etc/dracut.conf.d/10-boot-performance.conf \
     /etc/systemd/system/tuned.service.d/deferred.conf \
+    /etc/systemd/system/tuned-ppd.service.d/no-block-multiuser.conf \
     /etc/sysctl.d/99-performance.conf \
     /etc/sysctl.d/100-low-resource.conf \
     /etc/systemd/zram-generator.conf \
