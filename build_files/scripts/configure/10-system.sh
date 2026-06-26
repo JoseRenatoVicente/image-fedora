@@ -100,6 +100,7 @@ setfattr -n user.component -v "image-config" \
     /etc/systemd/system/user@.service.d/10-delegate.conf \
     /etc/systemd/system.conf.d/10-nofile-limit.conf \
     /etc/systemd/user.conf.d/10-nofile-limit.conf \
+    /usr/lib/systemd/system/amd-cpb-boost.service \
     /etc/systemd/resolved.conf.d/60-security-dns.conf \
     /etc/systemd/resolved.conf.d/10-disable-llmnr.conf \
     /etc/chrony.conf \

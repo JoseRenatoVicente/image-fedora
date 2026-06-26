@@ -35,7 +35,8 @@ enable_unit \
     thermald.service \
     systemd-oomd.service \
     auditd.service \
-    sd-boot-migrate.service
+    sd-boot-migrate.service \
+    amd-cpb-boost.service
 
 # /tmp como tmpfs (CIS 1.1.2.1) — a unit upstream já traz nosuid,nodev nas Options.
 # Fora do enable_unit: se a base marcar tmp.mount como 'static', o `enable` falha e

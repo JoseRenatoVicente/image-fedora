@@ -427,6 +427,15 @@ else
     echo "INFO: scx-scheds não instalado (COPR indisponível para esta arquitectura)"
 fi
 
+echo "=== AMD CPB boost (oneshot condicional) ==="
+[[ -f /usr/lib/systemd/system/amd-cpb-boost.service ]] \
+    || fail "amd-cpb-boost.service ausente"
+grep -q '^ConditionPathExists=/sys/devices/system/cpu/amd_pstate/cpb_boost$' \
+    /usr/lib/systemd/system/amd-cpb-boost.service \
+    || fail "amd-cpb-boost.service sem ConditionPathExists (geraria ruído em Intel)"
+systemctl is-enabled amd-cpb-boost.service 2>/dev/null | grep -q "^enabled$" \
+    || fail "amd-cpb-boost.service não habilitado"
+
 echo "=== Consistência de versão KDE ==="
 KDE_VER="$(rpm -q --qf '%{VERSION}' plasma-desktop 2>/dev/null || echo '')"
 KWIN_VER="$(rpm -q --qf '%{VERSION}' kwin 2>/dev/null || echo '')"
