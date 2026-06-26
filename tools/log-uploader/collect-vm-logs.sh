@@ -45,7 +45,7 @@ EOF
 
 run_capture journal-plasma-errors journalctl -b --no-pager -o short-iso
 run_capture journal-current-user journalctl --user -b --no-pager -o short-iso
-run_capture grep-error-loading-applet journalctl -b --no-pager -o short-iso
+run_capture grep-error-loading-applet bash -lc 'journalctl -b --no-pager -o short-iso | grep -iE "error.*loading.*applet|applet.*error" || true'
 run_capture system-info bash -lc 'printf "hostname="; hostname; printf "kernel="; uname -a; printf "os-release:\n"; cat /etc/os-release; printf "\nplasma packages:\n"; rpm -qa | grep -Ei "plasma|kwin|kde" | sort'
 run_capture appletsrc-focused bash -lc 'grep -nE "^\[Containments\]|^\[Containments\].*Applets|^plugin=|SystrayContainmentId|extraItems=|knownItems=" ~/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null || true'
 run_capture missing-applets bash -lc 'while IFS= read -r plugin; do [ -z "$plugin" ] && continue; [ -d "/usr/share/plasma/plasmoids/$plugin" ] || [ -d "/usr/share/kpackage/genericqml/$plugin" ] || echo "MISSING: $plugin"; done < <(sed -n "s/^plugin=//p" ~/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null | sort -u)'

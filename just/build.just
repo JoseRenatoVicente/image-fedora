@@ -54,6 +54,12 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
     #!/usr/bin/bash
     set -eoux pipefail
 
+    COPYTMP=""
+    cleanup_copytmp() {
+        [[ -n "${COPYTMP}" ]] && rm -rf "${COPYTMP}"
+    }
+    trap cleanup_copytmp EXIT
+
     # Check if already running as root or under sudo
     if [[ -n "${SUDO_USER:-}" || "${UID}" -eq "0" ]]; then
         # Verify the image actually exists in root podman storage
@@ -75,6 +81,7 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
                 chmod 1777 "${COPYTMP}"
                 TMPDIR=${COPYTMP} podman image scp ${SUDO_UID}@localhost::"${target_image}:${tag}" root@localhost::"${target_image}:${tag}"
                 rm -rf "${COPYTMP}"
+                COPYTMP=""
                 exit 0
             fi
         fi
@@ -102,6 +109,7 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
             chmod 1777 "${COPYTMP}"
             just sudoif TMPDIR=${COPYTMP} podman image scp ${UID}@localhost::"${target_image}:${tag}" root@localhost::"${target_image}:${tag}"
             rm -rf "${COPYTMP}"
+            COPYTMP=""
         fi
     else
         # If the image is not found, pull it from the repository
@@ -120,6 +128,12 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
 _build-bib $target_image $tag $type $config: (_rootful_load_image target_image tag)
     #!/usr/bin/env bash
     set -euo pipefail
+
+    BUILDTMP=""
+    cleanup_buildtmp() {
+        [[ -n "${BUILDTMP}" ]] && sudo rm -rf "${BUILDTMP}"
+    }
+    trap cleanup_buildtmp EXIT
 
     args="--type ${type} "
     args+="--use-librepo=True "
@@ -145,6 +159,7 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
     sudo rm -rf "output/${type}"
     sudo mv -f $BUILDTMP/* output/
     sudo rmdir $BUILDTMP
+    BUILDTMP=""
     sudo chown -R $USER:$USER output/
 
 # Podman builds the image from the Containerfile and creates a bootable image

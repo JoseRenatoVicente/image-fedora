@@ -70,3 +70,15 @@ setup() {
         fi
     done
 }
+
+@test "remoção de build deps não faz autoremove de runtime KDE" {
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/70-build-deps.sh" '--setopt=clean_requirements_on_remove=True'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/70-build-deps.sh" '--setopt=clean_requirements_on_remove=False'
+}
+
+@test "limpeza de órfãos não remove dependências do runtime KDE" {
+    run grep -Eq '^[[:space:]]*qt6-qtspeech([[:space:]]|$)' "${REPO_ROOT}/build_files/scripts/build-packages.sh"
+    [ "$status" -ne 0 ]
+    run grep -Eq '^[[:space:]]*qt6-qtspeech-flite([[:space:]]|$)' "${REPO_ROOT}/build_files/scripts/build-packages.sh"
+    [ "$status" -ne 0 ]
+}

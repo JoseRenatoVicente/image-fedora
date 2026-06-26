@@ -64,10 +64,8 @@ _install_tela_circle() {
     tar -xzf "$ARCHIVE" -C "$TMPDIR_ASSETS"
     bash "$TMPDIR_ASSETS/Tela-circle-icon-theme-${TELA_CIRCLE_VERSION}/install.sh" \
         -d /usr/share/icons -c dracula
-    # O script instala 3 variantes de brilho (padrão + light + dark).
-    # Mantemos só a variante padrão; light/dark são redundantes para esta imagem.
-    rm -rf /usr/share/icons/Tela-circle-dracula-light \
-           /usr/share/icons/Tela-circle-dracula-dark
+    # O skel usa Tela-circle-dracula-dark; removemos só a variante light.
+    rm -rf /usr/share/icons/Tela-circle-dracula-light
 }
 
 # Complex installer for Garuda Mokka (multiple rsync targets + skel)

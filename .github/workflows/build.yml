@@ -190,11 +190,6 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-      # Free disk space after scanning
-      - name: Clean up scan artifacts
-        if: always()
-        run: rm -f /tmp/image-scan.tar
-
       # ── Push (only on main branch, not PRs) ─────────────────────────────
       - name: Login to GitHub Container Registry
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
@@ -262,6 +257,11 @@ jobs:
             cosign attach sbom --sbom sbom.spdx.json "${IMAGE_REF}"
           fi
 
+      # Free disk space after all consumers of the archive have finished.
+      - name: Clean up scan artifacts
+        if: always()
+        run: rm -f /tmp/image-scan.tar
+
   # ── SLSA Provenance (Level 3) ─────────────────────────────────────────────
   provenance:
     needs: [build_push]
@@ -303,7 +303,7 @@ jobs:
           IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
         run: |
           cosign verify "${IMAGE_REF}" \
-            --certificate-identity-regexp 'https://github.com/.+' \
+            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/build.yml@refs/heads/" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 
       - name: Verify published provenance attestation
@@ -311,7 +311,7 @@ jobs:
           IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
         run: |
           cosign verify-attestation "${IMAGE_REF}" \
-            --certificate-identity-regexp 'https://github.com/.+' \
+            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/build.yml@refs/heads/" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             --type slsaprovenance
 

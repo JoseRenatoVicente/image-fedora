@@ -36,6 +36,11 @@ setup() {
     assert_tree_contains "$configure_dir" 'catppuccin-mocha-mauve-cursors'
 }
 
+@test "asset install keeps configured Tela icon theme" {
+    assert_tree_contains "$configure_dir" 'Tela-circle-dracula-dark'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/install-assets.sh" '/usr/share/icons/Tela-circle-dracula-dark'
+}
+
 @test "configure keeps host KDE theme family" {
     assert_tree_contains "$configure_dir" 'LookAndFeelPackage "Mokka"'
     assert_tree_contains "$configure_dir" 'widgetStyle "kvantum-dark"'

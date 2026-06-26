@@ -2,31 +2,26 @@
 [group('Just')]
 check:
     #!/usr/bin/bash
-    find . -type f -name "*.just" | while read -r file; do
-    	echo "Checking syntax: $file"
-    	just --unstable --fmt --check -f $file
+    for file in Justfile just/*.just; do
+        echo "Checking syntax: $file"
+        just --unstable --fmt --check -f "$file"
     done
-    echo "Checking syntax: Justfile"
-    just --unstable --fmt --check -f Justfile
 
 # Fix Just Syntax
 [group('Just')]
 fix:
     #!/usr/bin/bash
-    find . -type f -name "*.just" | while read -r file; do
-    	echo "Checking syntax: $file"
-    	just --unstable --fmt -f $file
+    for file in Justfile just/*.just; do
+        echo "Formatting syntax: $file"
+        just --unstable --fmt -f "$file"
     done
-    echo "Checking syntax: Justfile"
-    just --unstable --fmt -f Justfile || { exit 1; }
 
 # Clean Repo
 [group('Utility')]
 clean:
     #!/usr/bin/bash
     set -eoux pipefail
-    touch _build
-    find *_build* -exec rm -rf {} \;
+    rm -rf _build-bib.* _build-test.* _build_podman_scp.*
     rm -f previous.manifest.json
     rm -f changelog.md
     rm -f output.env
@@ -68,8 +63,8 @@ lint:
     # Run shellcheck por extensão E por shebang de shell — apanha scripts sem
     # extensão (ex.: usr/libexec/*, usr/bin/dnf) que de outra forma escapariam.
     {
-        find build_files tests -type f \( -name "*.sh" -o -name "*.bats" -o -name "*.bash" \)
-        find build_files tests -type f -exec sh -c 'head -1 "$1" | grep -qE "^#!.*\b(ba)?sh\b"' _ {} \; -print
+        find build_files tests tools -type f \( -name "*.sh" -o -name "*.bats" -o -name "*.bash" \)
+        find build_files tests tools -type f -exec sh -c 'head -1 "$1" | grep -qE "^#!.*\b(ba)?sh\b"' _ {} \; -print
     } | sort -u | xargs shellcheck -e SC1091 -e SC2154
 
 # Runs shfmt on all Bash scripts
@@ -81,5 +76,7 @@ format:
         echo "shfmt could not be found. Please install it."
         exit 1
     fi
-    # Run shfmt on all Bash scripts
-    /usr/bin/find . -iname "*.sh" -type f -exec shfmt --write "{}" ';'
+    {
+        find build_files tests tools -type f \( -name "*.sh" -o -name "*.bats" -o -name "*.bash" \)
+        find build_files tests tools -type f -exec sh -c 'head -1 "$1" | grep -qE "^#!.*\b(ba)?sh\b"' _ {} \; -print
+    } | sort -u | xargs shfmt --write

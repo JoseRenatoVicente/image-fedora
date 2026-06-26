@@ -51,6 +51,16 @@ setup() {
     assert_contains "$build_workflow" 'syft /tmp/image-scan.tar --from docker-archive -o spdx-json=sbom.spdx.json'
 }
 
+@test "build.yml keeps scan archive until SBOM generation finishes" {
+    run bash -c "awk '/Clean up scan artifacts/{clean=NR} /Generate SBOM with Syft/{sbom=NR} END{exit !(clean > sbom)}' '$build_workflow'"
+    [ "$status" -eq 0 ]
+}
+
+@test "build.yml restricts cosign verification identity" {
+    assert_contains "$build_workflow" '--certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/build.yml@refs/heads/"'
+    assert_not_contains "$build_workflow" "--certificate-identity-regexp 'https://github.com/.+'"
+}
+
 @test "integration_tests.yml has cosign verify" {
     assert_contains "$integration_workflow" 'cosign verify'
 }
@@ -75,6 +85,10 @@ setup() {
 
 @test "tests.yml runs shellcheck" {
     assert_contains "$tests_workflow" 'shellcheck'
+}
+
+@test "tests.yml lints operational tools scripts" {
+    assert_contains "$tests_workflow" 'find build_files tests tools'
 }
 
 @test "tests.yml installs just" {
@@ -124,4 +138,8 @@ setup() {
 
 @test "BIB is pinned by digest" {
     assert_contains "$disk_workflow" 'bootc-image-builder@sha256:'
+}
+
+@test "build-disk.yml defaults pull requests to amd64 runner" {
+    assert_contains "$disk_workflow" "(inputs.platform || 'amd64') == 'amd64'"
 }

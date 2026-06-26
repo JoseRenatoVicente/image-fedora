@@ -8,6 +8,7 @@ COPY build_files /
 FROM scratch AS ctx-pkgs
 COPY build_files/scripts/build-packages.sh /build-packages.sh
 COPY build_files/scripts/shared/copr-helpers.sh /shared/copr-helpers.sh
+COPY build_files/scripts/shared/common.sh /shared/common.sh
 COPY build_files/scripts/shared/package-lists.sh /shared/package-lists.sh
 COPY build_files/assets/configs/dnf-performance.conf /configs/dnf-performance.conf
 

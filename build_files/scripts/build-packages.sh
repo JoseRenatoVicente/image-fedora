@@ -4,7 +4,9 @@
 # Cache invalidado apenas quando a lista de pacotes ou os helpers mudam.
 set -euo pipefail
 
-trap 'printf "\033[1;31mERRO linha %s: %s\033[0m\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+# shellcheck source=shared/common.sh
+source /ctx-pkgs/shared/common.sh
+install_error_trap
 
 # shellcheck source=shared/copr-helpers.sh
 source /ctx-pkgs/shared/copr-helpers.sh
@@ -30,10 +32,7 @@ dnf5 install -y --allowerasing glibc-langpack-pt glibc-langpack-en
 dnf5 remove -y glibc-all-langpacks
 
 # REMOVE_PACKAGES vem de shared/package-lists.sh (fonte única).
-FOUND_PKGS=()
-for pkg in "${REMOVE_PACKAGES[@]}"; do
-    rpm -q "$pkg" &>/dev/null && FOUND_PKGS+=("$pkg")
-done
+mapfile -t FOUND_PKGS < <(installed_packages_from "${REMOVE_PACKAGES[@]}")
 if [[ ${#FOUND_PKGS[@]} -gt 0 ]]; then
     dnf5 remove -y --setopt=clean_requirements_on_remove=False "${FOUND_PKGS[@]}"
     echo "Removidos ${#FOUND_PKGS[@]} pacotes: ${FOUND_PKGS[*]}"
@@ -72,26 +71,6 @@ copr_install_isolated "alternateved/keyd" \
     || echo "WARN: keyd não instalado (COPR indisponível); apenas a config é aplicada"
 echo "::endgroup::"
 
-# ─── Remove weak deps / orphan bloat ───────────────────────────────────────────
-echo "::group:: Remove weak deps e pacotes órfãos"
-# Estes pacotes são puxados como recommends/weak-deps de outras partes do stack
-# (ex.: qt6-qtspeech → flite) e não são requeridos por nada na imagem final.
-# A remoção explícita evita que o bloat de TTS (text-to-speech) fique na ISO.
-ORPHAN_BLOAT=(
-    qt6-qtspeech
-    qt6-qtspeech-flite
-    espeak-ng
-    flite
-    lpcnetfreedv
-)
-FOUND_ORPHAN=()
-for pkg in "${ORPHAN_BLOAT[@]}"; do
-    rpm -q "$pkg" &>/dev/null && FOUND_ORPHAN+=("$pkg")
-done
-if [[ ${#FOUND_ORPHAN[@]} -gt 0 ]]; then
-    dnf5 remove -y --setopt=clean_requirements_on_remove=True "${FOUND_ORPHAN[@]}"
-    echo "Removidos ${#FOUND_ORPHAN[@]} pacotes órfãos: ${FOUND_ORPHAN[*]}"
-else
-    echo "Nenhum pacote órfão de TTS encontrado."
-fi
-echo "::endgroup::"
+# qt6-qtspeech/flite parecem bloat, mas no Fedora 44 a transação de remoção
+# leva junto plasma-desktop, kwin, dolphin, konsole e ffmpeg-free. Mantemos essa
+# pilha para preservar o runtime KDE validado em shared/tests.sh.

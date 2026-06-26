@@ -81,7 +81,7 @@ test-boot timeout="420":
     echo "A converter imagem de teste para QCOW2..."
     just _rootful_load_image localhost/fedora-kde-test latest
     TEST_BUILDTMP=$(mktemp -d -p "${PWD}" _build-test.XXXXXX)
-    sudo podman run --rm -it --privileged --pull=newer \
+    sudo podman run --rm --privileged --pull=newer \
         --net=host \
         --security-opt label=type:unconfined_t \
         -v "$(pwd)/disk_config/disk.toml":/config.toml:ro \

@@ -7,7 +7,9 @@
 # build_files/ muda.
 set -euo pipefail
 
-trap 'printf "\033[1;31mERRO linha %s: %s\033[0m\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+# shellcheck source=shared/common.sh
+source /ctx/scripts/shared/common.sh
+install_error_trap
 
 # Exportar variáveis de imagem para sub-scripts (image-info.sh, etc.)
 export IMAGE_NAME="${IMAGE_NAME:-fedora}"
@@ -28,7 +30,9 @@ CONFIGURE_DIR="/ctx/scripts/configure"
 run_step() {
     local script="$1"
     echo "::group:: $(basename "$script")"
+    trap 'echo "::endgroup::"' RETURN
     bash "$script"
+    trap - RETURN
     echo "::endgroup::"
 }
 
