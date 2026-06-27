@@ -248,8 +248,8 @@ grep -qE '^DEFAULT' /etc/crypto-policies/config 2>/dev/null \
     || fail "Crypto policy não é DEFAULT (ou DEFAULT:*)"
 
 echo "=== Performance / ZRAM ==="
-grep -q 'vm.swappiness = 100' /etc/sysctl.d/99-performance.conf \
-    || fail "swappiness não é 100 (ZRAM moderado para notebooks)"
+grep -q 'vm.swappiness = 180' /etc/sysctl.d/99-performance.conf \
+    || fail "swappiness não é 180 (ZRAM agressivo, estilo Bazzite)"
 grep -q 'vm.max_map_count' /etc/sysctl.d/99-performance.conf \
     || fail "vm.max_map_count não configurado"
 grep -q 'compression-algorithm=zstd' /etc/systemd/zram-generator.conf \
