@@ -52,6 +52,11 @@ if rpm -q scx-tools &>/dev/null; then
     enable_unit scx_loader.service
 fi
 
+# libvirt: socket activation (só arranca quando necessário; sem overhead no boot)
+if rpm -q libvirt &>/dev/null; then
+    enable_unit libvirtd.socket virtlogd.socket virtlockd.socket
+fi
+
 # bolt e fwupd são D-Bus/udev-activated; o enable não é necessário (nem funciona no container)
 systemctl preset power-profiles-daemon.service 2>/dev/null || true
 
@@ -96,10 +101,6 @@ systemctl mask --force ctrl-alt-del.target
 
 # bluetoothd ConfigurationDirectoryMode=0555 exige este modo; o pacote cria com 755.
 chmod 555 /etc/bluetooth
-
-mkdir -p /etc/tuned
-echo "balanced-workstation" > /etc/tuned/active_profile
-echo "auto" > /etc/tuned/profile_mode
 
 if command -v authselect >/dev/null 2>&1; then
     authselect current --raw &>/dev/null || authselect select minimal --force

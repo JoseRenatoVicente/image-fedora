@@ -119,6 +119,18 @@ _install_catppuccin_gtk() {
     unzip -qo "$ARCHIVE" -d /usr/share/themes/
 }
 
+_install_winapps() {
+    local prefix="winapps-${WINAPPS_COMMIT}"
+    tar -xzf "$ARCHIVE" -C "$TMPDIR_ASSETS" \
+        "${prefix}/bin/winapps" \
+        "${prefix}/apps" \
+        "${prefix}/install"
+    install -Dm755 "$TMPDIR_ASSETS/${prefix}/bin/winapps" /usr/bin/winapps
+    mkdir -p /usr/local/share/winapps
+    cp -a "$TMPDIR_ASSETS/${prefix}/apps" /usr/local/share/winapps/
+    cp -a "$TMPDIR_ASSETS/${prefix}/install" /usr/local/share/winapps/
+}
+
 # Load the asset manifest
 # shellcheck source=../assets/assets-manifest.sh
 source "$(dirname "$0")/../assets/assets-manifest.sh"

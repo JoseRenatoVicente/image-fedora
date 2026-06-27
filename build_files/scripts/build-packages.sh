@@ -52,13 +52,20 @@ dnf5 install -y --allowerasing \
     "${BUILD_DEPS[@]}"
 echo "::endgroup::"
 
+# ─── SCX scheduler (best-effort) ─────────────────────────────────────────────
+# scx-scheds/scx-tools podem não estar disponíveis em todos os snapshots de repo.
+# Instalados separadamente para não bloquear a transação principal.
+echo "::group:: SCX scheduler"
+dnf5 install -y scx-scheds scx-tools \
+    || echo "WARN: scx-scheds/scx-tools não disponíveis nos repos; scheduler SCX inactivo"
+echo "::endgroup::"
+
 # ─── COPR packages (isolados) ────────────────────────────────────────────────
 echo "::group:: COPR packages"
 # kwin-effect-roundcorners não está nos repos Fedora
 copr_install_isolated "matinlotfali/KDE-Rounded-Corners" \
     kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
     || echo "WARN: kwin-effect-roundcorners não instalado"
-# scx-scheds e scx-tools estão nos repos Fedora desde F40; sem COPR necessário.
 # keyd (remapeamento de teclado ao nível do uinput) não está nos repos Fedora —
 # vem do COPR alternateved/keyd, que tem builds fedora-44. Best-effort: se o COPR
 # estiver indisponível, a config /etc/keyd/default.conf (via overlay) ainda é

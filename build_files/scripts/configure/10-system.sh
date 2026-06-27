@@ -43,7 +43,8 @@ echo "Utilizadores em /etc/passwd após sync: $(wc -l < /etc/passwd)"
 chmod 755 /usr/bin/dnf
 chmod 755 /usr/libexec/fedora-shell-setup \
           /usr/libexec/fedora-dev-setup \
-          /usr/libexec/fedora-brew-setup
+          /usr/libexec/fedora-brew-setup \
+          /usr/libexec/fedora-kinoite-plasmalogin-workaround
 chmod 755 /usr/bin/tpm2-luks-enroll
 chmod 755 /usr/bin/tpm2-first-enroll
 # /etc/ld.so.preload: root-only (0600) — applied by the dynamic linker to ALL
@@ -118,6 +119,8 @@ setfattr -n user.component -v "image-config" \
     /etc/security/faillock.conf \
     /usr/lib/NetworkManager/conf.d/40-hardening.conf \
     /usr/lib/systemd/system-preset/35-security-desktop.preset \
+    /usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service \
+    /usr/libexec/fedora-kinoite-plasmalogin-workaround \
     /etc/xdg/kwinrc \
     /etc/xdg/kdeglobals \
     /etc/systemd/journald.conf.d/size-limit.conf \
@@ -131,4 +134,6 @@ setfattr -n user.component -v "image-config" \
     /usr/lib/tuned/profiles/throughput-performance-workstation/tuned.conf \
     /usr/lib/tuned/profiles/throughput-performance-workstation/script.sh \
     /usr/lib/tuned/profiles/powersave-workstation/tuned.conf \
-    /usr/lib/tuned/profiles/powersave-workstation/script.sh
+    /usr/lib/tuned/profiles/powersave-workstation/script.sh \
+    /etc/tuned/active_profile \
+    /etc/tuned/profile_mode

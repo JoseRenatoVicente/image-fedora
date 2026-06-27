@@ -42,6 +42,9 @@ disable usbguard-dbus.service
 # SCX scheduler (scx_lavd via scx_loader; tuned profiles mudam o modo)
 enable scx_loader.service
 
+# Plasmalogin workaround (from Kinoite)
+enable fedora-kinoite-plasmalogin-workaround.service
+
 # Dell/Intel laptop support
 enable bolt.service
 enable thermald.service

@@ -10,6 +10,7 @@
 
 # ── Versões pinadas ──────────────────────────────────────────────────────────
 STARSHIP_VERSION="v1.25.1"
+WINAPPS_COMMIT="abc2c3da1a7980a8e87c616f7387bd898aadfeb3"
 GARUDA_MOKKA_VERSION="1.4.7"
 TELA_CIRCLE_VERSION="2025-02-10"
 
@@ -34,4 +35,6 @@ ASSETS=(
   "catppuccin-sddm|https://github.com/catppuccin/sddm/releases/download/v1.1.2/catppuccin-mocha-mauve-sddm.zip|3d9bcc540924e06ae1aaef6994130170db7f630d7d1b25fe5e780d08493ed67f||_install_catppuccin_sddm"
 
   "catppuccin-gtk|https://github.com/catppuccin/gtk/releases/download/v1.0.3/catppuccin-mocha-mauve-standard%2Bdefault.zip|cbacdac6161f98c315fb86740e21426ef6dda64f0ad69157cf28f3a1dda446fe||_install_catppuccin_gtk"
+
+  "winapps|https://github.com/winapps-org/winapps/archive/${WINAPPS_COMMIT}.tar.gz|448bd39a2ac27e927cd493471466af94e1b8d5f889491a259f14a4b15045ae82||_install_winapps"
 )

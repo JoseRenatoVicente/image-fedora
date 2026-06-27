@@ -159,10 +159,8 @@ INSTALL_PACKAGES=(
     hunspell hunspell-pt-BR
     # Gaming
     gamemode
-    # SCX scheduler (sched_ext) — entrou nos repos Fedora a partir do F40.
-    # scx-scheds: binários (scx_lavd, scx_bpfland, …)
-    # scx-tools: scxctl + scx_loader (modo switching via tuned)
-    scx-scheds scx-tools
+    # SCX scheduler: instalado em best-effort separado em build-packages.sh
+    # (pode não estar disponível em todos os snapshots de repo Fedora)
     # Sistema
     earlyoom
     tuned tuned-ppd
@@ -179,6 +177,8 @@ INSTALL_PACKAGES=(
     libsmbios dmidecode
     # Containers
     distrobox podman-docker podman-compose
+    # WinApps / KVM: backend libvirt para integração de apps Windows via RDP
+    freerdp libvirt qemu-kvm virt-manager dialog
     # KDE / temas
     kvantum qt6ct
     flameshot
@@ -263,12 +263,14 @@ REQUIRED_PACKAGES=(
     hardened_malloc
     zsh
     fish
+    freerdp
+    libvirt
+    qemu-kvm
     hunspell-pt-BR
     audit
     # KDE pesquisa/Overview (kwin): org.kde.milou QML module
     plasma-milou
-    # SCX scheduler
-    scx-scheds
+    # SCX scheduler: best-effort (ver build-packages.sh); ausência não é falha
 )
 
 # ── Verificação runtime: pacotes KDE essenciais ──────────────────────────────

@@ -1,3 +1,18 @@
+# Configura WinApps: activa libvirtd (socket), rede NAT default e grupos libvirt/kvm
+[group('WinApps')]
+winapps-setup:
+    #!/usr/bin/bash
+    set -eoux pipefail
+    sudo systemctl enable --now libvirtd.socket virtlogd.socket virtlockd.socket
+    sudo virsh net-autostart default 2>/dev/null || true
+    sudo virsh net-start default 2>/dev/null || true
+    sudo usermod -aG libvirt,kvm "$USER"
+    echo ""
+    echo "WinApps pronto."
+    echo "Edita ~/.config/winapps/winapps.conf com IP e credenciais da VM Windows."
+    echo "Depois corre: winapps install"
+    echo "Reinicia a sessão para os grupos ficarem activos."
+
 # Check Just Syntax
 [group('Just')]
 check:

@@ -1,0 +1,15 @@
+[Unit]
+Description=Workaround for missing plasmalogin entries in /etc/shadow & /etc/gshadow
+Documentation=https://forge.fedoraproject.org/kde/tickets/issues/684
+ConditionPathIsReadWrite=/etc
+ConditionPathExists=/run/ostree-booted
+ConditionPathExists=!/etc/.fedora-kinoite-plasmalogin-workaround
+Before=plasmalogin.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/fedora-kinoite-plasmalogin-workaround
+
+[Install]
+WantedBy=multi-user.target
