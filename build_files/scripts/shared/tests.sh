@@ -418,12 +418,14 @@ echo "=== wpctl Steam wrapper ==="
 [[ -x /usr/bin/wpctl ]] || fail "/usr/bin/wpctl não é executável"
 grep -q "steam" /usr/bin/wpctl 2>/dev/null || fail "/usr/bin/wpctl não é o wrapper Steam"
 
-echo "=== scx-scheds (COPR sched_ext/scx) ==="
-if rpm -q scx-scheds &>/dev/null; then
-    systemctl is-enabled scx.service 2>/dev/null | grep -q "^enabled$" \
-        || fail "scx-scheds instalado mas scx.service não habilitado"
+echo "=== scx-scheds / scx_loader ==="
+rpm -q scx-scheds &>/dev/null \
+    || fail "scx-scheds não instalado (deve estar nos repos Fedora F40+)"
+if rpm -q scx-tools &>/dev/null; then
+    systemctl is-enabled scx_loader.service 2>/dev/null | grep -q "^enabled$" \
+        || fail "scx-tools instalado mas scx_loader.service não habilitado"
 else
-    echo "INFO: scx-scheds não instalado (COPR indisponível para esta arquitectura)"
+    echo "INFO: scx-tools não instalado; scx_loader.service não habilitado"
 fi
 
 echo "=== AMD CPB boost (oneshot condicional) ==="

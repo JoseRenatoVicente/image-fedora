@@ -58,11 +58,7 @@ echo "::group:: COPR packages"
 copr_install_isolated "matinlotfali/KDE-Rounded-Corners" \
     kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
     || echo "WARN: kwin-effect-roundcorners não instalado"
-# scx-scheds não está nos repos padrão do Fedora (disponível via COPR sched_ext)
-copr_install_isolated "sched_ext/scx" \
-    scx-scheds \
-    scx-tools \
-    || echo "WARN: scx-scheds/scx-tools não instalado"
+# scx-scheds e scx-tools estão nos repos Fedora desde F40; sem COPR necessário.
 # keyd (remapeamento de teclado ao nível do uinput) não está nos repos Fedora —
 # vem do COPR alternateved/keyd, que tem builds fedora-44. Best-effort: se o COPR
 # estiver indisponível, a config /etc/keyd/default.conf (via overlay) ainda é

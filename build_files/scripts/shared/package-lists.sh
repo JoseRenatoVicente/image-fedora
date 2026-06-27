@@ -159,6 +159,10 @@ INSTALL_PACKAGES=(
     hunspell hunspell-pt-BR
     # Gaming
     gamemode
+    # SCX scheduler (sched_ext) — entrou nos repos Fedora a partir do F40.
+    # scx-scheds: binários (scx_lavd, scx_bpfland, …)
+    # scx-tools: scxctl + scx_loader (modo switching via tuned)
+    scx-scheds scx-tools
     # Sistema
     earlyoom
     tuned tuned-ppd
@@ -263,6 +267,8 @@ REQUIRED_PACKAGES=(
     audit
     # KDE pesquisa/Overview (kwin): org.kde.milou QML module
     plasma-milou
+    # SCX scheduler
+    scx-scheds
 )
 
 # ── Verificação runtime: pacotes KDE essenciais ──────────────────────────────
