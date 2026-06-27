@@ -43,6 +43,7 @@ restorecon -FRv /usr 2>/dev/null || true
 # ─── SUID removal ────────────────────────────────────────────────────────────
 # Strip SUID/SGID de todos os binários em /usr excepto:
 #   sudo/su               — kdesu + escalada normal
+#   pkexec                — anaconda-live/liveinst eleva via polkit
 #   polkit-agent-helper-1 — autentica via PAM para polkit (sem SUID, TODA a
 #                           autenticação administrativa falha no KDE)
 #   passwd                — necessita SUID para escrever /etc/shadow
@@ -50,13 +51,15 @@ find /usr -type f -perm /6000 -print0 | while IFS= read -r -d '' binary; do
     case "$binary" in
         /usr/bin/sudo|\
         /usr/bin/su|\
+        /usr/bin/pkexec|\
         /usr/lib/polkit-1/polkit-agent-helper-1|\
         /usr/bin/passwd) continue ;;
         *) chmod ug-s "$binary" && echo "Stripped: $binary" ;;
     esac
 done
-# Remover binários desnecessários com histórico de vulnerabilidades SUID
-rm -f /usr/bin/chsh /usr/bin/chfn /usr/bin/pkexec
+# Remover binários desnecessários com histórico de vulnerabilidades SUID.
+# pkexec é preservado: anaconda-live/liveinst depende dele para elevar via polkit.
+rm -f /usr/bin/chsh /usr/bin/chfn
 # ─── Root account hardening ──────────────────────────────────────────────────
 # Bloqueia a password root (já sem password no build bootc, mas torna explícito)
 # e muda o shell para nologin — impede login directo mesmo com emergency console PAM.

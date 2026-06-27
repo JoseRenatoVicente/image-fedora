@@ -467,7 +467,8 @@ grep -E '^root:' /etc/passwd | cut -d: -f7 | grep -q 'nologin' \
 echo "=== SUID removal ==="
 [[ ! -f /usr/bin/chsh ]]   || fail "chsh deve ter sido removido (SUID desnecessário)"
 [[ ! -f /usr/bin/chfn ]]   || fail "chfn deve ter sido removido (SUID desnecessário)"
-[[ ! -f /usr/bin/pkexec ]] || fail "pkexec deve ter sido removido (CVE-2021-4034)"
+[[ -x /usr/bin/pkexec ]]    || fail "pkexec deve existir para fluxos polkit/liveinst"
+[[ -u /usr/bin/pkexec ]]    || fail "pkexec deve manter SUID para elevar via polkit/liveinst"
 [[ -u /usr/bin/sudo ]]     || fail "sudo perdeu bit SUID (necessário para KDE/kdesu)"
 
 echo "=== Container signing ==="
@@ -639,9 +640,9 @@ grep -qE '^-w /etc/passwd -p wa -k identity' "$AUDIT_RULES" \
     || fail "audit: regra identity (/etc/passwd) ausente"
 grep -qE '^-a always,exit .* -k time-change' "$AUDIT_RULES" \
     || fail "audit: regra time-change ausente"
-# As regras só podem referenciar binários presentes — chsh/chfn/pkexec foram
-# removidos e NÃO devem ser auditados (geraria erro de load no boot).
-for removed in chsh chfn pkexec; do
+# As regras só podem referenciar binários presentes — chsh/chfn foram removidos
+# e NÃO devem ser auditados (geraria erro de load no boot).
+for removed in chsh chfn; do
     grep -qE "path=/usr/bin/${removed}\b" "$AUDIT_RULES" \
         && fail "audit: regra referencia binário removido (/usr/bin/${removed}) — erro de load no boot"
 done

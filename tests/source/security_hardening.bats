@@ -162,6 +162,12 @@ setup() {
     [ "$status" -ne 0 ]
 }
 
+@test "SUID hardening preserves pkexec for polkit and Anaconda liveinst" {
+    assert_contains "$configure_dir/60-selinux-suid.sh" 'rm -f /usr/bin/chsh /usr/bin/chfn'
+    assert_contains "$configure_dir/60-selinux-suid.sh" '/usr/bin/pkexec|\'
+    assert_not_contains "$configure_dir/60-selinux-suid.sh" 'rm -f /usr/bin/chsh /usr/bin/chfn /usr/bin/pkexec'
+}
+
 @test "fast default does not disable native GPU drivers" {
     ! grep -RFq -- 'nomodeset' "${REPO_ROOT}/build_files"
     ! grep -RFq -- 'modprobe.blacklist=nouveau' "${REPO_ROOT}/build_files"

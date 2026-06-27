@@ -5,7 +5,7 @@
 ## nesta imagem. Um `-w` ou `-F path=` sobre algo ausente faz o auditctl emitir um
 ## erro no boot — violaria o objetivo de zero-warning e poderia falhar o test-boot.
 ## Por isso NÃO vigiamos /var/log/sudo.log (criado só no 1º uso), lastlog/faillock
-## (ainda não existem no load) nem chsh/chfn/pkexec (removidos da imagem).
+## (ainda não existem no load) nem chsh/chfn (removidos da imagem).
 ##
 ## Modo de falha: -f 1 (printk) e SEM imutabilidade (-e 2) — num desktop queremos
 ## poder reconfigurar sem reboot; o panic-on-audit-loss (-f 2) é perigoso aqui.
@@ -44,6 +44,7 @@
 ## 6.3.3.6 — comandos privilegiados (apenas binários presentes nesta imagem)
 -a always,exit -F path=/usr/bin/sudo    -F perm=x -F auid>=1000 -F auid!=unset -k privileged
 -a always,exit -F path=/usr/bin/su      -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/pkexec  -F perm=x -F auid>=1000 -F auid!=unset -k privileged
 -a always,exit -F path=/usr/bin/passwd  -F perm=x -F auid>=1000 -F auid!=unset -k privileged
 -a always,exit -F path=/usr/bin/gpasswd -F perm=x -F auid>=1000 -F auid!=unset -k privileged
 -a always,exit -F path=/usr/bin/newgrp  -F perm=x -F auid>=1000 -F auid!=unset -k privileged

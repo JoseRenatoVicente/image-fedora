@@ -94,8 +94,9 @@ setup() {
     [ ! -f /usr/bin/chfn ]
 }
 
-@test "pkexec has been removed (CVE-2021-4034)" {
-    [ ! -f /usr/bin/pkexec ]
+@test "pkexec is preserved for polkit and live installer flows" {
+    [ -x /usr/bin/pkexec ]
+    [ -u /usr/bin/pkexec ]
 }
 
 @test "sudo retains SUID bit" {
