@@ -9,36 +9,6 @@ INSTALL_IMAGE_PAYLOAD=${INSTALL_IMAGE_PAYLOAD:?}
 # /root pode ser symlink em base-atomic
 mkdir -p "$(realpath /root)"
 
-# bwrap (usado pelo flatpak) precisa de /proc/sys writable
-mount -o remount,rw /proc/sys
-
-# ── Flatpaks ──────────────────────────────────────────────────────────────────
-mkdir -p /etc/flatpak/remotes.d
-curl --retry 3 -Lo /etc/flatpak/remotes.d/flathub.flatpakrepo \
-    https://dl.flathub.org/repo/flathub.flatpakrepo
-xargs -r flatpak install -y --noninteractive < "/src/flatpaks"
-
-# Monta /var/lib/flatpak como read-only na live session para não ser corrompido
-cat > /etc/systemd/system/var-lib-flatpak.mount << 'EOF'
-[Mount]
-Type=none
-What=/var/lib/flatpak
-Where=/var/lib/flatpak
-Options=bind,ro
-
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl enable var-lib-flatpak.mount
-
-# ── Payload OCI embebido no ISO ───────────────────────────────────────────────
-# A imagem fica em containers-storage dentro do squashfs para instalação offline
-if mountpoint -q /usr/lib/containers/storage; then
-    podman save --format oci-archive "$INSTALL_IMAGE_PAYLOAD" | \
-        podman load --storage-opt additionalimagestore=''
-else
-    podman pull "$INSTALL_IMAGE_PAYLOAD"
-fi
 
 # ── Initramfs live ────────────────────────────────────────────────────────────
 dnf install -y dracut-live
@@ -67,25 +37,8 @@ systemctl enable livesys.service livesys-late.service
 # Handler COSMIC para o livesys — configura autologin via greetd
 if [[ "${_livesys_session}" == "cosmic" ]] && \
    [[ ! -f /usr/libexec/livesys/sessions.d/livesys-cosmic ]]; then
-    mkdir -p /usr/libexec/livesys/sessions.d
-    cat > /usr/libexec/livesys/sessions.d/livesys-cosmic << 'LIVESYS_EOF'
-#!/bin/bash
-# Configura greetd para autologin como liveuser na sessão COSMIC
-mkdir -p /etc/greetd
-cat > /etc/greetd/config.toml << 'GREETD_EOF'
-[terminal]
-vt = 1
-
-[default_session]
-command = "cosmic-greeter"
-user = "greeter"
-
-[initial_session]
-command = "cosmic-session"
-user = "liveuser"
-GREETD_EOF
-LIVESYS_EOF
-    chmod +x /usr/libexec/livesys/sessions.d/livesys-cosmic
+    install -Dm755 /src/sessions.d/livesys-cosmic \
+        /usr/libexec/livesys/sessions.d/livesys-cosmic
 fi
 
 # ── Anaconda ──────────────────────────────────────────────────────────────────
@@ -102,11 +55,9 @@ install_image_ref="${_ref}"
 # Extrai os app IDs do ficheiro de flatpaks (linha "app/ID/arch/branch" → "ID")
 mapfile -t _app_ids < <(sed -n 's|^app/\([^/]*\)/.*|\1|p' /src/flatpaks)
 
-# O sideload repo (copiado pelo kickstart) permite instalação offline sem internet
 cat > /etc/flatpak-user-setup.sh << SCRIPT_EOF
 #!/bin/bash
 set -euo pipefail
-SIDELOAD=/var/cache/flatpak-sideload
 STAMP="\${XDG_CONFIG_HOME:-\$HOME/.config}/flatpak-user-setup.done"
 [[ -f "\$STAMP" ]] && exit 0
 flatpak remote-add --user --if-not-exists flathub \\
@@ -115,12 +66,7 @@ APPS=(
 $(printf '    %s\n' "${_app_ids[@]}")
 )
 for pkg in "\${APPS[@]}"; do
-    if [[ -d "\${SIDELOAD}/repo" ]]; then
-        flatpak install --user -y --sideload-repo="\${SIDELOAD}/repo" flathub "\$pkg" \\
-            || flatpak install --user -y flathub "\$pkg" || true
-    else
-        flatpak install --user -y flathub "\$pkg" || true
-    fi
+    flatpak install --user -y flathub "\$pkg" || true
 done
 mkdir -p "\$(dirname "\$STAMP")"
 touch "\$STAMP"
@@ -130,15 +76,18 @@ chmod 755 /etc/flatpak-user-setup.sh
 # Kickstart defaults — Anaconda lê este ficheiro no arranque
 cat >> /usr/share/anaconda/interactive-defaults.ks << EOF
 
-# Instala a partir da imagem OCI embebida no ISO (sem internet)
-ostreecontainer --url=${install_image_ref} --transport=containers-storage --no-signature-verification
+# Particionamento padrão — /home numa partição dedicada preserva os dados do utilizador
+# ao trocar de sistema via `bootc switch` sem perder configurações
+clearpart --all --initlabel
+reqpart --add-boot
+part / --fstype=xfs --size=20480
+part /home --fstype=xfs --size=1 --grow
 
-# Copia o repo flatpak como sideload e o script de setup para o sistema instalado
-%post --nochroot --erroronfail --log=/tmp/flatpak-sideload.log
-if [ -d /var/lib/flatpak ]; then
-    mkdir -p /mnt/sysroot/var/cache/flatpak-sideload
-    cp -a /var/lib/flatpak/. /mnt/sysroot/var/cache/flatpak-sideload/
-fi
+# Instala a partir do registry durante a instalação (requer internet)
+ostreecontainer --url=${install_image_ref} --transport=registry --no-signature-verification
+
+# Copia o script de setup de flatpaks para o sistema instalado
+%post --nochroot --erroronfail --log=/tmp/flatpak-setup.log
 install -Dm755 /etc/flatpak-user-setup.sh /mnt/sysroot/etc/flatpak-user-setup.sh
 %end
 
@@ -151,7 +100,7 @@ Description=Flatpak User Setup
 Wants=network-online.target
 After=network-online.target
 ConditionUser=!@system
-ConditionPathIsDirectory=/var/home/%u
+ConditionPathIsDirectory=%h
 ConditionPathExists=!%E/flatpak-user-setup.done
 
 [Service]
@@ -173,19 +122,7 @@ EOF
 
 # ── /var/tmp maior para o ostree durante a instalação ────────────────────────
 rm -rf /var/tmp && mkdir /var/tmp
-cat > /etc/systemd/system/var-tmp.mount << 'EOF'
-[Unit]
-Description=Larger tmpfs for /var/tmp on live system
-
-[Mount]
-What=tmpfs
-Where=/var/tmp
-Type=tmpfs
-Options=size=50%,nr_inodes=1m,x-systemd.graceful-option=usrquota
-
-[Install]
-WantedBy=local-fs.target
-EOF
+install -Dm644 /src/var-tmp.mount /etc/systemd/system/var-tmp.mount
 systemctl enable var-tmp.mount
 
 # ── EFI para o bootc-image-builder ────────────────────────────────────────────

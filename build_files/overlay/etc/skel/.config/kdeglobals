@@ -1,0 +1,14 @@
+[General]
+AccentColor=203,166,247
+ColorScheme=Mokka
+fixed=JetBrains Mono,10,-1,5,50,0,0,0,0,0
+font=JetBrains Mono,10,-1,5,50,0,0,0,0,0
+menuFont=JetBrains Mono,10,-1,5,50,0,0,0,0,0
+toolBarFont=JetBrains Mono,10,-1,5,75,0,0,0,0,0
+
+[Icons]
+Theme=Tela-circle-dracula-dark
+
+[KDE]
+LookAndFeelPackage=Mokka
+widgetStyle=kvantum-dark

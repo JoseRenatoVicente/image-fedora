@@ -1,5 +1,12 @@
 [customizations.installer.kickstart]
 contents = """
+# Particionamento padrão — /home numa partição dedicada preserva os dados do utilizador
+# ao trocar de sistema via `bootc switch` sem perder configurações
+clearpart --all --initlabel
+reqpart --add-boot
+part / --fstype=xfs --size=20480
+part /home --fstype=xfs --size=1 --grow
+
 %post
 bootc switch --mutate-in-place --transport registry ghcr.io/joserenatovicente/image-fedora:latest
 %end

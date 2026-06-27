@@ -1,0 +1,15 @@
+#!/bin/bash
+# Configura greetd para autologin como liveuser na sessão COSMIC
+mkdir -p /etc/greetd
+cat > /etc/greetd/config.toml << 'GREETD_EOF'
+[terminal]
+vt = 1
+
+[default_session]
+command = "cosmic-greeter"
+user = "greeter"
+
+[initial_session]
+command = "cosmic-session"
+user = "liveuser"
+GREETD_EOF

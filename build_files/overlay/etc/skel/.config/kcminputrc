@@ -1,0 +1,6 @@
+[Libinput][default]
+NaturalScroll=true
+PointerAcceleration=0.45
+
+[Mouse]
+cursorTheme=catppuccin-mocha-mauve-cursors
