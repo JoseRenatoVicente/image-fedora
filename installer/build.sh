@@ -92,10 +92,11 @@ fi
 dnf install -y --allowerasing anaconda-live libblockdev-{btrfs,lvm,dm}
 mkdir -p /var/lib/rpm-state
 
-# Referência da imagem para o kickstart (strip scheme, keep registry path)
+# Referência da imagem para o kickstart (strip scheme, keep registry path).
+# Preserve registries with ports and digest references; splitting on ':' breaks
+# refs such as registry:5000/org/image:tag.
 _ref="${INSTALL_IMAGE_PAYLOAD##*://}"
-imageref="${_ref%%:*}"
-imagetag="${_ref##*:}"
+install_image_ref="${_ref}"
 
 # ── Script de instalação --user (gerado com a lista embebida) ─────────────────
 # Extrai os app IDs do ficheiro de flatpaks (linha "app/ID/arch/branch" → "ID")
@@ -130,7 +131,7 @@ chmod 755 /etc/flatpak-user-setup.sh
 cat >> /usr/share/anaconda/interactive-defaults.ks << EOF
 
 # Instala a partir da imagem OCI embebida no ISO (sem internet)
-ostreecontainer --url=${imageref}:${imagetag} --transport=containers-storage --no-signature-verification
+ostreecontainer --url=${install_image_ref} --transport=containers-storage --no-signature-verification
 
 # Copia o repo flatpak como sideload e o script de setup para o sistema instalado
 %post --nochroot --erroronfail --log=/tmp/flatpak-sideload.log
@@ -165,7 +166,7 @@ ln -sf ../flatpak-user-setup.service \
     /etc/skel/.config/systemd/user/default.target.wants/flatpak-user-setup.service
 
 # Aponta para o registry para receber actualizações futuras
-bootc switch --mutate-in-place --enforce-container-sigpolicy --transport registry ${imageref}:${imagetag}
+bootc switch --mutate-in-place --enforce-container-sigpolicy --transport registry ${install_image_ref}
 %end
 
 EOF

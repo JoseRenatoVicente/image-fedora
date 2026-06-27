@@ -10,9 +10,12 @@ setup() {
     build_packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
     build_deps="${REPO_ROOT}/build_files/scripts/configure/70-build-deps.sh"
     build_configure="${REPO_ROOT}/build_files/scripts/build-configure.sh"
+    install_assets="${REPO_ROOT}/build_files/scripts/install-assets.sh"
     plasmalogin_configure="${REPO_ROOT}/build_files/scripts/configure/20-plasmalogin.sh"
     services_configure="${REPO_ROOT}/build_files/scripts/configure/50-services.sh"
     overlay="${REPO_ROOT}/build_files/overlay"
+    installer_build="${REPO_ROOT}/installer/build.sh"
+    installer_containerfile="${REPO_ROOT}/installer/Containerfile"
 }
 
 @test "podman test boot does not force interactive TTY" {
@@ -79,4 +82,27 @@ setup() {
 @test "services configure script does not generate tuned active profile files" {
     assert_not_contains "$services_configure" 'echo "balanced-workstation" > /etc/tuned/active_profile'
     assert_not_contains "$services_configure" 'echo "auto" > /etc/tuned/profile_mode'
+}
+
+@test "legacy scx.service config asset is removed" {
+    run test -e "${REPO_ROOT}/build_files/assets/configs/scx-default.conf"
+    [ "$status" -ne 0 ]
+}
+
+@test "installer image reference parser preserves ports and digests" {
+    assert_contains "$installer_build" 'install_image_ref="${_ref}"'
+    assert_not_contains "$installer_build" 'imageref="${_ref%%:*}"'
+    assert_not_contains "$installer_build" 'imagetag="${_ref##*:}"'
+}
+
+@test "installer Containerfile uses literal ARG defaults" {
+    assert_contains "$installer_containerfile" 'ARG BASE_IMAGE=ghcr.io/joserenatovicente/image-fedora:latest'
+    assert_contains "$installer_containerfile" 'ARG INSTALL_IMAGE_PAYLOAD=ghcr.io/joserenatovicente/image-fedora:latest'
+    assert_not_contains "$installer_containerfile" '${BASE_IMAGE:-'
+}
+
+@test "winapps assets are installed under immutable /usr/share" {
+    assert_contains "$install_assets" 'SYS_APP_PATH="/usr/share/winapps"'
+    assert_contains "$install_assets" 'mkdir -p /usr/share/winapps'
+    assert_not_contains "$install_assets" 'mkdir -p /usr/local/share/winapps'
 }

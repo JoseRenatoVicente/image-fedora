@@ -126,9 +126,10 @@ _install_winapps() {
         "${prefix}/apps" \
         "${prefix}/install"
     install -Dm755 "$TMPDIR_ASSETS/${prefix}/bin/winapps" /usr/bin/winapps
-    mkdir -p /usr/local/share/winapps
-    cp -a "$TMPDIR_ASSETS/${prefix}/apps" /usr/local/share/winapps/
-    cp -a "$TMPDIR_ASSETS/${prefix}/install" /usr/local/share/winapps/
+    sed -i 's|^readonly SYS_APP_PATH=.*|readonly SYS_APP_PATH="/usr/share/winapps"|' /usr/bin/winapps
+    mkdir -p /usr/share/winapps
+    cp -a "$TMPDIR_ASSETS/${prefix}/apps" /usr/share/winapps/
+    cp -a "$TMPDIR_ASSETS/${prefix}/install" /usr/share/winapps/
 }
 
 # Load the asset manifest

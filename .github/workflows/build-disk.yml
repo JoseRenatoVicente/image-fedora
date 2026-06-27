@@ -48,6 +48,11 @@ jobs:
       id-token: write
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
       - name: Prepare environment
         run: |
           USER_UID=$(id -u)
@@ -77,6 +82,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Build disk images
         id: build
@@ -95,7 +102,7 @@ jobs:
         with:
           path: ${{ steps.build.outputs.output-directory }}
           if-no-files-found: error
-          retention-days: 0
+          retention-days: 7
           compression-level: 0
           overwrite: true
       
@@ -124,6 +131,11 @@ jobs:
       id-token: write
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
       - name: Prepare environment
         run: |
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
@@ -146,9 +158,11 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Log in to ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -174,7 +188,7 @@ jobs:
         # Usa titanoboa (mesma ferramenta que o Bazzite) para converter o
         # contentor instalador num ISO bootável com squashfs + GRUB.
         # Se preferires uma versão mais estável, verifica https://github.com/ublue-os/titanoboa
-        uses: Zeglius/titanoboa@revamp-pr
+        uses: Zeglius/titanoboa@7737f4748458252ac827dca14b3d6dd09298472a # revamp-pr
         id: build-iso
         with:
           image-ref: localhost/installer:latest

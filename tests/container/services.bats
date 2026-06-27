@@ -126,19 +126,19 @@ setup() {
 
 # ── scx-scheds ───────────────────────────────────────────────────────────────
 
-@test "scx.service is enabled if scx-scheds installed" {
-    if ! rpm -q scx-scheds &>/dev/null; then
-        skip "scx-scheds not installed"
+@test "scx_loader.service is enabled if scx-tools installed" {
+    if ! rpm -q scx-tools &>/dev/null; then
+        skip "scx-tools not installed"
     fi
-    systemctl is-enabled scx.service 2>/dev/null | grep -q "^enabled$"
+    systemctl is-enabled scx_loader.service 2>/dev/null | grep -q "^enabled$"
 }
 
-@test "scx scheduler is configured if scx-scheds installed" {
-    if ! rpm -q scx-scheds &>/dev/null; then
-        skip "scx-scheds not installed"
+@test "scx_loader scheduler is configured if scx-tools installed" {
+    if ! rpm -q scx-tools &>/dev/null; then
+        skip "scx-tools not installed"
     fi
-    [ -e /etc/default/scx ]
-    grep -qE '^SCX_SCHEDULER=scx_' /etc/default/scx
+    [ -e /etc/scx_loader/config.toml ]
+    grep -qE '^default_sched = "scx_' /etc/scx_loader/config.toml
 }
 
 # ── keyd ─────────────────────────────────────────────────────────────────────

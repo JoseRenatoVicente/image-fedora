@@ -27,10 +27,18 @@ setup() {
     assert_contains "$gitleaks_workflow" 'step-security/harden-runner@'
 }
 
+@test "build-disk.yml uses harden-runner" {
+    assert_contains "$disk_workflow" 'step-security/harden-runner@'
+}
+
 # ── Credentials ──────────────────────────────────────────────────────────────
 
 @test "build.yml disables persist-credentials" {
     assert_contains "$build_workflow" 'persist-credentials: false'
+}
+
+@test "build-disk.yml disables persist-credentials" {
+    assert_contains "$disk_workflow" 'persist-credentials: false'
 }
 
 # ── Cosign supply-chain ──────────────────────────────────────────────────────
@@ -69,6 +77,10 @@ setup() {
     assert_contains "$integration_workflow" 'cosign verify-attestation'
 }
 
+@test "integration_tests.yml runs container BATS tests" {
+    assert_contains "$integration_workflow" 'bats /tests/container/'
+}
+
 # ── Trivy / SARIF ────────────────────────────────────────────────────────────
 
 @test "build.yml uses hashFiles for trivy-results.sarif" {
@@ -88,7 +100,11 @@ setup() {
 }
 
 @test "tests.yml lints operational tools scripts" {
-    assert_contains "$tests_workflow" 'find build_files tests tools'
+    assert_contains "$tests_workflow" 'find build_files tests tools installer'
+}
+
+@test "just lint covers installer scripts" {
+    assert_contains "${REPO_ROOT}/just/utility.just" 'find build_files tests tools installer'
 }
 
 @test "tests.yml installs just" {
@@ -142,4 +158,13 @@ setup() {
 
 @test "build-disk.yml defaults pull requests to amd64 runner" {
     assert_contains "$disk_workflow" "(inputs.platform || 'amd64') == 'amd64'"
+}
+
+@test "build-disk.yml avoids zero-day artifact retention" {
+    assert_not_contains "$disk_workflow" 'retention-days: 0'
+}
+
+@test "build-disk.yml pins mutable third-party actions" {
+    assert_not_contains "$disk_workflow" 'docker/login-action@v3'
+    assert_not_contains "$disk_workflow" 'Zeglius/titanoboa@revamp-pr'
 }

@@ -92,6 +92,14 @@ jobs:
             "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}" \
             bash /run/tests.sh
 
+      - name: Run BATS container tests
+        run: |
+          podman run --rm \
+            --security-opt label=disable \
+            -v "$(pwd)/tests:/tests:ro,z" \
+            "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}" \
+            bash -c 'dnf5 install -y --setopt=install_weak_deps=False bats 2>/dev/null; bats /tests/container/'
+
       - name: Build test image (Containerfile.test)
         run: |
           podman build \

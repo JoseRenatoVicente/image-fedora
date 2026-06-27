@@ -40,8 +40,8 @@ setup() {
     grep -qE '^net\.ipv4\.icmp_echo_ignore_all\s*=\s*1' /etc/sysctl.d/60-security-hardening.conf
 }
 
-@test "vm.swappiness is 100 for ZRAM" {
-    grep -q 'vm.swappiness = 100' /etc/sysctl.d/99-performance.conf
+@test "vm.swappiness is 180 for aggressive ZRAM use" {
+    grep -q 'vm.swappiness = 180' /etc/sysctl.d/99-performance.conf
 }
 
 @test "vm.max_map_count is configured" {

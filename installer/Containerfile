@@ -2,8 +2,8 @@
 # BASE_IMAGE      = imagem que arranca na live session (o desktop)
 # INSTALL_IMAGE_PAYLOAD = imagem que o Anaconda instala no disco (pode ser a mesma)
 
-ARG BASE_IMAGE=${BASE_IMAGE:-ghcr.io/joserenatovicente/image-fedora:latest}
-ARG INSTALL_IMAGE_PAYLOAD=${INSTALL_IMAGE_PAYLOAD:-ghcr.io/joserenatovicente/image-fedora:latest}
+ARG BASE_IMAGE=ghcr.io/joserenatovicente/image-fedora:latest
+ARG INSTALL_IMAGE_PAYLOAD=ghcr.io/joserenatovicente/image-fedora:latest
 
 FROM $BASE_IMAGE
 ARG BASE_IMAGE

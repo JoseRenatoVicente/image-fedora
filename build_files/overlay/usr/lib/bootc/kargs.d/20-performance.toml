@@ -4,8 +4,8 @@
 kargs = [
   # Desliga o zswap: usamos zram como swap comprimido. zswap activo intercepta
   # as páginas antes do zram e impede a contabilização correcta (zramctl),
-  # além de duplicar compressão. Mantemos vm.swappiness=100 (não subimos a 150
-  # como o CachyOS — ver sysctl-performance.conf). Derivado de cachyos-settings.
+  # além de duplicar compressão. Mantemos vm.swappiness=180 em sysctl para usar
+  # ZRAM agressivamente antes de descartar cache quente.
   "zswap.enabled=0",
   # Desactiva transições de power state do NVMe (APST). Elimina picos de
   # latência de 30-100ms causados por wake de PS3/PS4 — crítico para gaming.

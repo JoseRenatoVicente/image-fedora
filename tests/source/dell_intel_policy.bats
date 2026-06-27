@@ -94,8 +94,8 @@ setup() {
     assert_contains "$preset" 'enable thermald.service'
 }
 
-@test "preset enables irqbalance.service" {
-    assert_contains "$preset" 'enable irqbalance.service'
+@test "preset does not enable irqbalance.service" {
+    assert_not_contains "$preset" 'enable irqbalance.service'
 }
 
 @test "preset enables fwupd.service" {
@@ -104,8 +104,8 @@ setup() {
 
 # ── Tuned profile ────────────────────────────────────────────────────────────
 
-@test "configure sets tuned active_profile to balanced" {
-    assert_tree_contains "$configure_dir" 'echo "balanced" > /etc/tuned/active_profile'
+@test "configure masks irqbalance.service" {
+    assert_tree_contains "$configure_dir" 'irqbalance.service'
 }
 
 @test "runtime tests validate tuned profile" {

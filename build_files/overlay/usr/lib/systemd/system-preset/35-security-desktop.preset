@@ -48,7 +48,6 @@ enable fedora-kinoite-plasmalogin-workaround.service
 # Dell/Intel laptop support
 enable bolt.service
 enable thermald.service
-enable irqbalance.service
 enable fwupd.service
 disable power-profiles-daemon.service
 
