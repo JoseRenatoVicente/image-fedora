@@ -118,8 +118,9 @@ setup() {
     semodule -l 2>/dev/null | grep -q 'secureblue_deny_ipsec_sockets'
 }
 
-@test "SELinux module harden_userns is loaded" {
-    semodule -l 2>/dev/null | grep -q 'harden_userns'
+@test "SELinux userns deny modules are not loaded" {
+    ! semodule -l 2>/dev/null | grep -q 'harden_userns'
+    ! semodule -l 2>/dev/null | grep -q 'harden_container_userns'
 }
 
 @test "SELinux module container-ptrace is loaded" {

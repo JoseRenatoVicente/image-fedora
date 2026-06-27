@@ -9,6 +9,8 @@ rm -rf /var/cache/dnf /var/log/dnf* /var/log/hawkey*
 rm -rf /run/* /tmp/* 2>/dev/null || true
 rm -rf /var/lib/dnf/repos /var/lib/dnf/*.lock 2>/dev/null || true
 rm -rf /var/lib/flatpak 2>/dev/null || true
+rm -rf /var/lib/authselect/checksum 2>/dev/null || true
+rm -rf /var/lib/fprint /var/lib/iscsi 2>/dev/null || true
 rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
 LOCALE_REMOVED=0
 while IFS= read -r -d '' dir; do

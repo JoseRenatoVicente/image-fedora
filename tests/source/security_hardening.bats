@@ -45,6 +45,16 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/assets/selinux/grant_userns.cil" '(allow unconfined_t self (user_namespace (create)))'
 }
 
+@test "SELinux userns deny policies stay disabled for Flatpak browsers" {
+    assert_contains "$configure_dir/60-selinux-suid.sh" 'REMOVIDOS: harden_userns.cil + harden_container_userns.cil'
+    assert_not_contains "$configure_dir/60-selinux-suid.sh" '/ctx/assets/selinux/harden_userns.cil'
+    assert_not_contains "$configure_dir/60-selinux-suid.sh" '/ctx/assets/selinux/harden_container_userns.cil'
+}
+
+@test "Tor Browser is installed through Flatpak" {
+    assert_contains "${REPO_ROOT}/installer/flatpaks" 'app/org.torproject.torbrowser-launcher/x86_64/stable'
+}
+
 @test "systemd preset uses only preset directives" {
     assert_not_contains "$preset" 'mask ctrl-alt-del.target'
     assert_contains "$configure_dir/50-services.sh" 'ctrl-alt-del.target'

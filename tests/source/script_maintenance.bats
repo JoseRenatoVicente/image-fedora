@@ -10,6 +10,7 @@ setup() {
     build_packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
     build_deps="${REPO_ROOT}/build_files/scripts/configure/70-build-deps.sh"
     build_configure="${REPO_ROOT}/build_files/scripts/build-configure.sh"
+    cleanup_configure="${REPO_ROOT}/build_files/scripts/configure/90-cleanup.sh"
     install_assets="${REPO_ROOT}/build_files/scripts/install-assets.sh"
     plasmalogin_configure="${REPO_ROOT}/build_files/scripts/configure/20-plasmalogin.sh"
     services_configure="${REPO_ROOT}/build_files/scripts/configure/50-services.sh"
@@ -105,4 +106,9 @@ setup() {
     assert_contains "$install_assets" 'SYS_APP_PATH="/usr/share/winapps"'
     assert_contains "$install_assets" 'mkdir -p /usr/share/winapps'
     assert_not_contains "$install_assets" 'mkdir -p /usr/local/share/winapps'
+}
+
+@test "cleanup removes build-time var state flagged by bootc lint" {
+    assert_contains "$cleanup_configure" 'rm -rf /var/lib/authselect/checksum'
+    assert_contains "$cleanup_configure" 'rm -rf /var/lib/fprint /var/lib/iscsi'
 }
