@@ -61,7 +61,8 @@ copr_install_isolated "matinlotfali/KDE-Rounded-Corners" \
 # scx-scheds não está nos repos padrão do Fedora (disponível via COPR sched_ext)
 copr_install_isolated "sched_ext/scx" \
     scx-scheds \
-    || echo "WARN: scx-scheds não instalado"
+    scx-tools \
+    || echo "WARN: scx-scheds/scx-tools não instalado"
 # keyd (remapeamento de teclado ao nível do uinput) não está nos repos Fedora —
 # vem do COPR alternateved/keyd, que tem builds fedora-44. Best-effort: se o COPR
 # estiver indisponível, a config /etc/keyd/default.conf (via overlay) ainda é

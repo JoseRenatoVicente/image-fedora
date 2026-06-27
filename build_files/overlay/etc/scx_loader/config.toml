@@ -1,0 +1,16 @@
+# scx_loader — configuração do scheduler sched_ext
+# Lido por scx_loader.service; scxctl switch -m <mode> aplica em runtime.
+default_sched = "scx_lavd"
+default_mode = "Auto"
+
+[scheds.scx_lavd]
+auto_mode = []
+gaming_mode = ["--performance"]
+lowlatency_mode = ["--performance"]
+powersave_mode = ["--powersave"]
+
+[scheds.scx_bpfland]
+auto_mode = []
+gaming_mode = ["-m", "performance"]
+lowlatency_mode = ["-s", "5000", "-S", "500", "-l", "5000", "-m", "performance"]
+powersave_mode = ["-m", "powersave"]

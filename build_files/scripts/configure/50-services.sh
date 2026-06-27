@@ -48,10 +48,8 @@ enable_unit \
 systemctl enable tmp.mount 2>/dev/null \
     || echo "INFO: tmp.mount não habilitável (static/ausente); /tmp permanece no rootfs"
 
-if rpm -q scx-scheds &>/dev/null; then
-    install -Dm644 /ctx/assets/configs/scx-default.conf /etc/default/scx
-    setfattr -n user.component -v "image-config" /etc/default/scx
-    enable_unit scx.service
+if rpm -q scx-tools &>/dev/null; then
+    enable_unit scx_loader.service
 fi
 
 # bolt e fwupd são D-Bus/udev-activated; o enable não é necessário (nem funciona no container)
@@ -100,7 +98,7 @@ systemctl mask --force ctrl-alt-del.target
 chmod 555 /etc/bluetooth
 
 mkdir -p /etc/tuned
-echo "balanced" > /etc/tuned/active_profile
+echo "balanced-workstation" > /etc/tuned/active_profile
 echo "auto" > /etc/tuned/profile_mode
 
 if command -v authselect >/dev/null 2>&1; then

@@ -123,4 +123,12 @@ setfattr -n user.component -v "image-config" \
     /etc/systemd/journald.conf.d/size-limit.conf \
     /etc/plasmalogin.conf.d/10-theme.conf \
     /etc/xdg/kscreenlockerrc \
-    /etc/profile.d/tmout.sh
+    /etc/profile.d/tmout.sh \
+    /etc/scx_loader/config.toml \
+    /etc/security/limits.d/60-gaming-nice.conf \
+    /usr/lib/tuned/profiles/balanced-workstation/tuned.conf \
+    /usr/lib/tuned/profiles/balanced-workstation/script.sh \
+    /usr/lib/tuned/profiles/throughput-performance-workstation/tuned.conf \
+    /usr/lib/tuned/profiles/throughput-performance-workstation/script.sh \
+    /usr/lib/tuned/profiles/powersave-workstation/tuned.conf \
+    /usr/lib/tuned/profiles/powersave-workstation/script.sh
