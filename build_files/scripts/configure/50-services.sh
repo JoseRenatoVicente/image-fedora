@@ -71,7 +71,29 @@ systemctl mask \
     avahi-daemon.socket \
     systemd-remount-fs.service \
     irqbalance.service \
-    lm_sensors.service
+    lm_sensors.service \
+    geoclue.service \
+    sshd.service \
+    sshd.socket \
+    sshd-unix-local.socket \
+    sshd-vsock.socket \
+    sshd-keygen.target \
+    rpcbind.service \
+    rpcbind.socket \
+    rpcbind.target \
+    nfs-server.service \
+    nfsdcld.service \
+    rpc-statd.service \
+    rpc-gssd.service \
+    rpc-statd-notify.service \
+    gssproxy.service \
+    nfs-blkmap.service \
+    nfs-idmapd.service \
+    nfs-mountd.service \
+    nfs-client.target \
+    iscsid.service \
+    iscsid.socket \
+    iscsiuio.service
 systemctl mask --force ctrl-alt-del.target
 
 # bluetoothd ConfigurationDirectoryMode=0555 exige este modo; o pacote cria com 755.

@@ -61,8 +61,8 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/90-luks-security.conf" 'tpm2-tss'
 }
 
-@test "hardened_malloc is in package install list" {
-    assert_contains "${REPO_ROOT}/build_files/scripts/shared/package-lists.sh" 'hardened_malloc'
+@test "hardened_malloc is installed via COPR" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/build-packages.sh" 'hardened_malloc'
 }
 
 @test "ld.so.preload is present in overlay and references hardened_malloc" {
@@ -89,6 +89,30 @@ setup() {
 
 @test "modprobe blacklist covers legacy USB cameras (gspca)" {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/modprobe.d/no-dvb-rc.conf" 'gspca_main'
+}
+
+@test "vm.max_map_count is set for gaming and dev workloads" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/sysctl.d/60-security-hardening.conf" 'vm.max_map_count = 1048576'
+}
+
+@test "systemd DefaultEnvironment preloads hardened_malloc for all services" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system.conf.d/40-hardened_malloc.conf" 'LD_PRELOAD=libhardened_malloc.so'
+}
+
+@test "sshd is masked in configure script" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'sshd.service'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'sshd.socket'
+}
+
+@test "NFS server daemons are masked in configure script" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'rpcbind.service'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'nfs-server.service'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'gssproxy.service'
+}
+
+@test "iSCSI daemons are masked in configure script" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'iscsid.service'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'iscsiuio.service'
 }
 
 @test "tpm2-first-enroll script is present in overlay" {

@@ -69,6 +69,13 @@ copr_install_isolated "sched_ext/scx" \
 copr_install_isolated "alternateved/keyd" \
     keyd \
     || echo "WARN: keyd não instalado (COPR indisponível); apenas a config é aplicada"
+# hardened_malloc (GrapheneOS-derived heap allocator): detecta use-after-free,
+# heap overflows e double-free. Não está nos repos Fedora — vem do COPR
+# secureblue/packages. Activado globalmente via /etc/ld.so.preload e
+# DefaultEnvironment do systemd. Overhead típico: <5% em workloads de desktop.
+copr_install_isolated "secureblue/packages" \
+    hardened_malloc \
+    || echo "WARN: hardened_malloc não instalado (COPR indisponível); ld.so.preload e DefaultEnvironment ficam sem efeito"
 echo "::endgroup::"
 
 # qt6-qtspeech/flite parecem bloat, mas no Fedora 44 a transação de remoção

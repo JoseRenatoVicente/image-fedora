@@ -80,6 +80,7 @@ setfattr -n user.component -v "security-hardening" \
     /usr/lib/systemd/system/tpm2-first-enroll.service \
     /etc/dracut.conf.d/90-luks-security.conf \
     /etc/ld.so.preload \
+    /usr/lib/systemd/system.conf.d/40-hardened_malloc.conf \
     /etc/sysctl.d/60-security-hardening.conf \
     /etc/sysctl.d/61-ptrace-scope.conf \
     /etc/modprobe.d/security-hardening.conf \
