@@ -33,25 +33,46 @@ kargs = [
   "bdev_allow_write_mounted=0",
   "l1d_flush=on",
   "l1tf=full,force",
-  "lockdown=integrity",
+  # lockdown=confidentiality: stronger than 'integrity' — adds read restrictions
+  # on kernel memory (kcore, /dev/mem reads, some perf paths) in addition to
+  # the modification restrictions of 'integrity'. Blocks potential data exfil
+  # from kernel address space. Already pairs with debugfs=off + kptr_restrict=2.
+  "lockdown=confidentiality",
   "loglevel=0",
   # oops=panic: converte qualquer kernel oops num panic imediato.
   # Sem isto o kernel tenta continuar após um oops, deixando uma janela de
   # exploração num estado inconsistente. Combinado com kernel.panic=-1
   # (sysctl) o sistema reinicia imediatamente. Complementa kernel.oops_limit.
   "oops=panic",
-  # rd.shell=0 + rd.emergency=halt: bloqueiam o debug shell e o modo emergency
-  # do initramfs. Sem isto, certas falhas de boot (ex: LUKS timeout) atiram
-  # um shell root antes do pivot — vetor de injeção de malware no initramfs.
-  # Ver CVE/blog 2025-07 insinuator.net/insecure-boot-injecting-initramfs.
-  "rd.shell=0",
-  "rd.emergency=halt",
+  # Não forçar rd.shell=0/rd.emergency=halt: após updates o initramfs é
+  # regenerado no sistema instalado, e falhas de storage/LUKS precisam continuar
+  # diagnosticáveis via rd.shell rd.debug na linha de comando do kernel.
   "extra_latent_entropy",
   # KFENCE: amostrador de segurança do heap do kernel (UAF, OOB, double-free).
   # Desactivado por defeito para evitar overhead e stalls em desktop/gaming.
   # Para activar em modo diagnóstico, use kfence.sample_interval=100.
   # "kfence.sample_interval=100",
   "mitigations=auto",
+  # mitigations=auto,nosmt: additionally disables SMT/hyperthreading to prevent
+  # cross-thread attacks (Spectre, MDS, L1TF cross-HT). Recommended by secureblue.
+  # Disabled here: 20-50% perf loss on compile/dev workloads (workstation profile).
+  # Enable on high-security hosts running untrusted VMs or multi-tenant workloads.
+  # "mitigations=auto,nosmt",
+  #
+  # KVM hardware isolation mitigations (no-op on hardware that doesn't support them)
+  # kvm_amd.sev=1/sev_es=1/sev_snp=1: AMD Secure Encrypted Virtualization —
+  # encrypts VM memory in hardware, isolating guests from the hypervisor.
+  # Requires AMD EPYC/Ryzen Pro CPUs with SEV support. No-op on Intel.
+  "kvm_amd.sev=1",
+  "kvm_amd.sev_es=1",
+  "kvm_amd.sev_snp=1",
+  # kvm-intel.vmentry_l1d_flush=always: flush L1 data cache on every VM entry
+  # to prevent L1TF (L1 Terminal Fault, CVE-2018-3620) data leaks from host.
+  # No-op on AMD. Small per-VMEXIT overhead (~1-2µs), negligible for typical VMs.
+  "kvm-intel.vmentry_l1d_flush=always",
+  # kvm.mitigate_smt_rsb=1: fills the Return Stack Buffer (RSB) on VM exit to
+  # prevent RSB underflow attacks across SMT siblings (cross-thread speculation).
+  "kvm.mitigate_smt_rsb=1",
   # module.sig_enforce=1: rejeita módulos de kernel não assinados.
   # Drivers NVIDIA via rpm-ostree install (kmod-nvidia) são assinados pelo
   # Fedora e funcionam normalmente. Módulos compilados localmente via DKMS

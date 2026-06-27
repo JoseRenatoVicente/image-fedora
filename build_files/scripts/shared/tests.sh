@@ -147,7 +147,6 @@ REQUIRED_FILES=(
     /etc/dracut.conf.d/10-boot-performance.conf
     /etc/systemd/system/tuned.service.d/deferred.conf
     /etc/systemd/system/tuned-ppd.service.d/no-block-multiuser.conf
-    /usr/libexec/fedora-flatpak-setup
     /usr/libexec/fedora-shell-setup
     /usr/libexec/fedora-dev-setup
     /usr/libexec/fedora-brew-setup
@@ -555,9 +554,16 @@ if systemctl list-unit-files usbguard.service &>/dev/null; then
 fi
 
 echo "=== FDE: LUKS2 + TPM2 + Secure Boot ==="
-for _pkg in cryptsetup tpm2-tools mokutil; do
-    rpm -q "$_pkg" &>/dev/null || fail "FDE: pacote ausente: $_pkg"
+for _pkg in cryptsetup tpm2-tools mokutil hardened_malloc; do
+    rpm -q "$_pkg" &>/dev/null || fail "FDE/hardening: pacote ausente: $_pkg"
 done
+# libhardened_malloc: presente em /etc/ld.so.preload com permissões correctas
+[[ -f /etc/ld.so.preload ]] \
+    || fail "hardened_malloc: /etc/ld.so.preload ausente"
+grep -q 'libhardened_malloc.so' /etc/ld.so.preload \
+    || fail "hardened_malloc: libhardened_malloc.so não está em /etc/ld.so.preload"
+[[ "$(stat -c %a /etc/ld.so.preload)" == "600" ]] \
+    || fail "hardened_malloc: /etc/ld.so.preload deve ter permissões 600 (tem $(stat -c %a /etc/ld.so.preload))"
 # systemd-cryptenroll vem com o systemd
 command -v systemd-cryptenroll &>/dev/null \
     || fail "FDE: systemd-cryptenroll ausente"
@@ -566,9 +572,14 @@ grep -qE '(^|[[:space:]])crypt([[:space:]]|")' /etc/dracut.conf.d/90-luks-securi
     || fail "FDE: módulo dracut 'crypt' ausente em 90-luks-security.conf"
 grep -q 'tpm2-tss' /etc/dracut.conf.d/90-luks-security.conf \
     || fail "FDE: módulo dracut 'tpm2-tss' ausente em 90-luks-security.conf"
-# Helper de enrollment presente e executável
+# Helpers de enrollment presentes e executáveis
 [[ -x /usr/bin/tpm2-luks-enroll ]] \
     || fail "FDE: /usr/bin/tpm2-luks-enroll ausente ou não executável"
+[[ -x /usr/bin/tpm2-first-enroll ]] \
+    || fail "FDE: /usr/bin/tpm2-first-enroll ausente ou não executável"
+# Serviço de primeiro arranque habilitado (activa TPM2 antes do greetd)
+systemctl is-enabled tpm2-first-enroll.service 2>/dev/null | grep -q '^enabled$' \
+    || fail "FDE: tpm2-first-enroll.service não está habilitado"
 
 echo "=== CIS Tier 1+2: banners, sudo, mounts, auditd, pwhistory ==="
 # Banners de aviso (CIS 1.7 / STIG 211020/255025): aviso de uso autorizado +

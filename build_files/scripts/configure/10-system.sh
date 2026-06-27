@@ -41,11 +41,15 @@ echo "Utilizadores em /etc/passwd após sync: $(wc -l < /etc/passwd)"
 
 # Executables from the mirrored tree need explicit permission bits.
 chmod 755 /usr/bin/dnf
-chmod 755 /usr/libexec/fedora-flatpak-setup \
-          /usr/libexec/fedora-shell-setup \
+chmod 755 /usr/libexec/fedora-shell-setup \
           /usr/libexec/fedora-dev-setup \
           /usr/libexec/fedora-brew-setup
 chmod 755 /usr/bin/tpm2-luks-enroll
+chmod 755 /usr/bin/tpm2-first-enroll
+# /etc/ld.so.preload: root-only (0600) — applied by the dynamic linker to ALL
+# processes including setuid binaries. World-readable would leak what's preloaded
+# and historically root-only is the convention for this file.
+chmod 600 /etc/ld.so.preload
 
 # sudoers.d TÊM de ser 0440 (git só preserva 0644): um drop-in group/world-writable
 # é ignorado pelo sudo e gera aviso em cada invocação. Validar a sintaxe também.
@@ -71,6 +75,11 @@ useradd -D -f 35
 
 # Anotar ficheiros de hardening com metadados de componente
 setfattr -n user.component -v "security-hardening" \
+    /usr/bin/tpm2-luks-enroll \
+    /usr/bin/tpm2-first-enroll \
+    /usr/lib/systemd/system/tpm2-first-enroll.service \
+    /etc/dracut.conf.d/90-luks-security.conf \
+    /etc/ld.so.preload \
     /etc/sysctl.d/60-security-hardening.conf \
     /etc/sysctl.d/61-ptrace-scope.conf \
     /etc/modprobe.d/security-hardening.conf \

@@ -1,0 +1,31 @@
+# Runs the TPM2 first-boot enrollment assistant once after installation.
+# Presents an interactive dialog on TTY1 before the login screen appears,
+# asking the user for their LUKS passphrase to enroll the TPM2 chip.
+# After enrollment, normal boots unlock the disk automatically (no passphrase
+# prompt) — the LUKS passphrase is kept as a recovery key only.
+#
+# Ordering: runs after all local filesystems are mounted (so /var/lib is
+# writable) and before greetd (so the user sees the prompt before the
+# graphical login screen). The ConditionPathExists guard makes it a true
+# one-shot: once /var/lib/tpm2-enrolled exists, systemd skips the unit entirely.
+[Unit]
+Description=TPM2 First-Boot LUKS Auto-Unlock Setup
+Documentation=man:systemd-cryptenroll(1)
+ConditionPathExists=!/var/lib/tpm2-enrolled
+After=local-fs.target
+Before=greetd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/tpm2-first-enroll
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+# Script uses read -t 120 internally; allow extra margin for cryptenroll I/O
+TimeoutStartSec=200
+
+[Install]
+WantedBy=multi-user.target

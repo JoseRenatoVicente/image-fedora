@@ -11,8 +11,14 @@ setup() {
 
 # ── Kernel hardening args ─────────────────────────────────────────────────────
 
-@test "kernel kargs include lockdown=integrity" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml" 'lockdown=integrity'
+@test "kernel kargs include lockdown=confidentiality" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml" 'lockdown=confidentiality'
+}
+
+@test "kernel kargs include KVM hardware isolation mitigations" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml" 'kvm_amd.sev=1'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml" 'kvm-intel.vmentry_l1d_flush=always'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml" 'kvm.mitigate_smt_rsb=1'
 }
 
 @test "kernel kargs include pti=on" {
@@ -55,6 +61,49 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/90-luks-security.conf" 'tpm2-tss'
 }
 
+@test "hardened_malloc is in package install list" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/shared/package-lists.sh" 'hardened_malloc'
+}
+
+@test "ld.so.preload is present in overlay and references hardened_malloc" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/ld.so.preload" 'libhardened_malloc.so'
+}
+
+@test "ld.so.preload is chmod 600 in configure script" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/10-system.sh" 'chmod 600 /etc/ld.so.preload'
+}
+
+@test "rpm-ostreed.conf has Recommends=false" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/rpm-ostreed.conf" 'Recommends=false'
+}
+
+@test "modprobe blacklist covers MCTP and batman-adv" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/modprobe.d/security-hardening.conf" 'mctp-serial'
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/modprobe.d/security-hardening.conf" 'batman-adv'
+}
+
+@test "modprobe blacklist covers NFS server stack" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/modprobe.d/security-hardening.conf" 'install nfsd'
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/modprobe.d/security-hardening.conf" 'install lockd'
+}
+
+@test "modprobe blacklist covers legacy USB cameras (gspca)" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/modprobe.d/no-dvb-rc.conf" 'gspca_main'
+}
+
+@test "tpm2-first-enroll script is present in overlay" {
+    run test -f "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll"
+    assert_success
+}
+
+@test "tpm2-first-enroll service runs before greetd" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-first-enroll.service" 'Before=greetd.service'
+}
+
+@test "tpm2-first-enroll service uses one-time condition marker" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-first-enroll.service" 'ConditionPathExists=!/var/lib/tpm2-enrolled'
+}
+
 @test "DRM dracut config stays active by default" {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/02-drm-drivers.conf" 'virtio_gpu'
 }
@@ -63,6 +112,20 @@ setup() {
     assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--no-hostonly'
     assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--force-drivers'
     assert_not_contains "${REPO_ROOT}/build_files/scripts/shared/initramfs.sh" '--no-hostonly'
+}
+
+@test "runtime initramfs keeps common rootfs discovery modules" {
+    run grep -Eq '^omit_dracutmodules\+=".*\blvm\b' "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/10-boot-performance.conf"
+    [ "$status" -ne 0 ]
+    run grep -Eq '^omit_dracutmodules\+=".*\bmdraid\b' "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/10-boot-performance.conf"
+    [ "$status" -ne 0 ]
+}
+
+@test "dracut failures remain diagnosable after updates" {
+    run grep -Eq '^[[:space:]]*"rd\.shell=0"' "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml"
+    [ "$status" -ne 0 ]
+    run grep -Eq '^[[:space:]]*"rd\.emergency=halt"' "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml"
+    [ "$status" -ne 0 ]
 }
 
 @test "fast default does not disable native GPU drivers" {

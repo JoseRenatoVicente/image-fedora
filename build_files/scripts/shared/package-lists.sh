@@ -196,6 +196,11 @@ INSTALL_PACKAGES=(
     # do Secure Boot. systemd-cryptenroll já vem com o systemd. Enroll real é
     # pós-install: ver /usr/bin/tpm2-luks-enroll.
     cryptsetup tpm2-tools mokutil
+    # Heap hardening (GrapheneOS-derived): substitui o allocador glibc por uma
+    # implementação que detecta use-after-free, heap overflows e double-free.
+    # Activado globalmente via /etc/ld.so.preload (aplica-se a todos os processos
+    # incluindo setuid). Overhead típico: <5% em workloads de desktop.
+    hardened_malloc
 )
 
 # ── Build deps (instaladas no Layer 1, removidas no Layer 2 70-build-deps.sh) ─
@@ -256,6 +261,7 @@ REQUIRED_PACKAGES=(
     cryptsetup
     tpm2-tools
     mokutil
+    hardened_malloc
     zsh
     fish
     hunspell-pt-BR

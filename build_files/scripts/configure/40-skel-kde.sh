@@ -25,7 +25,7 @@ sed -i 's|^SHELL=.*|SHELL=/bin/zsh|' /etc/default/useradd
 # First-boot user services
 mkdir -p /etc/skel/.config/systemd/user/timers.target.wants
 
-for script in fedora-flatpak-setup fedora-shell-setup fedora-dev-setup fedora-brew-setup; do
+for script in fedora-shell-setup fedora-dev-setup fedora-brew-setup; do
     install -Dm644 /ctx/skel/.config/systemd/user/"${script}".service \
         /etc/skel/.config/systemd/user/"${script}".service
     install -Dm644 /ctx/skel/.config/systemd/user/"${script}".timer \
@@ -72,12 +72,10 @@ kwriteconfig6 --file /etc/skel/.config/plasma-welcomerc \
     --group General --key LastSeenVersion "99.0"
 
 setfattr -n user.component -v "skel" \
-    /usr/libexec/fedora-flatpak-setup \
     /usr/libexec/fedora-shell-setup \
     /usr/libexec/fedora-dev-setup \
     /usr/libexec/fedora-brew-setup
 setfattr -n user.update-interval -v "monthly" \
-    /usr/libexec/fedora-flatpak-setup \
     /usr/libexec/fedora-shell-setup \
     /usr/libexec/fedora-dev-setup \
     /usr/libexec/fedora-brew-setup
