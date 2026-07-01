@@ -18,6 +18,7 @@
 # Build the image using the specified parameters
 build $target_image=image_name $tag=default_tag:
     #!/usr/bin/env bash
+    set -euo pipefail
 
     BUILD_ARGS=()
     if [[ -z "$(git status -s)" ]]; then
@@ -26,6 +27,18 @@ build $target_image=image_name $tag=default_tag:
     if [[ -n "${image_vendor:-}" ]]; then
         BUILD_ARGS+=("--build-arg" "IMAGE_VENDOR=${image_vendor}")
     fi
+    PKG_CACHE_INPUTS=(
+        Containerfile
+        build_files/scripts/build-packages.sh
+        build_files/scripts/shared/copr-helpers.sh
+        build_files/scripts/shared/common.sh
+        build_files/scripts/shared/package-lists.sh
+        build_files/assets/configs/dnf-performance.conf
+    )
+    PKG_CACHE_KEY=$(git ls-files --cached --others --exclude-standard "${PKG_CACHE_INPUTS[@]}" | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+    CONFIG_CACHE_KEY=$(git ls-files --cached --others --exclude-standard Containerfile build_files | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+    BUILD_ARGS+=("--build-arg" "PKG_CACHE_KEY=${PKG_CACHE_KEY}")
+    BUILD_ARGS+=("--build-arg" "CONFIG_CACHE_KEY=${CONFIG_CACHE_KEY}")
 
     podman build \
         "${BUILD_ARGS[@]}" \
@@ -57,6 +70,7 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
     COPYTMP=""
     cleanup_copytmp() {
         [[ -n "${COPYTMP}" ]] && rm -rf "${COPYTMP}"
+        return 0
     }
     trap cleanup_copytmp EXIT
 
@@ -132,6 +146,7 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
     BUILDTMP=""
     cleanup_buildtmp() {
         [[ -n "${BUILDTMP}" ]] && sudo rm -rf "${BUILDTMP}"
+        return 0
     }
     trap cleanup_buildtmp EXIT
 

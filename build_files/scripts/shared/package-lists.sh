@@ -138,7 +138,7 @@ INSTALL_PACKAGES=(
 
     # ── Ferramentas do utilizador ─────────────────────────────────────────────
     # Dev tools (git-core já vem na base-atomic; full git entra via git-credential-libsecret)
-    curl unzip tar jq make gettext
+    curl unzip tar jq make gettext android-tools
     # CLI tools
     bat btop fd-find ripgrep fastfetch eza
     neovim
@@ -228,10 +228,10 @@ REQUIRED_PACKAGES=(
     zsh-autosuggestions
     zsh-syntax-highlighting
     zoxide
+    android-tools
     kitty
     ksshaskpass
     ksystemlog
-    kwin-effect-roundcorners
     lm_sensors
     neovim
     nvtop

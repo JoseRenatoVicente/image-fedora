@@ -41,6 +41,13 @@ setup() {
     assert_not_contains "${REPO_ROOT}/build_files/scripts/install-assets.sh" '/usr/share/icons/Tela-circle-dracula-dark'
 }
 
+@test "configure restores local skel after upstream Mokka import" {
+    local skel_configure="${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh"
+    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/kscreenlockerrc'
+    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/gtk-3.0/settings.ini'
+    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/gtk-4.0/settings.ini'
+}
+
 @test "configure keeps host KDE theme family" {
     assert_tree_contains "$configure_dir" 'LookAndFeelPackage "Mokka"'
     assert_tree_contains "$configure_dir" 'widgetStyle "kvantum-dark"'

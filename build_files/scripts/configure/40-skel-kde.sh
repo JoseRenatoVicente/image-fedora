@@ -1,11 +1,9 @@
 #!/bin/bash
-# Skel + defaults KDE: limpa cópias user-local redundantes do Mokka, instala os
-# serviços de primeiro arranque no skel, e aplica patches nos ficheiros do pacote
-# Mokka. As configs de skel (kwinrc, kdeglobals, etc.) vivem em overlay/etc/skel.
+# Skel + defaults KDE: limpa cópias user-local redundantes do Mokka, reaplica
+# defaults locais após a importação do skel upstream, e aplica patches nos
+# ficheiros do pacote Mokka. As configs de skel vivem em overlay/etc/skel.
 set -euo pipefail
 trap 'printf "\033[1;31mERRO linha %s: %s\033[0m\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
-
-mkdir -p /etc/skel/.config
 
 rm -f /etc/skel/.config/autostart/initial-setup.desktop \
       /etc/skel/.config/autostart/initial-setup.sh \
@@ -22,25 +20,16 @@ rm -rf /etc/skel/.config/environment.d \
 # Shell padrão para novos utilizadores: zsh (evita chsh no primeiro login)
 sed -i 's|^SHELL=.*|SHELL=/bin/zsh|' /etc/default/useradd
 
-# First-boot user services
-mkdir -p /etc/skel/.config/systemd/user/timers.target.wants
-
-for script in fedora-shell-setup fedora-dev-setup fedora-brew-setup; do
-    install -Dm644 /ctx/skel/.config/systemd/user/"${script}".service \
-        /etc/skel/.config/systemd/user/"${script}".service
-    install -Dm644 /ctx/skel/.config/systemd/user/"${script}".timer \
-        /etc/skel/.config/systemd/user/"${script}".timer
-    ln -sf ../"${script}".timer \
-        /etc/skel/.config/systemd/user/timers.target.wants/"${script}".timer
-done
-
-install -Dm755 /ctx/skel/.local/bin/kwin-vm-compat.sh \
-    /usr/libexec/kwin-vm-compat.sh
-install -Dm644 /ctx/skel/.config/autostart/kwin-vm-compat.desktop \
-    /etc/xdg/autostart/kwin-vm-compat.desktop
-
-install -Dm644 /ctx/skel/.config/plasma-org.kde.plasma.desktop-appletsrc \
+# install-assets.sh imports Garuda Mokka's upstream /etc/skel after the overlay.
+# Re-apply local files that intentionally diverge from upstream Mokka defaults.
+install -Dm644 /ctx/overlay/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc \
     /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc
+install -Dm644 /ctx/overlay/etc/skel/.config/kscreenlockerrc \
+    /etc/skel/.config/kscreenlockerrc
+install -Dm644 /ctx/overlay/etc/skel/.config/gtk-3.0/settings.ini \
+    /etc/skel/.config/gtk-3.0/settings.ini
+install -Dm644 /ctx/overlay/etc/skel/.config/gtk-4.0/settings.ini \
+    /etc/skel/.config/gtk-4.0/settings.ini
 
 rm -rf /usr/share/plasma/look-and-feel/Mokka/contents/layouts
 

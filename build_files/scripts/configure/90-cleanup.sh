@@ -19,7 +19,6 @@ done < <(find /usr/share/locale -mindepth 1 -maxdepth 1 \
     ! -name 'pt_BR' ! -name 'en_US' ! -name 'locale.alias' \
     -print0)
 echo "Locales removidos: $LOCALE_REMOVED (mantidos: pt_BR, en_US)"
-ln -sf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime
 
 # Regenerar cache do linker após todas as alterações ao /usr
 ldconfig

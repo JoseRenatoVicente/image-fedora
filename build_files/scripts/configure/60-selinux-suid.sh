@@ -27,12 +27,21 @@ CIL_FILES=(
     /ctx/assets/selinux/grant_userns.cil
     /ctx/assets/selinux/userns_deny_unconfined_relabels.cil
 )
+SELINUX_PAYLOAD_DIR="/usr/share/selinux/image-fedora"
+install -d -m 0755 "$SELINUX_PAYLOAD_DIR"
+INSTALLED_CIL_FILES=()
+for cil in "${CIL_FILES[@]}"; do
+    installed_cil="$SELINUX_PAYLOAD_DIR/$(basename "$cil")"
+    install -m 0644 "$cil" "$installed_cil"
+    INSTALLED_CIL_FILES+=("$installed_cil")
+done
+
 # Instalados com prioridade 300 (>200 dos pacotes RPM, <400 do admin local)
-semodule -v -X 300 -i "${CIL_FILES[@]}"
+semodule -v -X 300 -i "${INSTALLED_CIL_FILES[@]}"
 # SELinux booleans: nega ptrace via MAC (camada adicional ao Yama ptrace_scope=2)
 # container_allow_ptrace é definido no container-ptrace.cil acima
 setsebool -P deny_ptrace=on container_allow_ptrace=off || \
-    echo "WARN: setsebool falhou (SELinux não activo no build container; booleans aplicados no arranque)"
+    echo "WARN: setsebool falhou (SELinux não activo no build container; booleans reaplicados no arranque)"
 # Fedora 44 atribui install_exec_t a /usr/bin/bootc por erro de política.
 # Esse tipo bloqueia execução via run0 (unconfined_t não aceita install_exec_t
 # como entrypoint). Corrigimos para bin_t antes do restorecon abaixo.
@@ -47,13 +56,18 @@ restorecon -FRv /usr 2>/dev/null || true
 #   polkit-agent-helper-1 — autentica via PAM para polkit (sem SUID, TODA a
 #                           autenticação administrativa falha no KDE)
 #   passwd                — necessita SUID para escrever /etc/shadow
+#   libhardened_malloc    — glibc exige SUID no .so para preload em binários SUID
 find /usr -type f -perm /6000 -print0 | while IFS= read -r -d '' binary; do
     case "$binary" in
         /usr/bin/sudo|\
         /usr/bin/su|\
         /usr/bin/pkexec|\
         /usr/lib/polkit-1/polkit-agent-helper-1|\
-        /usr/bin/passwd) continue ;;
+        /usr/bin/passwd|\
+        /usr/lib/libhardened_malloc*.so|\
+        /usr/lib64/libhardened_malloc*.so|\
+        /usr/lib/glibc-hwcaps/*/libhardened_malloc*.so|\
+        /usr/lib64/glibc-hwcaps/*/libhardened_malloc*.so) continue ;;
         *) chmod ug-s "$binary" && echo "Stripped: $binary" ;;
     esac
 done

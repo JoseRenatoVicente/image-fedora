@@ -18,6 +18,8 @@ ARG IMAGE_PRETTY_NAME="Fedora"
 ARG IMAGE_VENDOR=""
 ARG SHA_HEAD_SHORT=""
 ARG SOURCE_DATE_EPOCH=""
+ARG PKG_CACHE_KEY=""
+ARG CONFIG_CACHE_KEY=""
 
 # Base Image
 FROM quay.io/fedora-ostree-desktops/base-atomic:44@sha256:6856041720a8a506343df50b357f0e643801a8cc10e092fd5ac2024031fc5d34
@@ -27,6 +29,8 @@ ARG IMAGE_PRETTY_NAME="Fedora"
 ARG IMAGE_VENDOR=""
 ARG SHA_HEAD_SHORT=""
 ARG SOURCE_DATE_EPOCH=""
+ARG PKG_CACHE_KEY=""
+ARG CONFIG_CACHE_KEY=""
 
 RUN [[ -L /opt ]] && rm /opt && mkdir /opt || true
 
@@ -34,6 +38,7 @@ RUN [[ -L /opt ]] && rm /opt && mkdir /opt || true
 # Cache estável: só invalida quando build-packages.sh, copr-helpers.sh ou
 # dnf-performance.conf mudam (i.e., quando a lista de pacotes muda).
 # Alterações a configs/skel/theming não chegam a este stage → cache hit.
+LABEL org.image-fedora.pkg-cache-key="${PKG_CACHE_KEY}"
 RUN --mount=type=bind,from=ctx-pkgs,source=/,target=/ctx-pkgs \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
@@ -43,6 +48,7 @@ RUN --mount=type=bind,from=ctx-pkgs,source=/,target=/ctx-pkgs \
 # ── Layer 2: Configuração, theming, skel, dracut ──────────────────────────────
 # Cache invalida em qualquer mudança a build_files/ — mas este layer é rápido
 # (~2-3 min) porque não corre dnf install na maioria dos commits.
+LABEL org.image-fedora.config-cache-key="${CONFIG_CACHE_KEY}"
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \

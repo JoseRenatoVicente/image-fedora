@@ -36,6 +36,7 @@ enable_unit \
     systemd-oomd.service \
     auditd.service \
     sd-boot-migrate.service \
+    selinux-booleans.service \
     amd-cpb-boost.service \
     tpm2-first-enroll.service
 

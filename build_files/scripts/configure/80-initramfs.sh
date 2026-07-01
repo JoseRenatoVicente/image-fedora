@@ -26,7 +26,7 @@ KVER=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | so
 INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
 
 depmod "$KVER" 2>/dev/null || true
-dracut --force --hostonly --kver "$KVER" "$INITRAMFS"
+dracut --force --hostonly --tmpdir /tmp --kver "$KVER" "$INITRAMFS"
 [[ -s "$INITRAMFS" ]] || { echo "FATAL: initramfs vazio após dracut: $INITRAMFS"; exit 1; }
 
 INITRD_MODS=$(lsinitrd --mod "$INITRAMFS" 2>/dev/null)

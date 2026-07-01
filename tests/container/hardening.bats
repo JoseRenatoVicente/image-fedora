@@ -103,6 +103,14 @@ setup() {
     [ -u /usr/bin/sudo ]
 }
 
+@test "hardened_malloc preload libraries retain SUID bit" {
+    mapfile -d '' libs < <(find /usr/lib /usr/lib64 -type f -name 'libhardened_malloc*.so' -print0 2>/dev/null || true)
+    [ "${#libs[@]}" -gt 0 ]
+    for lib in "${libs[@]}"; do
+        [ -u "$lib" ]
+    done
+}
+
 # ── Container signing ───────────────────────────────────────────────────────
 
 @test "container signing policy for fedora-ostree-desktops exists" {
@@ -115,17 +123,21 @@ setup() {
 
 # ── SELinux CIL policies ────────────────────────────────────────────────────
 
-@test "SELinux module secureblue_deny_ipsec_sockets is loaded" {
-    semodule -l 2>/dev/null | grep -q 'secureblue_deny_ipsec_sockets'
+@test "SELinux secureblue CIL payload is shipped" {
+    [ -f /usr/share/selinux/image-fedora/secureblue_socket_utils.cil ]
+    [ -f /usr/share/selinux/image-fedora/secureblue_deny_ipsec_sockets.cil ]
 }
 
 @test "SELinux userns deny modules are not loaded" {
-    ! semodule -l 2>/dev/null | grep -q 'harden_userns'
-    ! semodule -l 2>/dev/null | grep -q 'harden_container_userns'
+    ! find /usr/share/selinux/image-fedora -type f -name '*harden_userns*.cil' | grep -q .
+    ! find /usr/share/selinux/image-fedora -type f -name '*harden_container_userns*.cil' | grep -q .
 }
 
-@test "SELinux module container-ptrace is loaded" {
-    semodule -l 2>/dev/null | grep -q 'container-ptrace'
+@test "SELinux boot-time setup installs CIL and booleans" {
+    [ -x /usr/libexec/image-fedora-selinux-setup ]
+    grep -q 'semodule -X 300 -i' /usr/libexec/image-fedora-selinux-setup
+    grep -q 'setsebool deny_ptrace=on' /usr/libexec/image-fedora-selinux-setup
+    grep -q 'setsebool container_allow_ptrace=off' /usr/libexec/image-fedora-selinux-setup
 }
 
 # ── modprobe DVB/RC ──────────────────────────────────────────────────────────
@@ -254,6 +266,10 @@ setup() {
 
 @test "/etc/security/limits.d/50-memlock.conf exists" {
     [ -e /etc/security/limits.d/50-memlock.conf ]
+}
+
+@test "libvirt user qemu config disables core dumps in skel" {
+    grep -qx 'max_core = 0' /etc/skel/.config/libvirt/qemu.conf
 }
 
 @test "/etc/dnf/conf.d/no-weak-deps.conf exists" {

@@ -5,6 +5,8 @@ setup() {
     load '../helpers/common'
     packages="${REPO_ROOT}/build_files/scripts/shared/package-lists.sh"
     configure_dir="${REPO_ROOT}/build_files/scripts/configure"
+    runtime_tests="${REPO_ROOT}/build_files/scripts/shared/tests.sh"
+    container_hardening="${REPO_ROOT}/tests/container/hardening.bats"
     security_just="${REPO_ROOT}/just/security.just"
     preset="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset"
 }
@@ -49,6 +51,30 @@ setup() {
     assert_contains "$configure_dir/60-selinux-suid.sh" 'REMOVIDOS: harden_userns.cil + harden_container_userns.cil'
     assert_not_contains "$configure_dir/60-selinux-suid.sh" '/ctx/assets/selinux/harden_userns.cil'
     assert_not_contains "$configure_dir/60-selinux-suid.sh" '/ctx/assets/selinux/harden_container_userns.cil'
+}
+
+@test "SELinux booleans are applied at boot when build-time persistence fails" {
+    local unit="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/selinux-booleans.service"
+    local helper="${REPO_ROOT}/build_files/overlay/usr/libexec/image-fedora-selinux-setup"
+    assert_file_exists "$unit"
+    assert_file_exists "$helper"
+    assert_contains "$unit" 'ConditionSecurity=selinux'
+    assert_contains "$unit" 'ExecStart=/usr/libexec/image-fedora-selinux-setup'
+    assert_contains "$helper" 'semodule -X 300 -i'
+    assert_contains "$helper" 'setsebool deny_ptrace=on'
+    assert_contains "$helper" 'setsebool container_allow_ptrace=off'
+    assert_contains "$configure_dir/50-services.sh" 'selinux-booleans.service'
+}
+
+@test "SELinux CIL payload is shipped for boot-time install" {
+    assert_contains "$configure_dir/60-selinux-suid.sh" '/usr/share/selinux/image-fedora'
+    assert_contains "$runtime_tests" '/usr/share/selinux/image-fedora/secureblue_socket_utils.cil'
+    assert_contains "$runtime_tests" '/usr/share/selinux/image-fedora/container-ptrace.cil'
+    assert_not_contains "$runtime_tests" "grep -q 'secureblue_deny_ipsec_sockets'"
+    assert_not_contains "$runtime_tests" "grep -q 'container-ptrace'"
+
+    assert_contains "$container_hardening" '/usr/share/selinux/image-fedora/secureblue_socket_utils.cil'
+    assert_contains "$container_hardening" '/usr/share/selinux/image-fedora/container-ptrace.cil'
 }
 
 @test "Tor Browser is installed through Flatpak" {
@@ -127,7 +153,7 @@ setup() {
 
 @test "tpm2-first-enroll script is present in overlay" {
     run test -f "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll"
-    assert_success
+    [ "$status" -eq 0 ]
 }
 
 @test "tpm2-first-enroll service runs before greetd" {
@@ -148,6 +174,10 @@ setup() {
     assert_not_contains "${REPO_ROOT}/build_files/scripts/shared/initramfs.sh" '--no-hostonly'
 }
 
+@test "initramfs generation stages temporary files on tmpfs" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--tmpdir /tmp'
+}
+
 @test "runtime initramfs keeps common rootfs discovery modules" {
     run grep -Eq '^omit_dracutmodules\+=".*\blvm\b' "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/10-boot-performance.conf"
     [ "$status" -ne 0 ]
@@ -166,6 +196,11 @@ setup() {
     assert_contains "$configure_dir/60-selinux-suid.sh" 'rm -f /usr/bin/chsh /usr/bin/chfn'
     assert_contains "$configure_dir/60-selinux-suid.sh" '/usr/bin/pkexec|\'
     assert_not_contains "$configure_dir/60-selinux-suid.sh" 'rm -f /usr/bin/chsh /usr/bin/chfn /usr/bin/pkexec'
+}
+
+@test "SUID hardening preserves hardened_malloc preload libraries" {
+    assert_contains "$configure_dir/60-selinux-suid.sh" 'libhardened_malloc*.so'
+    assert_contains "$configure_dir/60-selinux-suid.sh" 'glibc-hwcaps/*/libhardened_malloc*.so'
 }
 
 @test "fast default does not disable native GPU drivers" {

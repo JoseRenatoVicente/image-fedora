@@ -10,13 +10,17 @@ setup() {
     build_packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
     build_deps="${REPO_ROOT}/build_files/scripts/configure/70-build-deps.sh"
     build_configure="${REPO_ROOT}/build_files/scripts/build-configure.sh"
+    system_configure="${REPO_ROOT}/build_files/scripts/configure/10-system.sh"
     cleanup_configure="${REPO_ROOT}/build_files/scripts/configure/90-cleanup.sh"
     install_assets="${REPO_ROOT}/build_files/scripts/install-assets.sh"
     plasmalogin_configure="${REPO_ROOT}/build_files/scripts/configure/20-plasmalogin.sh"
+    skel_configure="${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh"
     services_configure="${REPO_ROOT}/build_files/scripts/configure/50-services.sh"
     overlay="${REPO_ROOT}/build_files/overlay"
     installer_build="${REPO_ROOT}/installer/build.sh"
     installer_containerfile="${REPO_ROOT}/installer/Containerfile"
+    anaconda_profile_installer="${REPO_ROOT}/installer/system_files/shared/etc/anaconda/profile.d/image-fedora.conf"
+    anaconda_profile_overlay="${REPO_ROOT}/build_files/overlay/etc/anaconda/profile.d/image-fedora.conf"
 }
 
 @test "podman test boot does not force interactive TTY" {
@@ -28,9 +32,61 @@ setup() {
     assert_contains "$build_just" 'trap cleanup_copytmp EXIT'
 }
 
+@test "podman copy cleanup trap succeeds after temp dir is cleared" {
+    local script="$BATS_TEST_TMPDIR/cleanup-copytmp.sh"
+    {
+        printf '%s\n' 'set -euo pipefail'
+        printf '%s\n' 'COPYTMP=""'
+        awk '
+            /^[[:space:]]+cleanup_copytmp\(\) \{/ { in_func=1 }
+            in_func {
+                line = $0
+                sub(/^    /, "", line)
+                print line
+                if (line == "}") exit
+            }
+        ' "$build_just"
+        printf '%s\n' 'trap cleanup_copytmp EXIT'
+        printf '%s\n' 'COPYTMP=""'
+    } > "$script"
+
+    run bash "$script"
+    [ "$status" -eq 0 ]
+}
+
 @test "temporary bootc image builder directory is cleaned with trap" {
     assert_contains "$build_just" 'cleanup_buildtmp()'
     assert_contains "$build_just" 'trap cleanup_buildtmp EXIT'
+}
+
+@test "bootc image builder cleanup trap succeeds after temp dir is cleared" {
+    local script="$BATS_TEST_TMPDIR/cleanup-buildtmp.sh"
+    {
+        printf '%s\n' 'set -euo pipefail'
+        printf '%s\n' 'BUILDTMP=""'
+        awk '
+            /^[[:space:]]+cleanup_buildtmp\(\) \{/ { in_func=1 }
+            in_func {
+                line = $0
+                sub(/^    /, "", line)
+                print line
+                if (line == "}") exit
+            }
+        ' "$build_just"
+        printf '%s\n' 'trap cleanup_buildtmp EXIT'
+        printf '%s\n' 'BUILDTMP=""'
+    } > "$script"
+
+    run bash "$script"
+    [ "$status" -eq 0 ]
+}
+
+@test "local build passes package and config cache keys" {
+    assert_contains "$build_just" 'set -euo pipefail'
+    assert_contains "$build_just" 'PKG_CACHE_KEY=$(git ls-files'
+    assert_contains "$build_just" 'CONFIG_CACHE_KEY=$(git ls-files'
+    assert_contains "$build_just" 'PKG_CACHE_KEY=${PKG_CACHE_KEY}'
+    assert_contains "$build_just" 'CONFIG_CACHE_KEY=${CONFIG_CACHE_KEY}'
 }
 
 @test "just formatting stays in versioned script paths" {
@@ -61,6 +117,17 @@ setup() {
     assert_contains "$build_configure" 'trap '\''echo "::endgroup::"'\'' RETURN'
 }
 
+@test "usr overlay does not overwrite dnf5 through dnf symlink" {
+    local remove_line overlay_line
+    remove_line=$(grep -nF 'rm -f /usr/bin/dnf' "$system_configure" | cut -d: -f1)
+    overlay_line=$(grep -nF 'cp -aT /ctx/overlay/usr/ /usr/' "$system_configure" | cut -d: -f1)
+
+    [[ -n "$remove_line" ]] || { echo "expected /usr/bin/dnf to be removed before usr overlay"; return 1; }
+    [[ -n "$overlay_line" ]] || { echo "expected usr overlay copy in $system_configure"; return 1; }
+    [[ "$remove_line" -lt "$overlay_line" ]] \
+        || { echo "expected /usr/bin/dnf removal before usr overlay copy"; return 1; }
+}
+
 @test "plasmalogin workaround files live in overlay" {
     assert_file_exists "$overlay/usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service"
     assert_file_exists "$overlay/usr/libexec/fedora-kinoite-plasmalogin-workaround"
@@ -80,6 +147,52 @@ setup() {
     assert_contains "$overlay/etc/tuned/profile_mode" 'auto'
 }
 
+@test "KDE first-boot user units live in overlay" {
+    for script in fedora-shell-setup fedora-dev-setup fedora-brew-setup; do
+        assert_file_exists "$overlay/etc/skel/.config/systemd/user/${script}.service"
+        assert_file_exists "$overlay/etc/skel/.config/systemd/user/${script}.timer"
+        assert_file_exists "$overlay/etc/skel/.config/systemd/user/timers.target.wants/${script}.timer"
+        run test -L "$overlay/etc/skel/.config/systemd/user/timers.target.wants/${script}.timer"
+        [ "$status" -eq 0 ]
+        run readlink "$overlay/etc/skel/.config/systemd/user/timers.target.wants/${script}.timer"
+        [ "$status" -eq 0 ]
+        [ "$output" = "../${script}.timer" ]
+    done
+}
+
+@test "libvirt user qemu config disables core dumps in skel" {
+    local qemu_config="$overlay/etc/skel/.config/libvirt/qemu.conf"
+    assert_file_exists "$qemu_config"
+    assert_contains "$qemu_config" 'max_core = 0'
+}
+
+@test "local Plasma desktop layout lives in overlay" {
+    assert_file_exists "$overlay/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc"
+    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc'
+    assert_not_contains "$skel_configure" '/ctx/skel/.config/plasma-org.kde.plasma.desktop-appletsrc'
+}
+
+@test "kwin VM compatibility files live in overlay" {
+    assert_file_exists "$overlay/usr/libexec/kwin-vm-compat.sh"
+    assert_file_exists "$overlay/etc/xdg/autostart/kwin-vm-compat.desktop"
+    assert_contains "$overlay/etc/xdg/autostart/kwin-vm-compat.desktop" 'Exec=/usr/libexec/kwin-vm-compat.sh'
+}
+
+@test "skel configure script does not install overlay-owned static files" {
+    assert_not_contains "$skel_configure" '/ctx/skel/.config/systemd/user/'
+    assert_not_contains "$skel_configure" '/ctx/skel/.local/bin/kwin-vm-compat.sh'
+    assert_not_contains "$skel_configure" '/ctx/skel/.config/autostart/kwin-vm-compat.desktop'
+}
+
+@test "local timezone is represented by overlay" {
+    run test -L "$overlay/etc/localtime"
+    [ "$status" -eq 0 ]
+    run readlink "$overlay/etc/localtime"
+    [ "$status" -eq 0 ]
+    [ "$output" = "/usr/share/zoneinfo/America/Sao_Paulo" ]
+    assert_not_contains "$cleanup_configure" 'ln -sf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime'
+}
+
 @test "services configure script does not generate tuned active profile files" {
     assert_not_contains "$services_configure" 'echo "balanced-workstation" > /etc/tuned/active_profile'
     assert_not_contains "$services_configure" 'echo "auto" > /etc/tuned/profile_mode'
@@ -94,6 +207,45 @@ setup() {
     assert_contains "$installer_build" 'install_image_ref="${_ref}"'
     assert_not_contains "$installer_build" 'imageref="${_ref%%:*}"'
     assert_not_contains "$installer_build" 'imagetag="${_ref##*:}"'
+}
+
+@test "image-fedora Anaconda profile lives in installer and overlay" {
+    assert_file_exists "$anaconda_profile_installer"
+    assert_file_exists "$anaconda_profile_overlay"
+    cmp -s "$anaconda_profile_installer" "$anaconda_profile_overlay" || {
+        echo "expected installer and overlay Anaconda profiles to match" >&2
+        return 1
+    }
+}
+
+@test "image-fedora Anaconda profile uses BTRFS defaults" {
+    assert_contains "$anaconda_profile_installer" 'profile_id = image-fedora'
+    assert_contains "$anaconda_profile_installer" 'os_id = fedora'
+    assert_contains "$anaconda_profile_installer" 'default_scheme = BTRFS'
+    assert_contains "$anaconda_profile_installer" 'btrfs_compression = zstd:1'
+    assert_contains "$anaconda_profile_installer" 'default_partitioning ='
+    assert_contains "$anaconda_profile_installer" '    /     (min 1 GiB, max 70 GiB)'
+    assert_contains "$anaconda_profile_installer" '    /home (min 500 MiB, free 50 GiB)'
+    assert_contains "$anaconda_profile_installer" '    /var  (btrfs)'
+    assert_contains "$anaconda_profile_installer" 'hidden_webui_pages ='
+    assert_contains "$anaconda_profile_installer" '    network'
+}
+
+@test "installer copies shared system files into live image" {
+    assert_contains "$installer_build" 'cp -a /src/system_files/shared/. /'
+}
+
+@test "installer embeds payload and installs from container storage" {
+    assert_contains "$installer_build" 'mountpoint -q /usr/lib/containers/storage'
+    assert_contains "$installer_build" 'podman save --format oci-archive "$INSTALL_IMAGE_PAYLOAD"'
+    assert_contains "$installer_build" 'podman pull "$INSTALL_IMAGE_PAYLOAD"'
+    assert_contains "$installer_build" '--transport=containers-storage --no-signature-verification'
+    assert_not_contains "$installer_build" '--transport=registry --no-signature-verification'
+}
+
+@test "installer lets Anaconda profile own storage defaults" {
+    assert_not_contains "$installer_build" 'part / --fstype=xfs --size=20480'
+    assert_not_contains "$installer_build" 'part /home --fstype=xfs --size=1 --grow'
 }
 
 @test "installer Containerfile uses literal ARG defaults" {

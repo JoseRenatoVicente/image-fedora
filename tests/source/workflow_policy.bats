@@ -93,6 +93,25 @@ setup() {
     assert_not_contains "$build_workflow" '--cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest'
 }
 
+@test "Containerfile uses hash labels to invalidate bind-mounted RUN layers" {
+    assert_contains "$containerfile" 'ARG PKG_CACHE_KEY=""'
+    assert_contains "$containerfile" 'ARG CONFIG_CACHE_KEY=""'
+    assert_contains "$containerfile" 'LABEL org.image-fedora.pkg-cache-key="${PKG_CACHE_KEY}"'
+    assert_contains "$containerfile" 'LABEL org.image-fedora.config-cache-key="${CONFIG_CACHE_KEY}"'
+    assert_contains "$containerfile" '--mount=type=bind,from=ctx-pkgs'
+    assert_contains "$containerfile" '--mount=type=bind,from=ctx,'
+    assert_not_contains "$containerfile" 'COPY --from=ctx-pkgs / /ctx-pkgs/'
+    assert_not_contains "$containerfile" 'COPY --from=ctx / /ctx/'
+}
+
+@test "build.yml computes and passes build input cache keys" {
+    assert_contains "$build_workflow" 'set -euo pipefail'
+    assert_contains "$build_workflow" 'PKG_CACHE_KEY=$(git ls-files'
+    assert_contains "$build_workflow" 'CONFIG_CACHE_KEY=$(git ls-files'
+    assert_contains "$build_workflow" 'PKG_CACHE_KEY=${{ env.PKG_CACHE_KEY }}'
+    assert_contains "$build_workflow" 'CONFIG_CACHE_KEY=${{ env.CONFIG_CACHE_KEY }}'
+}
+
 # ── Static analysis ─────────────────────────────────────────────────────────
 
 @test "tests.yml runs shellcheck" {

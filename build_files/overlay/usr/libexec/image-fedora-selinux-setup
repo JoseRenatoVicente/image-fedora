@@ -1,0 +1,15 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+cil_dir=/usr/share/selinux/image-fedora
+shopt -s nullglob
+cil_files=("${cil_dir}"/*.cil)
+
+if (( ${#cil_files[@]} == 0 )); then
+    echo "No image-fedora SELinux CIL payload found in ${cil_dir}" >&2
+    exit 1
+fi
+
+semodule -X 300 -i "${cil_files[@]}"
+setsebool deny_ptrace=on
+setsebool container_allow_ptrace=off

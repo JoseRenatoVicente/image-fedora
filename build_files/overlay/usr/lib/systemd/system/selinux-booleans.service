@@ -1,0 +1,13 @@
+[Unit]
+Description=Apply SELinux runtime booleans for desktop hardening
+Documentation=man:setsebool(8)
+ConditionSecurity=selinux
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/image-fedora-selinux-setup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

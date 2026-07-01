@@ -7,6 +7,7 @@ setup() {
     load '../helpers/common'
     # shellcheck source=/dev/null
     source "${REPO_ROOT}/build_files/scripts/shared/package-lists.sh"
+    build_packages="${REPO_ROOT}/build_files/scripts/build-packages.sh"
     in_list() {  # in_list <needle> <haystack...>
         local needle="$1"; shift
         local x
@@ -69,6 +70,20 @@ setup() {
             return 1
         fi
     done
+}
+
+@test "rounded-corners COPR best-effort is not an unconditional requirement" {
+    assert_contains "$build_packages" 'WARN: kwin-effect-roundcorners não instalado'
+    if in_list kwin-effect-roundcorners "${REQUIRED_PACKAGES[@]}" "${KDE_REQUIRED[@]}"; then
+        echo "Contradição: kwin-effect-roundcorners é best-effort mas está em REQUIRED/KDE_REQUIRED"
+        return 1
+    fi
+}
+
+@test "required hardened_malloc COPR install fails fast" {
+    if in_list hardened_malloc "${REQUIRED_PACKAGES[@]}"; then
+        assert_not_contains "$build_packages" 'WARN: hardened_malloc não instalado'
+    fi
 }
 
 @test "remoção de build deps não faz autoremove de runtime KDE" {

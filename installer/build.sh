@@ -9,6 +9,8 @@ INSTALL_IMAGE_PAYLOAD=${INSTALL_IMAGE_PAYLOAD:?}
 # /root pode ser symlink em base-atomic
 mkdir -p "$(realpath /root)"
 
+# Ficheiros estáticos do instalador (perfil Anaconda, overrides, etc.).
+cp -a /src/system_files/shared/. /
 
 # ── Initramfs live ────────────────────────────────────────────────────────────
 dnf install -y dracut-live
@@ -45,6 +47,14 @@ fi
 dnf install -y --allowerasing anaconda-live libblockdev-{btrfs,lvm,dm}
 mkdir -p /var/lib/rpm-state
 
+# ── Payload offline para o Anaconda ───────────────────────────────────────────
+if mountpoint -q /usr/lib/containers/storage; then
+    podman save --format oci-archive "$INSTALL_IMAGE_PAYLOAD" \
+        | podman load --storage-opt additionalimagestore=''
+else
+    podman pull "$INSTALL_IMAGE_PAYLOAD"
+fi
+
 # Referência da imagem para o kickstart (strip scheme, keep registry path).
 # Preserve registries with ports and digest references; splitting on ':' breaks
 # refs such as registry:5000/org/image:tag.
@@ -76,15 +86,8 @@ chmod 755 /etc/flatpak-user-setup.sh
 # Kickstart defaults — Anaconda lê este ficheiro no arranque
 cat >> /usr/share/anaconda/interactive-defaults.ks << EOF
 
-# Particionamento padrão — /home numa partição dedicada preserva os dados do utilizador
-# ao trocar de sistema via `bootc switch` sem perder configurações
-clearpart --all --initlabel
-reqpart --add-boot
-part / --fstype=xfs --size=20480
-part /home --fstype=xfs --size=1 --grow
-
-# Instala a partir do registry durante a instalação (requer internet)
-ostreecontainer --url=${install_image_ref} --transport=registry --no-signature-verification
+# Instala a partir do container storage local da live ISO (offline)
+ostreecontainer --url=${install_image_ref} --transport=containers-storage --no-signature-verification
 
 # Copia o script de setup de flatpaks para o sistema instalado
 %post --nochroot --erroronfail --log=/tmp/flatpak-setup.log

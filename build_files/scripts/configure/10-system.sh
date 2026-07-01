@@ -11,6 +11,9 @@ rm -f /etc/yum.repos.d/rpmfusion-*.repo
 # Mirrored filesystem tree: each file already lives at its final path under
 # build_files/etc/ and build_files/usr/; cp -aT overlays them in one shot.
 cp -aT /ctx/overlay/etc/ /etc/
+# Fedora bases may ship /usr/bin/dnf as a symlink to dnf5; remove it so the
+# immutable dnf wrapper does not overwrite /usr/bin/dnf5 through the symlink.
+rm -f /usr/bin/dnf
 cp -aT /ctx/overlay/usr/ /usr/
 
 # Popula /etc/group com os grupos padrão do sistema definidos em /usr/lib/group
@@ -44,7 +47,9 @@ chmod 755 /usr/bin/dnf
 chmod 755 /usr/libexec/fedora-shell-setup \
           /usr/libexec/fedora-dev-setup \
           /usr/libexec/fedora-brew-setup \
-          /usr/libexec/fedora-kinoite-plasmalogin-workaround
+          /usr/libexec/kwin-vm-compat.sh \
+          /usr/libexec/fedora-kinoite-plasmalogin-workaround \
+          /usr/libexec/image-fedora-selinux-setup
 chmod 755 /usr/bin/tpm2-luks-enroll
 chmod 755 /usr/bin/tpm2-first-enroll
 # /etc/ld.so.preload: root-only (0600) — applied by the dynamic linker to ALL
@@ -97,7 +102,9 @@ setfattr -n user.component -v "security-hardening" \
     /etc/tmpfiles.d/audit-log-dir.conf \
     /etc/security/pwhistory.conf \
     /etc/fstab \
-    /usr/lib/bootc/kargs.d/30-audit.toml
+    /usr/lib/bootc/kargs.d/30-audit.toml \
+    /usr/lib/systemd/system/selinux-booleans.service \
+    /usr/libexec/image-fedora-selinux-setup
 
 setfattr -n user.component -v "image-config" \
     /etc/dracut.conf.d/10-boot-performance.conf \
@@ -121,6 +128,7 @@ setfattr -n user.component -v "image-config" \
     /usr/lib/systemd/system-preset/35-security-desktop.preset \
     /usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service \
     /usr/libexec/fedora-kinoite-plasmalogin-workaround \
+    /usr/libexec/kwin-vm-compat.sh \
     /etc/xdg/kwinrc \
     /etc/xdg/kdeglobals \
     /etc/systemd/journald.conf.d/size-limit.conf \

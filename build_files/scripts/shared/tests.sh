@@ -470,6 +470,11 @@ echo "=== SUID removal ==="
 [[ -x /usr/bin/pkexec ]]    || fail "pkexec deve existir para fluxos polkit/liveinst"
 [[ -u /usr/bin/pkexec ]]    || fail "pkexec deve manter SUID para elevar via polkit/liveinst"
 [[ -u /usr/bin/sudo ]]     || fail "sudo perdeu bit SUID (necessário para KDE/kdesu)"
+mapfile -d '' _hmalloc_libs < <(find /usr/lib /usr/lib64 -type f -name 'libhardened_malloc*.so' -print0 2>/dev/null || true)
+((${#_hmalloc_libs[@]} > 0)) || fail "hardened_malloc: bibliotecas não encontradas"
+for _hmalloc_lib in "${_hmalloc_libs[@]}"; do
+    [[ -u "$_hmalloc_lib" ]] || fail "hardened_malloc: $_hmalloc_lib perdeu SUID para preload em binários privilegiados"
+done
 
 echo "=== Container signing ==="
 [[ -f /etc/containers/registries.d/quay.io-fedora-ostree-desktops.yaml ]] \
@@ -478,17 +483,28 @@ echo "=== Container signing ==="
     || fail "Container signing: policy ausente para toolbx-images"
 
 echo "=== SELinux CIL policies ==="
-semodule -l 2>/dev/null | grep -q 'secureblue_deny_ipsec_sockets' \
-    || fail "SELinux: módulo secureblue_deny_ipsec_sockets não carregado"
+SELINUX_PAYLOAD_DIR="/usr/share/selinux/image-fedora"
+[[ -f "$SELINUX_PAYLOAD_DIR/secureblue_socket_utils.cil" ]] \
+    || fail "SELinux: payload secureblue_socket_utils.cil ausente"
+[[ -f "$SELINUX_PAYLOAD_DIR/secureblue_deny_ipsec_sockets.cil" ]] \
+    || fail "SELinux: payload secureblue_deny_ipsec_sockets.cil ausente"
+[[ -f "$SELINUX_PAYLOAD_DIR/container-ptrace.cil" ]] \
+    || fail "SELinux: payload container-ptrace.cil ausente"
+[[ -x /usr/libexec/image-fedora-selinux-setup ]] \
+    || fail "SELinux: helper boot-time /usr/libexec/image-fedora-selinux-setup ausente"
+grep -q 'semodule -X 300 -i' /usr/libexec/image-fedora-selinux-setup \
+    || fail "SELinux: helper não instala CIL via semodule"
+grep -q 'setsebool deny_ptrace=on' /usr/libexec/image-fedora-selinux-setup \
+    || fail "SELinux: helper não aplica deny_ptrace"
+grep -q 'setsebool container_allow_ptrace=off' /usr/libexec/image-fedora-selinux-setup \
+    || fail "SELinux: helper não aplica container_allow_ptrace"
 # harden_userns / harden_container_userns foram REMOVIDOS de propósito: o deny
 # de user_namespace quebrava navegadores flatpak (bwrap/unconfined_t) e
 # rootless podman/distrobox (container_runtime_t). Garantimos que NÃO voltam.
-semodule -l 2>/dev/null | grep -q 'harden_userns' \
+find "$SELINUX_PAYLOAD_DIR" -type f -name '*harden_userns*.cil' | grep -q . \
     && fail "SELinux: harden_userns NÃO deve estar carregado (quebra flatpak/podman userns)"
-semodule -l 2>/dev/null | grep -q 'harden_container_userns' \
+find "$SELINUX_PAYLOAD_DIR" -type f -name '*harden_container_userns*.cil' | grep -q . \
     && fail "SELinux: harden_container_userns NÃO deve estar carregado (quebra podman/distrobox)"
-semodule -l 2>/dev/null | grep -q 'container-ptrace' \
-    || fail "SELinux: módulo container-ptrace não carregado"
 
 echo "=== sysctl sysrq e ICMP ==="
 grep -qE '^kernel\.sysrq\s*=\s*0' /etc/sysctl.d/60-security-hardening.conf \
