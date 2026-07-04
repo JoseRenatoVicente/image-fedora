@@ -164,18 +164,32 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-first-enroll.service" 'ConditionPathExists=!/var/lib/tpm2-enrolled'
 }
 
+@test "TPM2 enroll scripts refresh initramfs through rpm-ostree" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-luks-enroll" 'rpm-ostree initramfs --enable'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll" 'rpm-ostree initramfs --enable'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll" 'tpm2-device=auto'
+}
+
 @test "DRM dracut config stays active by default" {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/dracut.conf.d/02-drm-drivers.conf" 'virtio_gpu'
 }
 
-@test "initramfs generation uses host-only hardware defaults" {
-    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--no-hostonly'
+@test "container-built initramfs is hardware-generic" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--no-hostonly'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--hostonly'
     assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--force-drivers'
     assert_not_contains "${REPO_ROOT}/build_files/scripts/shared/initramfs.sh" '--no-hostonly'
 }
 
-@test "initramfs generation stages temporary files on tmpfs" {
-    assert_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--tmpdir /tmp'
+@test "systemd preload only references installed hardened_malloc library" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system.conf.d/40-hardened_malloc.conf" 'LD_PRELOAD=libhardened_malloc.so'
+    assert_not_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system.conf.d/40-hardened_malloc.conf" 'libno_rlimit_as.so'
+}
+
+@test "initramfs generation avoids tmpfs for dracut staging" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" 'DRACUT_TMPDIR="/var/tmp/dracut-build"'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--tmpdir "$DRACUT_TMPDIR"'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/80-initramfs.sh" '--tmpdir /tmp'
 }
 
 @test "runtime initramfs keeps common rootfs discovery modules" {

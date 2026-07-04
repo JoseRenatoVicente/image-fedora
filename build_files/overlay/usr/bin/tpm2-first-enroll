@@ -23,6 +23,29 @@ MARKER=/var/lib/tpm2-enrolled
 
 mark_done() { touch "$MARKER" 2>/dev/null || true; }
 
+refresh_initramfs() {
+    if command -v rpm-ostree >/dev/null 2>&1 && rpm-ostree status >/dev/null 2>&1; then
+        info "Regenerando initramfs transacional via rpm-ostree..."
+        if rpm-ostree initramfs --enable; then
+            ok "✓ Initramfs agendado para regeneração no próximo deployment."
+            return 0
+        fi
+        warn "Não foi possível executar 'rpm-ostree initramfs --enable'."
+        warn "Execute depois: sudo rpm-ostree initramfs --enable"
+        return 1
+    fi
+
+    if command -v dracut >/dev/null 2>&1; then
+        info "Regenerando initramfs via dracut..."
+        dracut --force --regenerate-all
+        ok "✓ Initramfs regenerado."
+        return 0
+    fi
+
+    warn "Nenhum regenerador de initramfs encontrado."
+    return 1
+}
+
 # ── Guard: TPM2 present ──────────────────────────────────────────────────────
 if ! systemd-cryptenroll --tpm2-device=list >/dev/null 2>&1; then
     mark_done; exit 0
@@ -116,9 +139,12 @@ fi
 UUID="$(cryptsetup luksUUID "$TARGET_DEV" 2>/dev/null || true)"
 if [[ -n "$UUID" ]] && grep -q "$UUID" /etc/crypttab 2>/dev/null; then
     if ! grep "$UUID" /etc/crypttab | grep -q 'tpm2-device=auto'; then
+        cp -a /etc/crypttab /etc/crypttab.bak.$(date +%s)
         sed -i "/$UUID/{/tpm2-device=auto/!s/$/,tpm2-device=auto/}" /etc/crypttab
     fi
 fi
+
+refresh_initramfs || warn "O próximo boot pode continuar pedindo a senha até o initramfs ser regenerado."
 
 mark_done
 

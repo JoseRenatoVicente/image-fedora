@@ -56,8 +56,12 @@ echo "::endgroup::"
 # scx-scheds/scx-tools podem não estar disponíveis em todos os snapshots de repo.
 # Instalados separadamente para não bloquear a transação principal.
 echo "::group:: SCX scheduler"
-dnf5 install -y scx-scheds scx-tools \
-    || echo "WARN: scx-scheds/scx-tools não disponíveis nos repos; scheduler SCX inactivo"
+SCX_AVAILABLE=$(dnf5 repoquery --available --queryformat '%{name}' scx-scheds scx-tools 2>/dev/null | sort -u || true)
+if grep -qx 'scx-scheds' <<<"$SCX_AVAILABLE" && grep -qx 'scx-tools' <<<"$SCX_AVAILABLE"; then
+    dnf5 install -y scx-scheds scx-tools
+else
+    echo "INFO: scx-scheds/scx-tools não disponíveis nos repos; scheduler SCX inactivo"
+fi
 echo "::endgroup::"
 
 # ─── COPR packages (isolados) ────────────────────────────────────────────────
@@ -85,3 +89,29 @@ echo "::endgroup::"
 # qt6-qtspeech/flite parecem bloat, mas no Fedora 44 a transação de remoção
 # leva junto plasma-desktop, kwin, dolphin, konsole e ffmpeg-free. Mantemos essa
 # pilha para preservar o runtime KDE validado em shared/tests.sh.
+
+# ─── Checkpoint da rpmdb (sqlite) ────────────────────────────────────────────
+# O backend sqlite do rpm mantém um WAL (rpmdb.sqlite-wal) que só é fundido no
+# ficheiro principal quando a última conexão fecha de forma limpa. Este RUN
+# termina aqui e a camada é commitada pelo buildah a seguir — se o WAL não for
+# consolidado antes disso, o Layer 2 (noutro processo/camada) abre uma rpmdb.sqlite
+# desatualizada e "rpm -q" passa a reportar o estado ANTERIOR a este script
+# inteiro (pacotes removidos parecem instalados, pacotes instalados parecem
+# ausentes), mesmo com os ficheiros reais já corretos em disco. Forçamos o
+# checkpoint explicitamente para garantir que a rpmdb committed na imagem
+# reflete as instalações/remoções acima.
+echo "::group:: Checkpoint rpmdb"
+rpmdb --rebuilddb || {
+    rebuild_dir="$(find /usr/share -maxdepth 1 -type d -name 'rpmrebuilddb.*' | sort | tail -1)"
+    if [[ -n "$rebuild_dir" ]]; then
+        rm -f /usr/share/rpm/rpmdb.sqlite /usr/share/rpm/rpmdb.sqlite-shm \
+            /usr/share/rpm/rpmdb.sqlite-wal /usr/share/rpm/.rpm.lock
+        cp -a "$rebuild_dir"/. /usr/share/rpm/
+        rm -rf "$rebuild_dir"
+    else
+        echo "FATAL: rpmdb --rebuilddb falhou e nenhum rpmrebuilddb.* encontrado para recuperar" >&2
+        exit 1
+    fi
+}
+rpm -q distrobox > /dev/null 2>&1 || { echo "FATAL: rpmdb inconsistente após checkpoint (distrobox não encontrado)" >&2; exit 1; }
+echo "::endgroup::"

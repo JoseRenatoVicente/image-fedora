@@ -20,6 +20,30 @@ info() { printf '%s\n' "$*"; }
 
 PCRS="7"
 
+refresh_initramfs() {
+    if command -v rpm-ostree >/dev/null 2>&1 && rpm-ostree status >/dev/null 2>&1; then
+        info "Regenerando initramfs transacional via rpm-ostree..."
+        if rpm-ostree initramfs --enable; then
+            ok "✓ Initramfs agendado para regeneração no próximo deployment."
+            warn "  Reinicie para activar o desbloqueio automático via TPM2."
+            return 0
+        fi
+        warn "Não foi possível executar 'rpm-ostree initramfs --enable'."
+        warn "Execute manualmente: sudo rpm-ostree initramfs --enable"
+        return 1
+    fi
+
+    if command -v dracut >/dev/null 2>&1; then
+        info "Regenerando initramfs via dracut..."
+        dracut --force --regenerate-all
+        ok "✓ Initramfs regenerado."
+        return 0
+    fi
+
+    warn "Nenhum regenerador de initramfs encontrado."
+    return 1
+}
+
 [[ $EUID -eq 0 ]] || { err "Execute como root (sudo tpm2-luks-enroll)."; exit 1; }
 
 # ── 1. Secure Boot ────────────────────────────────────────────────────────────
@@ -84,17 +108,15 @@ if [[ -n "$UUID" ]] && [[ -f /etc/crypttab ]] && grep -q "$UUID" /etc/crypttab; 
     if ! grep "$UUID" /etc/crypttab | grep -q 'tpm2-device=auto'; then
         warn "A entrada de /etc/crypttab para este device não tem 'tpm2-device=auto'."
         info "Linha atual:"; grep "$UUID" /etc/crypttab | sed 's/^/  /'
-        read -rp "Adicionar 'tpm2-device=auto' à entrada? [s/N] " a
-        if [[ "${a,,}" == s ]]; then
-            cp -a /etc/crypttab /etc/crypttab.bak.$(date +%s)
-            sed -i "/$UUID/{/tpm2-device=auto/!s/$/,tpm2-device=auto/}" /etc/crypttab
-            ok "✓ /etc/crypttab atualizado (backup criado)."
-            warn "  Regenere o initramfs para refletir: sudo dracut --force --regenerate-all"
-        fi
+        cp -a /etc/crypttab /etc/crypttab.bak.$(date +%s)
+        sed -i "/$UUID/{/tpm2-device=auto/!s/$/,tpm2-device=auto/}" /etc/crypttab
+        ok "✓ /etc/crypttab atualizado (backup criado)."
     else
         ok "✓ /etc/crypttab já tem tpm2-device=auto."
     fi
 fi
+
+refresh_initramfs || warn "O próximo boot pode continuar pedindo a senha até o initramfs ser regenerado."
 
 # ── 6. Recovery key (recomendado) ────────────────────────────────────────────
 info ""

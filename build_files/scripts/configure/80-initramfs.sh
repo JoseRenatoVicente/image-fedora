@@ -1,16 +1,14 @@
 #!/bin/bash
-# Regenera um initramfs HOST-ONLY enxuto, forçando via /etc/dracut.conf.d os
-# drivers essenciais de storage/crypt/virtio_gpu, e valida que ostree + storage
-# ficam presentes — sem eles não arranca.
+# Regenera um initramfs genérico para a imagem construída em container, forçando
+# via /etc/dracut.conf.d os drivers essenciais de storage/crypt/virtio_gpu, e
+# valida que ostree + storage ficam presentes — sem eles não arranca.
 #
-# Porquê --hostonly agora: em testes, dracut no container de build consegue
-# gerar initramfs host-only de ~60 MB (vs ~235 MB genérico) porque os drivers de
-# storage críticos são explicitamente adicionados em
-# /etc/dracut.conf.d/03-storage-drivers.conf (add_drivers). Os drivers
-# virtio_blk/sd_mod/ahci/libahci são built-in no kernel fc44, por isso não
-# precisam de .ko no initramfs; nvme e virtio_scsi são adicionados pela config.
-# O modo genérico incluía centenas de firmwares/drivers de GPU não essenciais no
-# initrd, inflacionando a ISO.
+# Porquê --no-hostonly aqui: o dracut corre dentro de um container, sem a árvore
+# /sys do hardware onde o sistema será instalado. Um initramfs host-only gerado
+# nesse contexto pode arrancar na ISO/live mas falhar após a instalação porque o
+# disco real/VM não é descoberto no initrd. O modo genérico custa espaço, mas é a
+# opção segura para o primeiro boot; depois, updates do bootc podem regenerar o
+# initramfs no sistema instalado com acesso ao hardware real.
 #
 # A verificação no fim aceita drivers presentes no initramfs OU built-in no
 # kernel (modules.builtin), evitando falsos-negativos.
@@ -22,11 +20,21 @@ trap 'printf "\033[1;31mERRO linha %s: %s\033[0m\n" "$LINENO" "$BASH_COMMAND" >&
 # antes do dracut resolve o erro; no sistema real é gerido por systemd-tmpfiles.
 mkdir -p /var/roothome
 
+# O Containerfile monta /tmp como tmpfs para acelerar o build. Nesse tmpfs,
+# dracut-install falha ao preservar ownership/xattrs em rootless build
+# ("cp: setting attributes ... Operation not supported"). Use /var/tmp, que
+# fica no filesystem da camada e suporta os atributos que o dracut preserva.
+DRACUT_TMPDIR="/var/tmp/dracut-build"
+rm -rf "$DRACUT_TMPDIR"
+mkdir -p "$DRACUT_TMPDIR"
+trap 'rm -rf "$DRACUT_TMPDIR"' EXIT
+export DRACUT_NO_XATTR=1
+
 KVER=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | sort -V | tail -1)
 INITRAMFS="/usr/lib/modules/$KVER/initramfs.img"
 
 depmod "$KVER" 2>/dev/null || true
-dracut --force --hostonly --tmpdir /tmp --kver "$KVER" "$INITRAMFS"
+dracut --force --no-hostonly --tmpdir "$DRACUT_TMPDIR" --kver "$KVER" "$INITRAMFS"
 [[ -s "$INITRAMFS" ]] || { echo "FATAL: initramfs vazio após dracut: $INITRAMFS"; exit 1; }
 
 INITRD_MODS=$(lsinitrd --mod "$INITRAMFS" 2>/dev/null)
