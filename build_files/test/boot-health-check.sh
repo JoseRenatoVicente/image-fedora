@@ -178,7 +178,7 @@ fi
 
 # ── 6. Serviços essenciais ativos ────────────────────────────────────────────
 # display-manager.service é o alias estável → plasmalogin.service (rebrand do SDDM)
-for svc in earlyoom tuned firewalld chronyd display-manager; do
+for svc in systemd-oomd tuned firewalld chronyd display-manager; do
     if systemctl is-active "$svc" &>/dev/null; then
         report PASS "Ativo: $svc"
     else

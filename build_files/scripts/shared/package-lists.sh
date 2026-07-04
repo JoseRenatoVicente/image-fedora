@@ -162,7 +162,6 @@ INSTALL_PACKAGES=(
     # SCX scheduler: instalado em best-effort separado em build-packages.sh
     # (pode não estar disponível em todos os snapshots de repo Fedora)
     # Sistema
-    earlyoom
     tuned tuned-ppd
     zram-generator
     # Auditoria (CIS §6.3): auditd + augenrules. Regras em /etc/audit/rules.d/.
@@ -219,7 +218,6 @@ BUILD_DEPS=(
 # INSTALL_PACKAGES mas têm de acabar instaladas.
 REQUIRED_PACKAGES=(
     distrobox
-    earlyoom
     fastfetch
     ffmpeg
     firewalld

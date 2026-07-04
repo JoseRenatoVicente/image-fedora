@@ -39,7 +39,7 @@ if [[ -z "$BOOT_PART" ]]; then
 fi
 DISK_NAME=$(lsblk -no PKNAME "$BOOT_PART")
 DISK="/dev/$DISK_NAME"
-PARTNO=$(lsblk -no PARTNO "$BOOT_PART")
+PARTNO=$(lsblk -no PARTN "$BOOT_PART")
 
 log "disco: $DISK  partição /boot: $PARTNO"
 

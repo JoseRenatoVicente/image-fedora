@@ -23,7 +23,6 @@ enable_unit \
     sshd.service \
     podman.socket \
     tuned.service \
-    earlyoom.service \
     firewalld.service \
     chronyd.service \
     rpm-ostreed-automatic.timer \

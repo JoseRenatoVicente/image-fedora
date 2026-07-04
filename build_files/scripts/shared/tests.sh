@@ -51,7 +51,6 @@ echo "=== Serviços systemd ==="
 REQUIRED_UNITS=(
     podman.socket
     tuned.service
-    earlyoom.service
     firewalld.service
     chronyd.service
     flatpak-nuke-fedora.service

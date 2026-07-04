@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cil_dir=/usr/share/selinux/image-fedora
+stamp=/etc/.image-fedora-selinux-setup.stamp
 shopt -s nullglob
 cil_files=("${cil_dir}"/*.cil)
 
@@ -10,6 +11,12 @@ if (( ${#cil_files[@]} == 0 )); then
     exit 1
 fi
 
-semodule -X 300 -i "${cil_files[@]}"
+# semodule -i relinks the whole policy store, not just the new module, which
+# costs several seconds. Skip it on boots where the CIL payload is unchanged.
+current_hash=$(cat "${cil_files[@]}" | sha256sum | cut -d' ' -f1)
+if [[ "$(cat "$stamp" 2>/dev/null)" != "$current_hash" ]]; then
+    semodule -X 300 -i "${cil_files[@]}"
+    echo "$current_hash" > "$stamp"
+fi
 setsebool deny_ptrace=on
 setsebool container_allow_ptrace=off
