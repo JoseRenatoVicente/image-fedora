@@ -23,11 +23,12 @@ disable rpcbind.service
 disable rpcbind.socket
 disable rpcbind.target
 
-# Desabilitar SSH
-disable sshd.service
+# SSH server is enabled for remote administration. Keep sshd-keygen available so
+# first boot can create host keys before sshd starts.
+enable sshd.service
+enable sshd-keygen.target
 disable sshd.socket
 disable sshd-unix-local.socket
-disable sshd-keygen.target
 
 # Desabilitar serviços rootful não confinados
 disable low-memory-monitor.service

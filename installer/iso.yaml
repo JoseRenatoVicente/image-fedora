@@ -3,8 +3,8 @@ grub2:
   timeout: 3
   entries:
     - name: "Launch Installer"
-      linux: "/images/pxeboot/vmlinuz quiet rhgb root=live:CDLABEL=Fedora-Live enforcing=0 rd.live.image"
+      linux: "/images/pxeboot/vmlinuz quiet rhgb root=live:CDLABEL=Fedora-Live rd.live.image"
       initrd: "/images/pxeboot/initrd.img"
     - name: "Launch Installer (Basic Graphics Mode)"
-      linux: "/images/pxeboot/vmlinuz quiet rhgb root=live:CDLABEL=Fedora-Live enforcing=0 rd.live.image nomodeset"
+      linux: "/images/pxeboot/vmlinuz quiet rhgb root=live:CDLABEL=Fedora-Live rd.live.image nomodeset"
       initrd: "/images/pxeboot/initrd.img"

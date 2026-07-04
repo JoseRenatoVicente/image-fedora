@@ -209,6 +209,10 @@ setup() {
     assert_not_contains "$installer_build" 'imagetag="${_ref##*:}"'
 }
 
+@test "installer ISO does not force SELinux permissive mode" {
+    assert_not_contains "${REPO_ROOT}/installer/iso.yaml" 'enforcing=0'
+}
+
 @test "image-fedora Anaconda profile lives in installer and overlay" {
     assert_file_exists "$anaconda_profile_installer"
     assert_file_exists "$anaconda_profile_overlay"

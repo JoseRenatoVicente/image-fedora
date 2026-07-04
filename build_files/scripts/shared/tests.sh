@@ -392,6 +392,11 @@ done
 
 [[ -f "/usr/share/color-schemes/Mokka.colors" ]] || fail "Mokka: color scheme ausente"
 [[ -d "/usr/share/plasma/desktoptheme/Mokka" ]]  || fail "Mokka: desktop theme ausente"
+MOKKA_PLASMARC="/usr/share/plasma/desktoptheme/Mokka/plasmarc"
+grep -q '^enabled=false$' <(sed -n '/^\[AdaptiveTransparency\]/,/^\[/{p}' "$MOKKA_PLASMARC" 2>/dev/null) \
+    || fail "Mokka: AdaptiveTransparency não está desativado em $MOKKA_PLASMARC"
+grep -q '^enabled=true$' <(sed -n '/^\[BlurBehindEffect\]/,/^\[/{p}' "$MOKKA_PLASMARC" 2>/dev/null) \
+    || fail "Mokka: BlurBehindEffect não está alinhado ao host em $MOKKA_PLASMARC"
 
 APPLETSRC_WALL=$(grep '^Image=' /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null | head -1 | sed 's|^Image=file://||')
 if [[ -n "$APPLETSRC_WALL" ]]; then

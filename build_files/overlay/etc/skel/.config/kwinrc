@@ -11,11 +11,25 @@ TransitionTime=30
 blurEnabled=false
 kwin4_effect_roundcornersEnabled=false
 roundcornersEnabled=false
+shapeCornersEnabled=false
+shapecornersEnabled=false
+
+[Round-Corners]
+ActiveOutlineAlpha=0
+ActiveOutlineUseCustom=true
+ActiveOutlineUsePalette=false
+InactiveOutlineAlpha=0
+InactiveOutlineThickness=0
+InactiveOutlineUseCustom=true
+InactiveOutlineUsePalette=false
+InactiveSecondOutlineThickness=0
+OutlineThickness=0
+SecondOutlineThickness=0
 
 [org.kde.kdecoration2]
 BorderSize=None
 BorderSizeAuto=false
 ButtonsOnLeft=
 ButtonsOnRight=IAX
-library=org.kde.kwin.aurorae
-theme=__aurorae__svg__CatppuccinMocha-Classic
+library=org.kde.breeze
+theme=Breeze

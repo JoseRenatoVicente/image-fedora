@@ -135,9 +135,18 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system.conf.d/40-hardened_malloc.conf" 'LD_PRELOAD=libhardened_malloc.so'
 }
 
-@test "sshd is masked in configure script" {
+@test "public desktop config files are made world-readable during configure" {
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/10-system.sh" '/etc/locale.conf'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/10-system.sh" '/usr/share/qt6/qtlogging.ini'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/10-system.sh" '/usr/share/wireplumber/wireplumber.conf.d/51-disable-suspension.conf'
+    assert_contains "${REPO_ROOT}/build_files/scripts/configure/10-system.sh" 'chmod 0644'
+}
+
+@test "sshd is enabled and host key generation is not masked" {
     assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'sshd.service'
-    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'sshd.socket'
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'sshd-keygen.target'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset" 'enable sshd.service'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset" 'enable sshd-keygen.target'
 }
 
 @test "NFS server daemons are masked in configure script" {

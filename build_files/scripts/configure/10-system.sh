@@ -16,6 +16,35 @@ cp -aT /ctx/overlay/etc/ /etc/
 rm -f /usr/bin/dnf
 cp -aT /ctx/overlay/usr/ /usr/
 
+# The build runs with a restrictive umask, but desktop/user daemons must be able
+# to read public configuration from /etc and /usr/share. Keep explicit secrets
+# out of these lists; root-only files such as shadow, sudoers and host keys are
+# handled separately below or by their owning packages.
+for public_config in \
+    /etc/locale.conf \
+    /etc/motd \
+    /etc/timezone \
+    /etc/vconsole.conf \
+    /usr/share/qt6/qtlogging.ini \
+    /usr/share/wireplumber/wireplumber.conf.d/51-disable-suspension.conf; do
+    [[ -e "$public_config" ]] && chmod 0644 "$public_config"
+done
+
+for public_config_dir in \
+    /etc/dracut.conf.d \
+    /etc/modprobe.d \
+    /etc/profile.d \
+    /etc/security/limits.d \
+    /etc/skel \
+    /etc/sysctl.d \
+    /etc/systemd \
+    /etc/tmpfiles.d \
+    /etc/xdg \
+    /usr/lib/systemd/system \
+    /usr/lib/systemd/system-preset; do
+    [[ -d "$public_config_dir" ]] && find "$public_config_dir" -type f -exec chmod 0644 {} +
+done
+
 # Popula /etc/group com os grupos padrão do sistema definidos em /usr/lib/group
 # (sysusers.d altfiles). No OSTree, /etc/group tem apenas as contas de serviço
 # criadas durante a build; os grupos de legacy Unix (audio, disk, kvm, tty, video,

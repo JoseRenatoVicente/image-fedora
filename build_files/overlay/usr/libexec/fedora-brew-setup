@@ -21,8 +21,25 @@ safe_run() {
     bash "$tmp" "$@"
 }
 
+wait_for_network() {
+    local tries=60
+    while (( tries > 0 )); do
+        if getent hosts raw.githubusercontent.com >/dev/null 2>&1 \
+            && getent hosts github.com >/dev/null 2>&1 \
+            && getent hosts ghcr.io >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+        ((tries--))
+    done
+    echo "Network/DNS unavailable after waiting; deferring first-boot setup." >&2
+    return 1
+}
+
+wait_for_network
+
 notify-send -a 'Fedora' -i 'dialog-information' -u normal \
-    'A instalar Homebrew e ferramentas de infra (pode demorar)...'
+    'A instalar Homebrew e ferramentas de infra (pode demorar)...' || true
 
 # Homebrew — /home/linuxbrew é criado pelo tmpfiles-homebrew.conf (root:wheel 0775)
 # com permissões suficientes para utilizadores do grupo wheel instalarem sem sudo.
@@ -35,9 +52,13 @@ fi
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # Infra tools
-brew install terraform kubernetes-cli || true
-brew install fluxcd/tap/flux          || true
-brew install siderolabs/tap/talosctl  || true
+brew tap hashicorp/tap
+brew tap fluxcd/tap
+brew tap siderolabs/tap
+brew install gcc
+brew install hashicorp/tap/terraform kubernetes-cli
+brew install fluxcd/tap/flux
+brew install siderolabs/tap/talosctl
 
 notify-send -a 'Fedora' -i 'dialog-information' -u normal \
-    'Homebrew e ferramentas de infra instaladas.'
+    'Homebrew e ferramentas de infra instaladas.' || true

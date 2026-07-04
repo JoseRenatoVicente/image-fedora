@@ -20,6 +20,7 @@ enable_unit() {
 }
 
 enable_unit \
+    sshd.service \
     podman.socket \
     tuned.service \
     earlyoom.service \
@@ -77,11 +78,6 @@ systemctl mask \
     irqbalance.service \
     lm_sensors.service \
     geoclue.service \
-    sshd.service \
-    sshd.socket \
-    sshd-unix-local.socket \
-    sshd-vsock.socket \
-    sshd-keygen.target \
     rpcbind.service \
     rpcbind.socket \
     rpcbind.target \

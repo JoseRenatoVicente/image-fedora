@@ -24,6 +24,14 @@ sed -i 's|^SHELL=.*|SHELL=/bin/zsh|' /etc/default/useradd
 # Re-apply local files that intentionally diverge from upstream Mokka defaults.
 install -Dm644 /ctx/overlay/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc \
     /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc
+install -Dm644 /ctx/overlay/etc/skel/.config/kdeglobals \
+    /etc/skel/.config/kdeglobals
+install -Dm644 /ctx/overlay/etc/skel/.config/kwinrc \
+    /etc/skel/.config/kwinrc
+install -Dm644 /ctx/overlay/etc/skel/.config/breezerc \
+    /etc/skel/.config/breezerc
+install -Dm644 /ctx/overlay/etc/skel/.config/Kvantum/kvantum.kvconfig \
+    /etc/skel/.config/Kvantum/kvantum.kvconfig
 install -Dm644 /ctx/overlay/etc/skel/.config/kscreenlockerrc \
     /etc/skel/.config/kscreenlockerrc
 install -Dm644 /ctx/overlay/etc/skel/.config/gtk-3.0/settings.ini \
@@ -46,6 +54,17 @@ sed -i 's|^Image=file:///usr/share/wallpapers/garuda-mokka/Mokka-tree\.jpg$|Imag
 # mas o pacote instala o diretório em lowercase. Corrigir para evitar falha no greeter.
 sed -i 's/^cursorTheme=Catppuccin-Mocha-Mauve-Cursors$/cursorTheme=catppuccin-mocha-mauve-cursors/' \
     /usr/share/plasma/look-and-feel/Mokka/contents/defaults
+
+if [[ -f /usr/share/plasma/desktoptheme/Mokka/plasmarc ]]; then
+    kwriteconfig6 --file /usr/share/plasma/desktoptheme/Mokka/plasmarc \
+        --group AdaptiveTransparency --key enabled "false"
+    kwriteconfig6 --file /usr/share/plasma/desktoptheme/Mokka/plasmarc \
+        --group BlurBehindEffect --key enabled "true"
+    kwriteconfig6 --file /usr/share/plasma/desktoptheme/Mokka/plasmarc \
+        --group ContrastEffect --key saturation "0"
+    kwriteconfig6 --file /usr/share/plasma/desktoptheme/Mokka/plasmarc \
+        --group ContrastEffect --key contrast "100"
+fi
 
 touch /etc/plasma-setup-done
 

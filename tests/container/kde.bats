@@ -21,8 +21,17 @@ setup() {
     grep -q 'ColorScheme=Mokka' "$KDE_SKEL/kdeglobals"
 }
 
-@test "KDE widget style is kvantum-dark" {
-    grep -q 'widgetStyle=kvantum-dark' "$KDE_SKEL/kdeglobals"
+@test "KDE widget style is Breeze" {
+    grep -q 'widgetStyle=Breeze' "$KDE_SKEL/kdeglobals"
+}
+
+@test "Kvantum fallback theme is KvDark" {
+    grep -q 'theme=KvDark' "$KDE_SKEL/Kvantum/kvantum.kvconfig"
+}
+
+@test "Breeze window outline is disabled" {
+    grep -q 'OutlineEnabled=false' "$KDE_SKEL/breezerc"
+    grep -q 'OutlineIntensity=OutlineOff' "$KDE_SKEL/breezerc"
 }
 
 @test "KDE icon theme is Tela-circle-dracula-dark" {

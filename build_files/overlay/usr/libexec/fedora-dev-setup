@@ -23,6 +23,24 @@ safe_run() {
     bash "$tmp" "$@"
 }
 
+wait_for_network() {
+    local tries=60
+    while (( tries > 0 )); do
+        if getent hosts raw.githubusercontent.com >/dev/null 2>&1 \
+            && getent hosts github.com >/dev/null 2>&1 \
+            && getent hosts nodejs.org >/dev/null 2>&1 \
+            && getent hosts registry.npmjs.org >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+        ((tries--))
+    done
+    echo "Network/DNS unavailable after waiting; deferring first-boot setup." >&2
+    return 1
+}
+
+wait_for_network
+
 notify-send -a 'Fedora' -i 'dialog-information' -u normal \
     'A instalar ferramentas de desenvolvimento (NVM, Node.js, LazyDocker)...' || true
 
@@ -43,8 +61,8 @@ nvm use default
 set -u
 
 # npm globals
-npm install -g pnpm || true
-npm install -g "opencode-ai@${OPENCODE_NPM_VERSION}" || true
+npm install -g pnpm
+npm install -g "opencode-ai@${OPENCODE_NPM_VERSION}"
 
 # LazyDocker
 if [[ ! -f "$HOME/bin/lazydocker" ]] && [[ ! -f "$HOME/.local/bin/lazydocker" ]]; then

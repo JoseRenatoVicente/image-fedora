@@ -11,4 +11,4 @@ Theme=Tela-circle-dracula-dark
 
 [KDE]
 LookAndFeelPackage=Mokka
-widgetStyle=kvantum-dark
+widgetStyle=Breeze

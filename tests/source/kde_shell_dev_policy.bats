@@ -28,8 +28,11 @@ setup() {
     assert_tree_contains "$configure_dir" 'plasma-org.kde.plasma.desktop-appletsrc'
 }
 
-@test "configure sets kvantum widget style" {
-    assert_tree_contains "$configure_dir" 'kvantum'
+@test "skel keeps Breeze widget style with KvDark fallback" {
+    local kdeglobals="${REPO_ROOT}/build_files/overlay/etc/skel/.config/kdeglobals"
+    local kvantum="${REPO_ROOT}/build_files/overlay/etc/skel/.config/Kvantum/kvantum.kvconfig"
+    assert_contains "$kdeglobals" 'widgetStyle=Breeze'
+    assert_contains "$kvantum" 'theme=KvDark'
 }
 
 @test "configure sets Catppuccin cursor theme" {
@@ -43,31 +46,47 @@ setup() {
 
 @test "configure restores local skel after upstream Mokka import" {
     local skel_configure="${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh"
+    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/kdeglobals'
+    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/kwinrc'
+    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/breezerc'
+    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/Kvantum/kvantum.kvconfig'
     assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/kscreenlockerrc'
     assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/gtk-3.0/settings.ini'
     assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/gtk-4.0/settings.ini'
 }
 
 @test "configure keeps host KDE theme family" {
-    assert_tree_contains "$configure_dir" 'LookAndFeelPackage "Mokka"'
-    assert_tree_contains "$configure_dir" 'widgetStyle "kvantum-dark"'
-    assert_tree_contains "$configure_dir" '__aurorae__svg__CatppuccinMocha-Classic'
+    local kdeglobals="${REPO_ROOT}/build_files/overlay/etc/skel/.config/kdeglobals"
+    assert_contains "$kdeglobals" 'LookAndFeelPackage=Mokka'
+    assert_contains "$kdeglobals" 'widgetStyle=Breeze'
 }
 
-@test "configure keeps window blur and rounded-corner effects enabled" {
-    assert_tree_contains "$configure_dir" '--group Plugins --key blurEnabled "true"'
-    assert_tree_contains "$configure_dir" '--group Plugins --key roundcornersEnabled "true"'
-    assert_tree_contains "$configure_dir" '--group Plugins --key kwin4_effect_roundcornersEnabled "true"'
-    assert_tree_contains "$configure_dir" '--group "org.kde.kdecoration2" --key BorderSize "None"'
+@test "skel keeps opaque decoration with buttons on the right" {
+    local kwinrc="${REPO_ROOT}/build_files/overlay/etc/skel/.config/kwinrc"
+    local breezerc="${REPO_ROOT}/build_files/overlay/etc/skel/.config/breezerc"
+    assert_contains "$kwinrc" 'blurEnabled=false'
+    assert_contains "$kwinrc" 'roundcornersEnabled=false'
+    assert_contains "$kwinrc" 'kwin4_effect_roundcornersEnabled=false'
+    assert_contains "$kwinrc" 'shapeCornersEnabled=false'
+    assert_contains "$kwinrc" 'shapecornersEnabled=false'
+    assert_contains "$kwinrc" 'OutlineThickness=0'
+    assert_contains "$kwinrc" 'SecondOutlineThickness=0'
+    assert_contains "$kwinrc" 'BorderSize=None'
+    assert_contains "$kwinrc" 'ButtonsOnLeft='
+    assert_contains "$kwinrc" 'ButtonsOnRight=IAX'
+    assert_contains "$kwinrc" 'library=org.kde.breeze'
+    assert_contains "$kwinrc" 'theme=Breeze'
+    assert_contains "$breezerc" 'OutlineEnabled=false'
+    assert_contains "$breezerc" 'OutlineIntensity=OutlineOff'
     assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key blurEnabled "false"'
     assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key roundcornersEnabled "false"'
     assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key kwin4_effect_roundcornersEnabled "false"'
 }
 
-@test "configure does not disable Kvantum Mokka transparency system-wide" {
-    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" 'translucent_windows=false'
-    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" 'blurring=false'
-    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" 'composite=false'
+@test "configure disables Mokka adaptive transparency" {
+    local skel_configure="${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh"
+    assert_contains "$skel_configure" '--group AdaptiveTransparency --key enabled "false"'
+    assert_contains "$skel_configure" '--group BlurBehindEffect --key enabled "true"'
 }
 
 # ── KDE packages present ─────────────────────────────────────────────────────
