@@ -34,6 +34,8 @@ install -Dm644 /ctx/overlay/etc/skel/.config/Kvantum/kvantum.kvconfig \
     /etc/skel/.config/Kvantum/kvantum.kvconfig
 install -Dm644 /ctx/overlay/etc/skel/.config/kscreenlockerrc \
     /etc/skel/.config/kscreenlockerrc
+install -Dm644 /ctx/overlay/etc/skel/.config/kcminputrc \
+    /etc/skel/.config/kcminputrc
 install -Dm644 /ctx/overlay/etc/skel/.config/gtk-3.0/settings.ini \
     /etc/skel/.config/gtk-3.0/settings.ini
 install -Dm644 /ctx/overlay/etc/skel/.config/gtk-4.0/settings.ini \

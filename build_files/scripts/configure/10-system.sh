@@ -81,6 +81,8 @@ chmod 755 /usr/libexec/fedora-shell-setup \
           /usr/libexec/image-fedora-selinux-setup
 chmod 755 /usr/bin/tpm2-luks-enroll
 chmod 755 /usr/bin/tpm2-first-enroll
+chmod 755 /usr/bin/tpm2-reenroll-check
+chmod 755 /usr/bin/mok-enroll
 # /etc/ld.so.preload: root-only (0600) — applied by the dynamic linker to ALL
 # processes including setuid binaries. World-readable would leak what's preloaded
 # and historically root-only is the convention for this file.
@@ -112,7 +114,10 @@ useradd -D -f 35
 setfattr -n user.component -v "security-hardening" \
     /usr/bin/tpm2-luks-enroll \
     /usr/bin/tpm2-first-enroll \
+    /usr/bin/tpm2-reenroll-check \
     /usr/lib/systemd/system/tpm2-first-enroll.service \
+    /usr/lib/systemd/system/tpm2-reenroll-check.service \
+    /usr/bin/mok-enroll \
     /etc/dracut.conf.d/90-luks-security.conf \
     /etc/ld.so.preload \
     /usr/lib/systemd/system.conf.d/40-hardened_malloc.conf \

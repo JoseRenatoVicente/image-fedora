@@ -53,6 +53,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
+    --mount=type=secret,id=mok_key,target=/run/secrets/mok_key \
     IMAGE_NAME="${IMAGE_NAME}" \
     IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME}" \
     IMAGE_VENDOR="${IMAGE_VENDOR}" \

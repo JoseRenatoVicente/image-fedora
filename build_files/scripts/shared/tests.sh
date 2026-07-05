@@ -580,7 +580,7 @@ if systemctl list-unit-files usbguard.service &>/dev/null; then
 fi
 
 echo "=== FDE: LUKS2 + TPM2 + Secure Boot ==="
-for _pkg in cryptsetup tpm2-tools mokutil hardened_malloc; do
+for _pkg in cryptsetup tpm2-tools mokutil hardened_malloc systemd-boot-unsigned; do
     rpm -q "$_pkg" &>/dev/null || fail "FDE/hardening: pacote ausente: $_pkg"
 done
 # libhardened_malloc: presente em /etc/ld.so.preload com permissões correctas
@@ -603,9 +603,25 @@ grep -q 'tpm2-tss' /etc/dracut.conf.d/90-luks-security.conf \
     || fail "FDE: /usr/bin/tpm2-luks-enroll ausente ou não executável"
 [[ -x /usr/bin/tpm2-first-enroll ]] \
     || fail "FDE: /usr/bin/tpm2-first-enroll ausente ou não executável"
+[[ -x /usr/bin/tpm2-reenroll-check ]] \
+    || fail "FDE: /usr/bin/tpm2-reenroll-check ausente ou não executável"
 # Serviço de primeiro arranque habilitado (activa TPM2 antes do greetd)
 systemctl is-enabled tpm2-first-enroll.service 2>/dev/null | grep -q '^enabled$' \
     || fail "FDE: tpm2-first-enroll.service não está habilitado"
+# Serviço de deteção de drift do selo TPM2 habilitado (reenroll após updates
+# de bootloader que mudem o PCR 7)
+systemctl is-enabled tpm2-reenroll-check.service 2>/dev/null | grep -q '^enabled$' \
+    || fail "FDE: tpm2-reenroll-check.service não está habilitado"
+
+echo "=== Secure Boot: MOK para systemd-boot ==="
+[[ -x /usr/bin/mok-enroll ]] \
+    || fail "SecureBoot: /usr/bin/mok-enroll ausente ou não executável"
+[[ -x /usr/libexec/sd-boot-migrate ]] \
+    || fail "SecureBoot: /usr/libexec/sd-boot-migrate ausente ou não executável"
+[[ -s /usr/share/secureboot/MOK.der ]] \
+    || fail "SecureBoot: /usr/share/secureboot/MOK.der ausente — mok-enroll não teria o que importar"
+systemctl is-enabled sd-boot-migrate.service 2>/dev/null | grep -q '^enabled$' \
+    || fail "SecureBoot: sd-boot-migrate.service não está habilitado"
 
 echo "=== CIS Tier 1+2: banners, sudo, mounts, auditd, pwhistory ==="
 # Banners de aviso (CIS 1.7 / STIG 211020/255025): aviso de uso autorizado +

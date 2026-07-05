@@ -199,6 +199,12 @@ INSTALL_PACKAGES=(
     # do Secure Boot. systemd-cryptenroll já vem com o systemd. Enroll real é
     # pós-install: ver /usr/bin/tpm2-luks-enroll.
     cryptsetup tpm2-tools mokutil
+    # systemd-boot (para migração opt-in via sd-boot-migrate, ver
+    # /usr/libexec/sd-boot-migrate). "-unsigned": os binários EFI só arrancam
+    # sob Secure Boot depois de assinados com a MOK do projeto — ver
+    # 65-secureboot-sign.sh. Sem a assinatura, o migrate script recusa-se a
+    # instalar (evita meter um bootloader não confiável no boot order).
+    systemd-boot-unsigned
 )
 
 # ── Build deps (instaladas no Layer 1, removidas no Layer 2 70-build-deps.sh) ─
@@ -211,6 +217,9 @@ BUILD_DEPS=(
     kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel
     libsass sassc
     rsync
+    # sbsign (assinatura Secure Boot do systemd-boot em 65-secureboot-sign.sh).
+    # Só necessário durante o build; removido daqui como os outros build deps.
+    sbsigntools
 )
 
 # ── Verificação runtime: pacotes que DEVEM estar presentes ───────────────────
@@ -258,6 +267,7 @@ REQUIRED_PACKAGES=(
     cryptsetup
     tpm2-tools
     mokutil
+    systemd-boot-unsigned
     hardened_malloc
     zsh
     fish

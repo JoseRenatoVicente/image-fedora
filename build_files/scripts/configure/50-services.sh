@@ -38,7 +38,8 @@ enable_unit \
     sd-boot-migrate.service \
     selinux-booleans.service \
     amd-cpb-boost.service \
-    tpm2-first-enroll.service
+    tpm2-first-enroll.service \
+    tpm2-reenroll-check.service
 
 # /tmp como tmpfs (CIS 1.1.2.1) — a unit upstream já traz nosuid,nodev nas Options.
 # Fora do enable_unit: se a base marcar tmp.mount como 'static', o `enable` falha e

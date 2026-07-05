@@ -29,6 +29,23 @@ if ! ls "$BOOT/loader/entries/"*.conf &>/dev/null; then
     exit 1
 fi
 
+# A MOK do projecto tem de estar enrolada NESTA máquina antes de trocar o
+# bootloader, senão o systemd-bootx64.efi assinado (65-secureboot-sign.sh)
+# não é confiado pelo Secure Boot e a máquina fica sem arrancar. O enrollment
+# exige confirmação física no MokManager — não pode ser feito por este script.
+# Ver /usr/bin/mok-enroll.
+if [[ -d /sys/firmware/efi ]] && command -v mokutil >/dev/null 2>&1; then
+    SB_STATE=$(mokutil --sb-state 2>/dev/null || true)
+    if printf '%s' "$SB_STATE" | grep -qi 'enabled'; then
+        if ! mokutil --list-enrolled 2>/dev/null | grep -qi "image-fedora Secure Boot MOK"; then
+            log "MOK do projecto ainda não enrolada — a adiar migração."
+            log "Execute 'sudo mok-enroll' e reinicie para confirmar, depois"
+            log "corra 'sudo /usr/libexec/sd-boot-migrate' manualmente."
+            exit 0
+        fi
+    fi
+fi
+
 log "a migrar de GRUB para systemd-boot…"
 
 # Descobre dispositivo e número de partição de /boot

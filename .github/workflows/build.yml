@@ -151,6 +151,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Chave privada da MOK usada para assinar o systemd-bootx64.efi (ver
+      # build_files/scripts/configure/65-secureboot-sign.sh). Só existe como
+      # secret do GitHub Actions — nunca fica em texto claro no repo ou na
+      # imagem. Ausente em builds de PRs vindas de forks (secrets não
+      # propagam); nesse caso o binário fica por assinar (best-effort, ver
+      # o script de assinatura).
+      - name: Write MOK signing key
+        env:
+          MOK_SIGNING_KEY: ${{ secrets.MOK_SIGNING_KEY }}
+        run: |
+          umask 077
+          # Ficheiro sempre criado (vazio se o secret não estiver configurado,
+          # ex.: PRs de forks) para o --secret abaixo nunca apontar para um
+          # ficheiro inexistente. 65-secureboot-sign.sh trata vazio como
+          # "sem chave" e salta a assinatura sem falhar o build.
+          printf '%s' "${MOK_SIGNING_KEY:-}" > "${{ runner.temp }}/mok.key"
+
       - name: Build Image
         id: build_image
         uses: redhat-actions/buildah-build@061ffd31bb5c3f8733a6f9bbdf00a9fb02eb708c # v2 (node24)
@@ -170,6 +187,11 @@ jobs:
           extra-args: |
             --layers
             --cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
+            --secret=id=mok_key,src=${{ runner.temp }}/mok.key
+
+      - name: Remove MOK signing key from runner
+        if: always()
+        run: shred -u "${{ runner.temp }}/mok.key" 2>/dev/null || rm -f "${{ runner.temp }}/mok.key"
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
       - name: Export image for scanning

@@ -1,0 +1,25 @@
+# Deteta drift do selo TPM2 (PCR 7) em CADA arranque pós-enroll e oferece
+# reenroll interactivo se o unseal falhou e caiu para a senha de recuperação.
+# Ao contrário do tpm2-first-enroll (ConditionPathExists=!marker, corre só
+# uma vez), este corre sempre que o marker JÁ existe — o próprio script sai
+# em silêncio se o TPM2 desbloqueou normalmente neste boot.
+[Unit]
+Description=TPM2 LUKS Seal Drift Check
+Documentation=man:systemd-cryptenroll(1)
+ConditionPathExists=/var/lib/tpm2-enrolled
+After=local-fs.target tpm2-first-enroll.service
+Before=greetd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/tpm2-reenroll-check
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TimeoutStartSec=200
+
+[Install]
+WantedBy=multi-user.target
