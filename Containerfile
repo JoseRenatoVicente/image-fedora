@@ -22,7 +22,7 @@ ARG PKG_CACHE_KEY=""
 ARG CONFIG_CACHE_KEY=""
 
 # Base Image
-FROM quay.io/fedora-ostree-desktops/base-atomic:45@sha256:d5f763964273a3ef832861113891c37751a58b6035fdbe0ef5ef71c6f1e959bc
+FROM quay.io/fedora-ostree-desktops/base-atomic:44@sha256:01edd4dc7e952a3750f8ed7b199e85543025d07b159c68698f9a0101b0a936b1
 
 ARG IMAGE_NAME="fedora"
 ARG IMAGE_PRETTY_NAME="Fedora"
