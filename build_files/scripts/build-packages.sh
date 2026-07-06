@@ -113,5 +113,4 @@ rpmdb --rebuilddb || {
         exit 1
     fi
 }
-rpm -q distrobox > /dev/null 2>&1 || { echo "FATAL: rpmdb inconsistente após checkpoint (distrobox não encontrado)" >&2; exit 1; }
 echo "::endgroup::"

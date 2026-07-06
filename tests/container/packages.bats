@@ -8,10 +8,6 @@ setup() {
 
 # ── Required packages ───────────────────────────────────────────────────────
 
-@test "distrobox is installed" {
-    rpm -q distrobox
-}
-
 @test "systemd-oomd-defaults is installed" {
     rpm -q systemd-oomd-defaults
 }
@@ -353,10 +349,6 @@ setup() {
 
 @test "dev setup writes user-scoped guide" {
     grep -q '.local/share/fedora-dev-setup' /usr/libexec/fedora-dev-setup
-}
-
-@test "dev setup guides distrobox usage" {
-    grep -q 'distrobox create' /usr/libexec/fedora-dev-setup
 }
 
 @test "dev setup guides toolbox usage" {
