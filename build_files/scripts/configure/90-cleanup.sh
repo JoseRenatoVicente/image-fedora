@@ -4,6 +4,11 @@
 set -euo pipefail
 trap 'printf "\033[1;31mERRO linha %s: %s\033[0m\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
+# bluetoothd ConfigurationDirectoryMode=0555 exige este modo; o pacote cria
+# com 755. Tem de correr DEPOIS de todas as transações dnf (70-build-deps.sh),
+# senão um dnf5 remove repõe o modo de fábrica do dir do pacote bluez.
+chmod 555 /etc/bluetooth
+
 dnf5 clean all
 rm -rf /var/cache/dnf /var/log/dnf* /var/log/hawkey*
 rm -rf /run/* /tmp/* 2>/dev/null || true

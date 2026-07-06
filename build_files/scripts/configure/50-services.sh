@@ -93,11 +93,14 @@ systemctl mask \
     nfs-client.target \
     iscsid.service \
     iscsid.socket \
-    iscsiuio.service
+    iscsiuio.service \
+    iscsiuio.socket \
+    iscsi.service
 systemctl mask --force ctrl-alt-del.target
 
-# bluetoothd ConfigurationDirectoryMode=0555 exige este modo; o pacote cria com 755.
-chmod 555 /etc/bluetooth
+# NOTA: chmod 555 /etc/bluetooth NÃO fica aqui — ver 90-cleanup.sh. O
+# 70-build-deps.sh faz dnf5 remove depois deste passo, e qualquer transação
+# rpm/dnf pode repor o modo de fábrica (755) do dir do pacote bluez.
 
 if command -v authselect >/dev/null 2>&1; then
     authselect current --raw &>/dev/null || authselect select minimal --force

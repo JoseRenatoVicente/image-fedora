@@ -81,8 +81,6 @@ REMOVE_PACKAGES=(
 INSTALL_EXCLUDES=(
     PackageKit
     PackageKit-glib
-    plasma-discover-offline-updates
-    plasma-discover-packagekit
     plasma-pk-updates
     tracker
     tracker-miners
@@ -96,7 +94,6 @@ INSTALL_EXCLUDES=(
     firefox
     orca
     speech-dispatcher
-    plasma-discover
     power-profiles-daemon
     xorg-x11-drv-nvidia
     akmod-nvidia
@@ -311,8 +308,6 @@ UNWANTED_PACKAGES=(
     ModemManager
     # input-remapper substituído por keyd
     input-remapper
-    # KDE bloat que não deve estar presente
-    plasma-discover
     plasma-workspace-wallpapers
     kde-connect
     akonadi-server
