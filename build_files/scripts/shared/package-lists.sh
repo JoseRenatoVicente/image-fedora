@@ -172,7 +172,7 @@ INSTALL_PACKAGES=(
     fwupd
     libsmbios dmidecode
     # Containers
-    distrobox podman-docker podman-compose
+    podman-docker podman-compose
     # WinApps / KVM: backend libvirt para integração de apps Windows via RDP
     freerdp libvirt qemu-kvm virt-manager dialog
     # KDE / temas
@@ -223,7 +223,6 @@ BUILD_DEPS=(
 # Inclui dependências transitivas (pipewire, wireplumber) que não estão em
 # INSTALL_PACKAGES mas têm de acabar instaladas.
 REQUIRED_PACKAGES=(
-    distrobox
     fastfetch
     ffmpeg
     firewalld

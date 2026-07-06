@@ -82,7 +82,10 @@ copr_install_isolated "alternateved/keyd" \
 # secureblue/packages. Activado globalmente via /etc/ld.so.preload e
 # DefaultEnvironment do systemd, por isso é obrigatório se a configuração o
 # referencia. Falhar aqui evita uma imagem com preload quebrado.
-copr_install_isolated "secureblue/packages" \
+# --chroot fedora-44-x86_64: secureblue/packages não publica builds de
+# fedora-rawhide (a base desta imagem), então o chroot tem de ser fixado
+# manualmente ou o dnf5 copr enable falha com "Chroot not found".
+copr_install_isolated "secureblue/packages" --chroot fedora-44-x86_64 \
     hardened_malloc
 echo "::endgroup::"
 
