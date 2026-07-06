@@ -542,7 +542,7 @@ grep -qE '^PermitRootLogin no' /etc/ssh/sshd_config.d/60-hardening.conf \
 
 echo "=== kargs extra (cipherblue-derived) ==="
 # page_poison=1 removido por overhead; mantêm-se defesas de heap/branch/stack.
-for _karg in 'spec_rstack_overflow=safe-ret' 'slab_nomerge' 'ftrace=off'; do
+for _karg in 'spec_rstack_overflow=safe-ret' 'slab_nomerge' 'ftrace=off' 'mem_sleep_default=s2idle'; do
     grep -qF "\"${_karg}\"" /usr/lib/bootc/kargs.d/10-hardening.toml \
         || fail "kargs: '${_karg}' ausente"
 done

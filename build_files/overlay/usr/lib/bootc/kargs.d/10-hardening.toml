@@ -33,11 +33,17 @@ kargs = [
   "bdev_allow_write_mounted=0",
   "l1d_flush=on",
   "l1tf=full,force",
-  # lockdown=confidentiality: stronger than 'integrity' — adds read restrictions
-  # on kernel memory (kcore, /dev/mem reads, some perf paths) in addition to
-  # the modification restrictions of 'integrity'. Blocks potential data exfil
-  # from kernel address space. Already pairs with debugfs=off + kptr_restrict=2.
-  "lockdown=confidentiality",
+  # lockdown=integrity: 'confidentiality' also gates LOCKDOWN_BPF_READ, which
+  # silently broke systemd's own BPF LSM hardening every boot (bpf-restrict-fs
+  # for RestrictFileSystems=, and systemd-nsresourced's LSM BPF attach) —
+  # "Lockdown: systemd: use of bpf to read kernel RAM is restricted". That's a
+  # kernel-fixed tier, not a per-feature toggle: no karg carves out bpf_read
+  # alone at confidentiality level. 'integrity' still blocks kernel
+  # modification (module loading w/o sig, /dev/mem writes, kexec, etc.) and
+  # pairs with debugfs=off + kptr_restrict=2; it just drops the extra
+  # confidentiality-only read restrictions (kcore, /dev/mem reads, some perf
+  # paths, hibernation) in exchange for working BPF-based sandboxing.
+  "lockdown=integrity",
   "loglevel=0",
   # oops=panic: converte qualquer kernel oops num panic imediato.
   # Sem isto o kernel tenta continuar após um oops, deixando uma janela de
@@ -109,4 +115,11 @@ kargs = [
   "systemd.ssh_auto=no",
   "vdso32=0",
   "vsyscall=none",
+  # mem_sleep_default=s2idle: fwupd HSI-3 (org.fwupd.hsi.SuspendToRam) marca
+  # suspend-to-RAM (S3/"deep") como risco — com a RAM fisicamente acessível
+  # durante o sleep, um atacante com acesso físico pode tentar extrair chaves
+  # (cold boot attack) sem reautenticação. s2idle (S0ix) mantém mais do SoC
+  # ativo/monitorizado durante a suspensão. Custo: alguma bateria extra em
+  # idle vs S3 puro, mas Ryzen mobile (Zen2+) tem s2idle bem otimizado.
+  "mem_sleep_default=s2idle",
 ]

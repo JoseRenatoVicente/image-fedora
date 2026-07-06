@@ -13,8 +13,8 @@ setup() {
 
 # ── Kernel hardening args ─────────────────────────────────────────────────────
 
-@test "kernel kargs include lockdown=confidentiality" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml" 'lockdown=confidentiality'
+@test "kernel kargs include lockdown=integrity" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/bootc/kargs.d/10-hardening.toml" 'lockdown=integrity'
 }
 
 @test "kernel kargs include KVM hardware isolation mitigations" {

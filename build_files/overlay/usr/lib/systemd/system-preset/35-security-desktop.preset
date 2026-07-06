@@ -52,6 +52,16 @@ enable thermald.service
 enable fwupd.service
 disable power-profiles-daemon.service
 
+# tuned-ppd: Type=dbus com BusName= (org.freedesktop.UPower.PowerProfiles /
+# net.hadess.PowerProfiles) -- não precisa de WantedBy=graphical.target.
+# graphical.target é um target, e systemd adiciona automaticamente After=
+# para tudo que um target Wants= (tuned-ppd.service.d/no-block-multiuser.conf
+# por si só NÃO resolve isto -- a ordenação vem do lado de graphical.target,
+# não do tuned-ppd). Desabilitar o enable remove tuned-ppd (e por tabela
+# tuned.service, seu Requires=) do caminho crítico de boot (~2s); o D-Bus
+# ativa-o sob demanda quando algo consulta a interface PowerProfiles.
+disable tuned-ppd.service
+
 # Desabilitar SSSD
 disable sssd.service
 disable sssd-kcm.service
