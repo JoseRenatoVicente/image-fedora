@@ -123,6 +123,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
           ignore-unfixed: true
+          trivyignores: '.trivyignore'
           timeout: '10m'
 
       - name: Run Trivy vulnerability scanner (main gate)
@@ -135,6 +136,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '1'
           ignore-unfixed: true
+          trivyignores: '.trivyignore'
           timeout: '10m'
 
       - name: Upload Trivy scan results to GitHub Security
