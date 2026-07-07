@@ -46,6 +46,16 @@ build $target_image=image_name $tag=default_tag:
         --tag "${target_image}:${tag}" \
         .
 
+# Build the dev toolbox image locally (same image published to ghcr.io/<owner>/toolbox-dev)
+[group('Toolbox')]
+build-toolbox-dev $tag=default_tag:
+    podman build --pull=newer --tag "toolbox-dev:{{tag}}" -f Containerfile.toolbox-dev .
+
+# Build the infra toolbox image locally (same image published to ghcr.io/<owner>/toolbox-infra)
+[group('Toolbox')]
+build-toolbox-infra $tag=default_tag:
+    podman build --pull=newer --tag "toolbox-infra:{{tag}}" -f Containerfile.toolbox-infra .
+
 # Command: _rootful_load_image
 # Description: This script checks if the current user is root or running under sudo. If not, it attempts to resolve the image tag using podman inspect.
 #              If the image is found, it loads it into rootful podman. If the image is not found, it pulls it from the repository.

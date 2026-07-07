@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Equivalente a docker-host para docker-compose — ver
+# dev.containers.dockerComposePath em .var/app/com.visualstudio.code/config/Code/User/settings.json.
+exec flatpak-spawn --host podman-compose "$@"

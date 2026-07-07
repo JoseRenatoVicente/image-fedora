@@ -1,0 +1,271 @@
+---
+# Reusable workflow: builda, escaneia, assina (cosign keyless) e publica UMA
+# imagem de toolbox em ghcr.io. Chamado duas vezes por build-toolbox.yml (dev
+# e infra) — ver esse ficheiro para o gatilho e a matriz de chamada.
+#
+# Não reaproveita build.yml porque o Containerfile de origem é diferente
+# (registry.fedoraproject.org/fedora-toolbox, não base-atomic) e não há chave
+# pública para verificar a assinatura da imagem base — ver "Build image".
+name: Build toolbox image (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+      containerfile:
+        required: true
+        type: string
+      description:
+        required: true
+        type: string
+    outputs:
+      image_full:
+        value: ${{ jobs.build_push.outputs.image_full }}
+      image_digest:
+        value: ${{ jobs.build_push.outputs.image_digest }}
+
+jobs:
+  build_push:
+    name: Build and push ${{ inputs.image_name }}
+    runs-on: ubuntu-24.04
+
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
+
+    outputs:
+      image_full: ${{ steps.image_ref.outputs.image_full }}
+      image_digest: ${{ steps.push.outputs.digest }}
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Prepare environment
+        env:
+          IMAGE_NAME: ${{ inputs.image_name }}
+        run: |
+          echo "IMAGE_REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_ENV}"
+          echo "IMAGE_NAME=${IMAGE_NAME}" >> "${GITHUB_ENV}"
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
+        with:
+          cosign-release: 'v2.6.3'
+
+      - name: Get current date
+        id: date
+        run: |
+          echo "date=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)" >> "$GITHUB_OUTPUT"
+
+      - name: Image Metadata
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        id: metadata
+        with:
+          images: ${{ inputs.image_name }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=latest.{{date 'YYYYMMDD'}}
+            type=sha,enable=${{ github.event_name == 'pull_request' }}
+            type=ref,event=pr
+          labels: |
+            org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}/blob/${{ github.sha }}/${{ inputs.containerfile }}
+            org.opencontainers.image.title=${{ inputs.image_name }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+          sep-tags: " "
+          sep-annotations: " "
+
+      - name: Login to GHCR (for layer cache)
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        id: build_image
+        uses: redhat-actions/buildah-build@061ffd31bb5c3f8733a6f9bbdf00a9fb02eb708c # v2 (node24)
+        with:
+          containerfiles: |
+            ./${{ inputs.containerfile }}
+          image: ${{ inputs.image_name }}
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          oci: false
+          extra-args: |
+            --layers
+            --cache-from=${{ env.IMAGE_REGISTRY }}/${{ inputs.image_name }}
+
+      - name: Export image for scanning
+        run: buildah push "localhost/${IMAGE_NAME}:latest" "docker-archive:/tmp/${IMAGE_NAME}-scan.tar"
+
+      - name: Run Trivy vulnerability scanner (PR advisory)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: github.event_name == 'pull_request' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
+        with:
+          input: '/tmp/${{ inputs.image_name }}-scan.tar'
+          format: 'sarif'
+          output: 'trivy-results-${{ inputs.image_name }}.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+          ignore-unfixed: true
+          timeout: '10m'
+
+      - name: Run Trivy vulnerability scanner (main gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        with:
+          input: '/tmp/${{ inputs.image_name }}-scan.tar'
+          format: 'sarif'
+          output: 'trivy-results-${{ inputs.image_name }}.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          ignore-unfixed: true
+          timeout: '10m'
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@1a818fd5f97ed0ee9a823421bd5b171add01227f # v4.36.2
+        if: always() && github.event_name != 'pull_request' && hashFiles(format('trivy-results-{0}.sarif', inputs.image_name)) != ''
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results-${{ inputs.image_name }}.sarif'
+
+      # ── Push (only on main branch, not PRs) ─────────────────────────────
+      - name: Push To GHCR
+        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        id: push
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ github.token }}
+        with:
+          registry: ${{ env.IMAGE_REGISTRY }}
+          image: ${{ inputs.image_name }}
+          tags: ${{ steps.metadata.outputs.tags }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+
+      - name: Set image ref output
+        id: image_ref
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          echo "image_full=${IMAGE_REGISTRY}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Download Syft
+        id: download_syft
+        uses: anchore/sbom-action/download-syft@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.20.0
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+
+      - name: Generate SBOM with Syft
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        continue-on-error: true
+        env:
+          SYFT_CMD: ${{ steps.download_syft.outputs.cmd }}
+        run: |
+          sudo install -m 0755 "${SYFT_CMD}" /usr/local/bin/syft
+          syft "/tmp/${IMAGE_NAME}-scan.tar" --from docker-archive -o spdx-json="sbom-${IMAGE_NAME}.spdx.json"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && hashFiles(format('sbom-{0}.spdx.json', inputs.image_name)) != ''
+        with:
+          name: sbom-${{ inputs.image_name }}.spdx.json
+          path: sbom-${{ inputs.image_name }}.spdx.json
+
+      - name: Sign container image (keyless)
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
+        run: |
+          IMAGE_FULL="${IMAGE_REGISTRY}/${IMAGE_NAME}"
+          for tag in ${IMAGE_TAGS}; do
+            cosign sign -y --recursive "${IMAGE_FULL}:${tag}"
+          done
+
+      - name: Attach SBOM to image
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          PUSH_REGISTRY_PATH: ${{ steps.push.outputs.registry-path }}
+          PUSH_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          if [[ -f "sbom-${IMAGE_NAME}.spdx.json" ]]; then
+            IMAGE_REF="${PUSH_REGISTRY_PATH}@${PUSH_DIGEST}"
+            cosign attach sbom --sbom "sbom-${IMAGE_NAME}.spdx.json" "${IMAGE_REF}"
+          fi
+
+      - name: Clean up scan artifacts
+        if: always()
+        run: rm -f "/tmp/${IMAGE_NAME}-scan.tar"
+
+  provenance:
+    needs: [build_push]
+    if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a # v2.1.0
+    with:
+      image: ${{ needs.build_push.outputs.image_full }}
+      digest: ${{ needs.build_push.outputs.image_digest }}
+    secrets:
+      registry-username: ${{ github.actor }}
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+  verify_published:
+    name: Verify published ${{ inputs.image_name }}
+    needs: [build_push, provenance]
+    if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
+        with:
+          cosign-release: 'v2.6.3'
+
+      - name: Verify published image signature
+        env:
+          IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
+        run: |
+          cosign verify "${IMAGE_REF}" \
+            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/_build-toolbox-image.yml@refs/heads/" \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+
+      - name: Verify published provenance attestation
+        env:
+          IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
+        run: |
+          cosign verify-attestation "${IMAGE_REF}" \
+            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/_build-toolbox-image.yml@refs/heads/" \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            --type slsaprovenance
+
+      - name: Verify published SBOM attachment
+        env:
+          IMAGE_REF: ${{ needs.build_push.outputs.image_full }}@${{ needs.build_push.outputs.image_digest }}
+        run: |
+          cosign download sbom "${IMAGE_REF}" > /tmp/published-sbom.spdx.json
+          test -s /tmp/published-sbom.spdx.json

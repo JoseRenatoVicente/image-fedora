@@ -1,0 +1,41 @@
+# Toolbox de desenvolvimento — publicado em ghcr.io e criado no primeiro boot via
+# /usr/libexec/fedora-toolbox-setup (toolbox create --image ... dev).
+#
+# Base: fedora-toolbox oficial, na mesma versão do base-atomic usado pela imagem
+# principal (ver Containerfile). Todo o toolchain vive aqui dentro — a base
+# imutável não carrega compiladores nem SDKs (ver build_files/scripts/configure/70-build-deps.sh).
+FROM registry.fedoraproject.org/fedora-toolbox:45
+
+LABEL com.github.containers.toolbox="true"
+LABEL org.image-fedora.toolbox.role="dev"
+
+# Versões pinadas (binários sem pacote Fedora): lazydocker via release assinado
+# (checksums.txt oficial) e opencode-ai via npm, mesma versão usada no
+# first-boot do host (build_files/overlay/usr/libexec/fedora-dev-setup) para
+# manter os dois ambientes consistentes.
+ARG LAZYDOCKER_VERSION="0.25.2"
+ARG LAZYDOCKER_SHA256="0d9dbfc26068b218e7ed84b104748cadc6e3cf733c0afd35465306fb39b9523c"
+ARG OPENCODE_NPM_VERSION="1.17.3"
+
+RUN dnf5 -y install \
+        gcc gcc-c++ cpp make cmake extra-cmake-modules \
+        git-core gh jq ripgrep fd-find bat \
+        python3 python3-pip \
+        nodejs22 nodejs22-npm \
+        golang rust cargo \
+        neovim tar unzip \
+    && dnf5 clean all
+
+# lazydocker — binário verificado por SHA256 (sem pacote Fedora).
+RUN set -euo pipefail; \
+    tmp="$(mktemp -d)"; \
+    trap 'rm -rf "$tmp"' EXIT; \
+    url="https://github.com/jesseduffield/lazydocker/releases/download/v${LAZYDOCKER_VERSION}/lazydocker_${LAZYDOCKER_VERSION}_Linux_x86_64.tar.gz"; \
+    curl -fsSL "$url" -o "$tmp/lazydocker.tar.gz"; \
+    echo "${LAZYDOCKER_SHA256}  $tmp/lazydocker.tar.gz" | sha256sum -c -; \
+    tar -xzf "$tmp/lazydocker.tar.gz" -C "$tmp" lazydocker; \
+    install -Dm755 "$tmp/lazydocker" /usr/local/bin/lazydocker
+
+# opencode-ai — CLI de IA, mesma versão pinada do first-boot do host.
+RUN npm install -g "opencode-ai@${OPENCODE_NPM_VERSION}" \
+    && npm cache clean --force

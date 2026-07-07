@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Wrapper para a extensão Dev Containers do VSCode (Flatpak) conseguir falar
+# com o podman do host de dentro do sandbox — ver dev.containers.dockerPath em
+# .var/app/com.visualstudio.code/config/Code/User/settings.json. /usr/bin/docker
+# no host já é o shim docker-cli do pacote podman-docker.
+exec flatpak-spawn --host docker "$@"

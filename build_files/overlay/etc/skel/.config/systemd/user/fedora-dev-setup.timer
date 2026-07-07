@@ -1,9 +1,0 @@
-[Unit]
-Description=Fedora Dev First-Boot Setup Timer
-ConditionUser=!@system
-
-[Timer]
-OnStartupSec=30s
-
-[Install]
-WantedBy=timers.target

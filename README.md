@@ -2,7 +2,7 @@
 
 Custom Fedora bootc image (KDE Plasma on the minimal `base-atomic` base) for a secure development workstation.
 
-The image keeps the base OS focused on boot, security hardening, KDE integration, container workflow support, and hardware/security-key support. Development stacks and user applications should live in Flatpak, Distrobox, Toolbox, or user-scoped setup instead of being layered into the immutable base.
+The image keeps the base OS focused on boot, security hardening, KDE integration, container workflow support, and hardware/security-key support. Development stacks and user applications should live in Flatpak, Toolbox, or user-scoped setup instead of being layered into the immutable base.
 
 ## Atomic Model
 
@@ -10,29 +10,39 @@ The image keeps the base OS focused on boot, security hardening, KDE integration
 - Runtime package mutation with `dnf` is intentionally discouraged; `/usr/bin/dnf` is wrapped to point users toward Atomic workflows.
 - Use `rpm-ostree install <package>` only for rare host-level layering that truly belongs in the base deployment.
 - Use Flatpak for GUI applications.
-- Use Distrobox or Toolbox for language runtimes, build tools, Kubernetes/Terraform CLIs, and per-project dependencies.
+- Use the pre-built `toolbox-dev`/`toolbox-infra` Toolbox containers (see below) for language runtimes, build tools, Kubernetes/Terraform CLIs, and per-project dependencies.
 
 ## Base OS Contents
 
 - Fedora `base-atomic` bootc base pinned by digest in `Containerfile`, with a minimal KDE Plasma install layered on top.
 - SELinux enforcing configuration.
 - Firewalld, hardened sysctl settings, bootc kernel arguments, coredump restrictions, and module blacklists.
-- Podman, Distrobox, Podman Compose, and Docker-compatible Podman wrappers for container workflows.
+- Podman, Podman Compose, and Docker-compatible Podman wrappers for container workflows.
 - KDE/Plasma defaults, theme assets, SDDM configuration, and desktop integration.
 - YubiKey/U2F packages and PAM support for security keys.
 - Small recovery and productivity CLI tools such as `git`, `curl`, `jq`, `ripgrep`, `fd`, `bat`, `eza`, and `neovim`.
 
 ## Development Workflow
 
-On first boot, per-user systemd services and timers (`fedora-flatpak-setup`, `fedora-shell-setup`, `fedora-dev-setup`, `fedora-brew-setup`, installed via `/etc/skel`) run automatically to install user-scoped Flatpaks, shell conveniences (Oh My Zsh / zsh), NVM/Node.js, and Homebrew.
+On first boot, per-user systemd services and timers (`fedora-flatpak-setup`, `fedora-shell-setup`, `fedora-dev-setup`, `fedora-brew-setup`, `fedora-toolbox-setup`, installed via `/etc/skel`) run automatically to install user-scoped Flatpaks (including VSCode), shell conveniences (Oh My Zsh / zsh), NVM/Node.js, Homebrew, and the dev/infra Toolboxes.
 
-Prefer a per-project development container for toolchains:
+### Dev and infra Toolboxes
+
+Two pre-built Toolbox images are published to `ghcr.io/<owner>/toolbox-dev` and `ghcr.io/<owner>/toolbox-infra` (see `Containerfile.toolbox-dev`, `Containerfile.toolbox-infra`, and the `build-toolbox.yml` workflow) and created automatically on first boot:
+
+- **`dev`** — gcc/make/cmake, Node.js, Go, Rust, `gh`, `lazydocker`, `opencode`.
+- **`infra`** — Terraform, kubectl, Flux, talosctl, Helm, k9s, Ansible, awscli2.
 
 ```bash
-distrobox create --name dev --image registry.fedoraproject.org/fedora-toolbox:44
+toolbox enter dev
+toolbox enter infra
 ```
 
-Install high-churn tools such as Node packages, Terraform, Kubernetes CLIs, language servers, compilers, and SDKs inside the project container unless they are needed by the host itself.
+Install high-churn tools such as Node packages, Terraform, Kubernetes CLIs, language servers, compilers, and SDKs inside these containers unless they are needed by the host itself. Rebuild them locally with `just build-toolbox-dev` / `just build-toolbox-infra`.
+
+### VSCode integration
+
+VSCode ships as a Flatpak (not an RPM — the base image intentionally keeps third-party package repos out, see Supply Chain). Its integrated terminal defaults to the `dev` Toolbox (`terminal.integrated.defaultProfile.linux`, seeded via skel); switch to the `infra` Toolbox or the bare host shell from the terminal profile picker. The **Dev Containers** extension is installed automatically and configured (`dev.containers.dockerPath`) to reach the host's Podman through `flatpak-spawn`, so you can also "Attach to Running Container" on `dev`/`infra` to get IntelliSense and debugging resolved from inside the Toolbox.
 
 ## Build And Test
 
@@ -110,6 +120,7 @@ Podman auto-update is also enabled for containers that opt in through their labe
 ## Repository Layout
 
 - `Containerfile`: bootc image definition and build entrypoint (two cached layers: packages, then configuration).
+- `Containerfile.toolbox-dev`, `Containerfile.toolbox-infra`: pre-built Toolbox images published by `.github/workflows/build-toolbox.yml`, created on first boot by `fedora-toolbox-setup`.
 - `build_files/scripts/`: build logic — `build-packages.sh` (Layer 1: dnf/COPR), `build-configure.sh` (Layer 2 driver), `configure/` (numbered configuration modules), and `shared/` (helpers, `package-lists.sh`, in-build `tests.sh`).
 - `build_files/overlay/`: filesystem tree (`etc/`, `usr/`) overlaid onto the image as-is.
 - `build_files/assets/`: build-time inputs — `assets-manifest.sh` (themes/fonts with pinned checksums), `configs/`, and `selinux/` CIL policies.

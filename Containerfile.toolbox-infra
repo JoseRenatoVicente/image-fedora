@@ -1,0 +1,65 @@
+# Toolbox de infraestrutura — publicado em ghcr.io e criado no primeiro boot via
+# /usr/libexec/fedora-toolbox-setup (toolbox create --image ... infra).
+#
+# Substitui o Homebrew usado hoje em build_files/overlay/usr/libexec/fedora-brew-setup:
+# as mesmas ferramentas (terraform, kubectl, flux, talosctl) mais helm/k9s/ansible/
+# awscli2 — só que pré-instaladas na imagem, sem depender de rede no first-boot.
+FROM registry.fedoraproject.org/fedora-toolbox:45
+
+LABEL com.github.containers.toolbox="true"
+LABEL org.image-fedora.toolbox.role="infra"
+
+# helm, k9s, ansible-core e awscli2 têm pacote Fedora — dnf direto, sem download
+# manual. terraform, kubectl, flux e talosctl não são empacotados pela Fedora
+# (licença/política upstream) — binários oficiais verificados por SHA256.
+ARG TERRAFORM_VERSION="1.15.7"
+ARG TERRAFORM_SHA256="73bbb8f5188ad75d4fb853fd100ae4d7e146ef7af7db18776109642fdb7759d2"
+ARG KUBECTL_VERSION="v1.36.2"
+ARG KUBECTL_SHA256="1e9045ec32bea85da43de85f0065358529ea7c7a152eca78154fba5b58c27d82"
+ARG FLUX_VERSION="2.9.0"
+ARG FLUX_SHA256="7aa9779fc7ec6d030e609dab7dbed8c6fc9e3a7f4670834ad02369268aaf341f"
+ARG TALOSCTL_VERSION="v1.13.5"
+ARG TALOSCTL_SHA256="cb12209727c0c4d57d74c0595f34d441ba491421e1d3c8a5142ed91028a20232"
+
+RUN dnf5 -y install \
+        git-core gh jq unzip tar \
+        helm k9s ansible-core awscli2 \
+    && dnf5 clean all
+
+# terraform
+RUN set -euo pipefail; \
+    tmp="$(mktemp -d)"; \
+    trap 'rm -rf "$tmp"' EXIT; \
+    url="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"; \
+    curl -fsSL "$url" -o "$tmp/terraform.zip"; \
+    echo "${TERRAFORM_SHA256}  $tmp/terraform.zip" | sha256sum -c -; \
+    unzip -q "$tmp/terraform.zip" -d "$tmp"; \
+    install -Dm755 "$tmp/terraform" /usr/local/bin/terraform
+
+# kubectl
+RUN set -euo pipefail; \
+    tmp="$(mktemp -d)"; \
+    trap 'rm -rf "$tmp"' EXIT; \
+    url="https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; \
+    curl -fsSL "$url" -o "$tmp/kubectl"; \
+    echo "${KUBECTL_SHA256}  $tmp/kubectl" | sha256sum -c -; \
+    install -Dm755 "$tmp/kubectl" /usr/local/bin/kubectl
+
+# flux
+RUN set -euo pipefail; \
+    tmp="$(mktemp -d)"; \
+    trap 'rm -rf "$tmp"' EXIT; \
+    url="https://github.com/fluxcd/flux2/releases/download/v${FLUX_VERSION}/flux_${FLUX_VERSION}_linux_amd64.tar.gz"; \
+    curl -fsSL "$url" -o "$tmp/flux.tar.gz"; \
+    echo "${FLUX_SHA256}  $tmp/flux.tar.gz" | sha256sum -c -; \
+    tar -xzf "$tmp/flux.tar.gz" -C "$tmp" flux; \
+    install -Dm755 "$tmp/flux" /usr/local/bin/flux
+
+# talosctl
+RUN set -euo pipefail; \
+    tmp="$(mktemp -d)"; \
+    trap 'rm -rf "$tmp"' EXIT; \
+    url="https://github.com/siderolabs/talos/releases/download/${TALOSCTL_VERSION}/talosctl-linux-amd64"; \
+    curl -fsSL "$url" -o "$tmp/talosctl"; \
+    echo "${TALOSCTL_SHA256}  $tmp/talosctl" | sha256sum -c -; \
+    install -Dm755 "$tmp/talosctl" /usr/local/bin/talosctl

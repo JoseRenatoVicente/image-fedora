@@ -73,11 +73,13 @@ touch /etc/plasma-setup-done
 setfattr -n user.component -v "skel" \
     /usr/libexec/fedora-shell-setup \
     /usr/libexec/fedora-dev-setup \
-    /usr/libexec/fedora-brew-setup
+    /usr/libexec/fedora-brew-setup \
+    /usr/libexec/fedora-toolbox-setup
 setfattr -n user.update-interval -v "monthly" \
     /usr/libexec/fedora-shell-setup \
     /usr/libexec/fedora-dev-setup \
-    /usr/libexec/fedora-brew-setup
+    /usr/libexec/fedora-brew-setup \
+    /usr/libexec/fedora-toolbox-setup
 
 if [[ -f /usr/share/Kvantum/Mokka/Mokka.kvconfig ]]; then
     sed -i \

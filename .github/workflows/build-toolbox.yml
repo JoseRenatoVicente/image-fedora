@@ -1,0 +1,64 @@
+---
+# Builda e publica os toolboxes de dev e infra (ghcr.io/<owner>/toolbox-dev,
+# toolbox-infra). Consumidos no primeiro boot por
+# /usr/libexec/fedora-toolbox-setup ("toolbox create --image ...").
+#
+# Só reconstrói quando os Containerfiles das toolboxes mudam — desacoplado do
+# build.yml da imagem base (Containerfile principal), que tem cache/tempo de
+# build próprios.
+name: Build toolbox images
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Containerfile.toolbox-dev'
+      - 'Containerfile.toolbox-infra'
+      - '.github/workflows/build-toolbox.yml'
+      - '.github/workflows/_build-toolbox-image.yml'
+  schedule:
+    - cron: '35 10 * * *'  # 10:35am UTC everyday — depois do build.yml (10:05)
+  push:
+    branches:
+      - main
+    paths:
+      - 'Containerfile.toolbox-dev'
+      - 'Containerfile.toolbox-infra'
+      - '.github/workflows/build-toolbox.yml'
+      - '.github/workflows/_build-toolbox-image.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  toolbox-dev:
+    name: dev
+    uses: ./.github/workflows/_build-toolbox-image.yml
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
+    with:
+      image_name: toolbox-dev
+      containerfile: Containerfile.toolbox-dev
+      description: "Toolbox de desenvolvimento — gcc/make/cmake, node, go, rust, lazydocker, opencode"
+    secrets: inherit
+
+  toolbox-infra:
+    name: infra
+    uses: ./.github/workflows/_build-toolbox-image.yml
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
+    with:
+      image_name: toolbox-infra
+      containerfile: Containerfile.toolbox-infra
+      description: "Toolbox de infra — terraform, kubectl, flux, talosctl, helm, k9s, ansible, awscli2"
+    secrets: inherit

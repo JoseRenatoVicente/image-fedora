@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Cria os toolboxes de dev e infra a partir das imagens publicadas em ghcr.io
+# (ver Containerfile.toolbox-dev, Containerfile.toolbox-infra e o workflow
+# build-toolbox.yml). Idempotente: não recria se já existirem.
+set -euo pipefail
+
+wait_for_network() {
+    local tries=60
+    while (( tries > 0 )); do
+        if getent hosts ghcr.io >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+        ((tries--))
+    done
+    echo "Network/DNS unavailable after waiting; deferring first-boot setup." >&2
+    return 1
+}
+
+wait_for_network
+
+create_toolbox() {
+    local name="$1" image="$2"
+    if toolbox list -c 2>/dev/null | awk '{print $2}' | grep -qx "$name"; then
+        echo "Toolbox '$name' já existe, a saltar."
+        return 0
+    fi
+    toolbox --assumeyes create --image "$image" "$name"
+}
+
+# O owner do registry (ghcr.io/<vendor>) vem do image-vendor gravado em build
+# (ver build_files/scripts/shared/image-info.sh) — mesma fonte de verdade que
+# o IMAGE_REF do os-release usa para o Discover encontrar updates.
+IMAGE_INFO="/usr/share/image-info.json"
+VENDOR="$(jq -r '.["image-vendor"] // empty' "$IMAGE_INFO" 2>/dev/null || true)"
+if [[ -z "$VENDOR" || "$VENDOR" == "custom" ]]; then
+    echo "image-vendor ausente/custom em ${IMAGE_INFO}; sem registry conhecido para as toolboxes — a saltar." >&2
+else
+    notify-send -a 'Fedora' -i 'dialog-information' -u normal \
+        'A criar toolboxes de desenvolvimento e infra...' || true
+
+    create_toolbox dev   "ghcr.io/${VENDOR}/toolbox-dev:latest"
+    create_toolbox infra "ghcr.io/${VENDOR}/toolbox-infra:latest"
+
+    notify-send -a 'Fedora' -i 'dialog-information' -u normal \
+        'Toolboxes de desenvolvimento e infra prontas.' || true
+fi
+
+# Extensão Dev Containers do VSCode (Flatpak) — permite anexar o VSCode aos
+# toolboxes ("Attach to Running Container"). flatpak-user-setup.service
+# (installer/flatpaks) instala o Flatpak em paralelo; espera um pouco por ele
+# em vez de assumir que já terminou (After= sozinho não garante conclusão).
+# flatpak run --install-extension já é idempotente (não reinstala se a versão
+# presente for igual). Este passo corre só uma vez (stamp do .service) — se o
+# Flatpak não aparecer a tempo, fica pendente para instalação manual.
+wait_for_vscode_flatpak() {
+    local tries=90
+    while (( tries > 0 )); do
+        flatpak info --user com.visualstudio.code &>/dev/null && return 0
+        sleep 2
+        ((tries--))
+    done
+    return 1
+}
+
+if wait_for_vscode_flatpak; then
+    flatpak run com.visualstudio.code \
+        --install-extension ms-vscode-remote.remote-containers &>/dev/null \
+        || echo "Falha ao instalar a extensão Dev Containers; tenta manualmente no VSCode." >&2
+else
+    echo "VSCode (Flatpak) não apareceu a tempo; extensão Dev Containers não instalada automaticamente." >&2
+fi

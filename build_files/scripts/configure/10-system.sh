@@ -76,9 +76,15 @@ chmod 755 /usr/bin/dnf
 chmod 755 /usr/libexec/fedora-shell-setup \
           /usr/libexec/fedora-dev-setup \
           /usr/libexec/fedora-brew-setup \
+          /usr/libexec/fedora-toolbox-setup \
+          /usr/libexec/fedora-first-setup-runner \
           /usr/libexec/kwin-vm-compat.sh \
           /usr/libexec/fedora-kinoite-plasmalogin-workaround \
           /usr/libexec/image-fedora-selinux-setup
+# Wrappers docker-cli usados pelo VSCode (Flatpak) via flatpak-spawn --host —
+# ver dev.containers.dockerPath no settings.json do skel.
+chmod 755 /etc/skel/.local/bin/docker-host \
+          /etc/skel/.local/bin/docker-compose-host
 chmod 755 /usr/bin/tpm2-luks-enroll
 chmod 755 /usr/bin/tpm2-first-enroll
 chmod 755 /usr/bin/tpm2-reenroll-check

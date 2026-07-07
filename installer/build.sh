@@ -94,29 +94,6 @@ ostreecontainer --url=${install_image_ref} --transport=containers-storage --no-s
 install -Dm755 /etc/flatpak-user-setup.sh /mnt/sysroot/etc/flatpak-user-setup.sh
 %end
 
-# Cria serviço systemd user no skel — corre no primeiro login de cada utilizador
-%post --erroronfail --log=/tmp/flatpak-user-service.log
-mkdir -p /etc/skel/.config/systemd/user/default.target.wants
-cat > /etc/skel/.config/systemd/user/flatpak-user-setup.service << 'SERVICE_EOF'
-[Unit]
-Description=Flatpak User Setup
-Wants=network-online.target
-After=network-online.target
-ConditionUser=!@system
-ConditionPathIsDirectory=%h
-ConditionPathExists=!%E/flatpak-user-setup.done
-
-[Service]
-Type=oneshot
-ExecStart=/etc/flatpak-user-setup.sh
-Restart=on-failure
-RestartSec=30s
-RestartMaxDelaySec=1800s
-RestartSteps=10
-SERVICE_EOF
-ln -sf ../flatpak-user-setup.service \
-    /etc/skel/.config/systemd/user/default.target.wants/flatpak-user-setup.service
-
 # Aponta para o registry para receber actualizações futuras
 bootc switch --mutate-in-place --enforce-container-sigpolicy --transport registry ${install_image_ref}
 %end

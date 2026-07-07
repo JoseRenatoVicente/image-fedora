@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Orquestra o setup de primeiro login (shell, brew, dev, flatpak --user,
+# toolbox) sem depender de systemd --user. Disparado em background pelo
+# dispatcher em /etc/profile.d/fedora-first-setup.sh. flock garante instância
+# única; cada passo só corre uma vez (stamp marcado apenas em sucesso, para
+# haver retry no próximo login em caso de falha).
+set -uo pipefail
+
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}/fedora"
+mkdir -p "$cfg"
+
+exec 9>"$cfg/.runner.lock"
+flock -n 9 || exit 0
+
+exec >>"$cfg/first-setup.log" 2>&1
+echo "=== fedora-first-setup $(date -Is) ==="
+
+run_step() {
+    local script="$1" stamp="$2"
+    [ -e "$stamp" ] && return 0
+    if "$script"; then
+        touch "$stamp"
+    else
+        echo "step $script falhou (rc=$?); retry no próximo login" >&2
+    fi
+}
+
+run_step /usr/libexec/fedora-shell-setup   "$cfg/fedora-shell-setup.stamp"
+run_step /usr/libexec/fedora-brew-setup    "$cfg/fedora-brew-setup.stamp"
+run_step /usr/libexec/fedora-dev-setup     "$cfg/fedora-dev-setup.stamp"
+
+fp_done="${XDG_CONFIG_HOME:-$HOME/.config}/flatpak-user-setup.done"
+if [ -x /etc/flatpak-user-setup.sh ] && [ ! -e "$fp_done" ]; then
+    /etc/flatpak-user-setup.sh || echo "flatpak-user-setup falhou; retry no próximo login" >&2
+fi
+
+run_step /usr/libexec/fedora-toolbox-setup "$cfg/fedora-toolbox-setup.stamp"
+
+if [ -e "$cfg/fedora-shell-setup.stamp" ] && [ -e "$cfg/fedora-brew-setup.stamp" ] \
+    && [ -e "$cfg/fedora-dev-setup.stamp" ] && [ -e "$cfg/fedora-toolbox-setup.stamp" ] \
+    && { [ ! -x /etc/flatpak-user-setup.sh ] || [ -e "$fp_done" ]; }; then
+    touch "$cfg/.first-setup-complete"
+fi

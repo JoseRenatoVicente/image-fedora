@@ -75,6 +75,34 @@ REMOVE_PACKAGES=(
     # irrelevante em pt_BR. unicode-ucd é órfão (nada o requer).
     ibus ibus-setup ibus-libs ibus-gtk2 ibus-gtk3 ibus-gtk4 ibus-data
     unicode-ucd
+
+    # ── Bloat órfão adicional da base-atomic (~380 MB) ──
+    # Confirmado ao vivo via `rpm -q --whatrequires` (nenhum pacote instalado
+    # exige estes) e `ldd` (nenhum binário/lib faz link em runtime).
+    #
+    # clang-libs: órfão puro. llvm-libs (que ele exige) NÃO entra aqui —
+    # libvulkan_radeon.so (RADV) faz link direto a libLLVM.so em runtime sem
+    # Requires declarado no RPM; removê-lo quebraria Vulkan em GPU AMD.
+    clang-libs
+    # binutils/libstdc++-devel: sobra da remoção de gcc/gcc-c++ (BUILD_DEPS) —
+    # sem compilador instalado, ferramentas/headers ficam inúteis.
+    binutils libstdc++-devel
+    # qt6-doc-devel/doxygen: sobra do toolchain de docs dos pacotes -devel do
+    # KF6 (BUILD_DEPS); nada os exige depois da remoção do toolchain.
+    qt6-doc-devel doxygen
+    # vulkan-headers/vulkan-loader-devel: headers de desenvolvimento Vulkan;
+    # vulkan-tools (runtime, mantido) não precisa deles.
+    vulkan-headers vulkan-loader-devel
+    # libgs + adobe-mappings-cmap(-deprecated): sobra da stack de impressão já
+    # removida (cups-filters etc.). Confirmado: poppler/Okular não dependem de
+    # ghostscript para renderizar PDF.
+    libgs adobe-mappings-cmap adobe-mappings-cmap-deprecated
+    # espeak-ng/flite/lpcnetfreedv: backends TTS órfãos. qt6-qtspeech só tem o
+    # plugin "mock" instalado (nenhum plugin flite/espeak presente no disco) —
+    # nada os carrega. NOTA: qt6-qtspeech em si fica — tentativa anterior de
+    # removê-lo arrastou plasma-desktop/kwin/dolphin/konsole (ver comentário
+    # mais abaixo, junto ao COPR de packages).
+    espeak-ng flite lpcnetfreedv
 )
 
 # ── Excludes da transação de install ─────────────────────────────────────────
@@ -319,4 +347,16 @@ UNWANTED_PACKAGES=(
     buildah
     ibus
     unicode-ucd
+    # Bloat órfão adicional (~380 MB) — regressão se voltar
+    clang-libs
+    binutils
+    libstdc++-devel
+    qt6-doc-devel
+    doxygen
+    vulkan-headers
+    vulkan-loader-devel
+    libgs
+    espeak-ng
+    flite
+    lpcnetfreedv
 )

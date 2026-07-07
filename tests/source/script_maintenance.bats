@@ -17,6 +17,7 @@ setup() {
     skel_configure="${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh"
     services_configure="${REPO_ROOT}/build_files/scripts/configure/50-services.sh"
     overlay="${REPO_ROOT}/build_files/overlay"
+    installer_flatpaks="${REPO_ROOT}/installer/flatpaks"
     installer_build="${REPO_ROOT}/installer/build.sh"
     installer_containerfile="${REPO_ROOT}/installer/Containerfile"
     anaconda_profile_installer="${REPO_ROOT}/installer/system_files/shared/etc/anaconda/profile.d/image-fedora.conf"
@@ -147,17 +148,15 @@ setup() {
     assert_contains "$overlay/etc/tuned/profile_mode" 'auto'
 }
 
-@test "KDE first-boot user units live in overlay" {
-    for script in fedora-shell-setup fedora-dev-setup fedora-brew-setup; do
-        assert_file_exists "$overlay/etc/skel/.config/systemd/user/${script}.service"
-        assert_file_exists "$overlay/etc/skel/.config/systemd/user/${script}.timer"
-        assert_file_exists "$overlay/etc/skel/.config/systemd/user/timers.target.wants/${script}.timer"
-        run test -L "$overlay/etc/skel/.config/systemd/user/timers.target.wants/${script}.timer"
-        [ "$status" -eq 0 ]
-        run readlink "$overlay/etc/skel/.config/systemd/user/timers.target.wants/${script}.timer"
-        [ "$status" -eq 0 ]
-        [ "$output" = "../${script}.timer" ]
+@test "KDE first-boot user setup is dispatched without systemd --user" {
+    assert_file_exists "$overlay/etc/profile.d/fedora-first-setup.sh"
+    assert_file_exists "$overlay/usr/libexec/fedora-first-setup-runner"
+    for script in fedora-shell-setup fedora-dev-setup fedora-brew-setup fedora-toolbox-setup; do
+        assert_file_exists "$overlay/usr/libexec/${script}"
+        assert_contains "$overlay/usr/libexec/fedora-first-setup-runner" "/usr/libexec/${script}"
     done
+    assert_contains "$overlay/etc/profile.d/fedora-first-setup.sh" 'fedora-first-setup-runner'
+    [ ! -d "$overlay/etc/skel/.config/systemd" ]
 }
 
 @test "libvirt user qemu config disables core dumps in skel" {
@@ -267,4 +266,55 @@ setup() {
 @test "cleanup removes build-time var state flagged by bootc lint" {
     assert_contains "$cleanup_configure" 'rm -rf /var/lib/authselect/checksum'
     assert_contains "$cleanup_configure" 'rm -rf /var/lib/fprint /var/lib/iscsi'
+}
+
+@test "VSCode is installed through Flatpak, not the base image" {
+    assert_contains "$installer_flatpaks" 'app/com.visualstudio.code/x86_64/stable'
+}
+
+@test "VSCode terminal profiles default into the dev toolbox" {
+    local settings="$overlay/etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json"
+    assert_file_exists "$settings"
+    assert_contains "$settings" '"toolbox-dev"'
+    assert_contains "$settings" '"toolbox-infra"'
+    assert_contains "$settings" '"terminal.integrated.defaultProfile.linux": "toolbox-dev"'
+    assert_contains "$settings" '"dev.containers.dockerPath": "~/.local/bin/docker-host"'
+    run python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$settings"
+    [ "$status" -eq 0 ]
+}
+
+@test "VSCode Flatpak sandbox override grants host access for Dev Containers" {
+    local override="$overlay/etc/skel/.local/share/flatpak/overrides/com.visualstudio.code"
+    assert_file_exists "$override"
+    assert_contains "$override" 'filesystems=host;'
+    assert_contains "$override" 'org.freedesktop.Flatpak=talk'
+}
+
+@test "docker-cli host wrappers exist for the Dev Containers extension" {
+    assert_file_exists "$overlay/etc/skel/.local/bin/docker-host"
+    assert_file_exists "$overlay/etc/skel/.local/bin/docker-compose-host"
+    assert_contains "$overlay/etc/skel/.local/bin/docker-host" 'flatpak-spawn --host docker'
+    assert_contains "$overlay/etc/skel/.local/bin/docker-compose-host" 'flatpak-spawn --host podman-compose'
+    assert_contains "$system_configure" '/etc/skel/.local/bin/docker-host'
+    assert_contains "$system_configure" '/etc/skel/.local/bin/docker-compose-host'
+}
+
+@test "toolbox setup script resolves registry owner from image-info.json" {
+    local toolbox_setup="$overlay/usr/libexec/fedora-toolbox-setup"
+    assert_file_exists "$toolbox_setup"
+    assert_contains "$toolbox_setup" '/usr/share/image-info.json'
+    assert_contains "$toolbox_setup" 'toolbox-dev:latest'
+    assert_contains "$toolbox_setup" 'toolbox-infra:latest'
+    assert_contains "$system_configure" '/usr/libexec/fedora-toolbox-setup'
+}
+
+@test "toolbox Containerfiles are pinned to fedora-toolbox and checksummed downloads" {
+    local dev_cf="${REPO_ROOT}/Containerfile.toolbox-dev"
+    local infra_cf="${REPO_ROOT}/Containerfile.toolbox-infra"
+    assert_file_exists "$dev_cf"
+    assert_file_exists "$infra_cf"
+    assert_contains "$dev_cf" 'FROM registry.fedoraproject.org/fedora-toolbox:45'
+    assert_contains "$infra_cf" 'FROM registry.fedoraproject.org/fedora-toolbox:45'
+    assert_contains "$dev_cf" 'sha256sum -c -'
+    assert_contains "$infra_cf" 'sha256sum -c -'
 }

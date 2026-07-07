@@ -1,0 +1,19 @@
+{
+    "terminal.integrated.profiles.linux": {
+        "toolbox-dev": {
+            "path": "flatpak-spawn",
+            "args": ["--host", "toolbox", "enter", "dev"]
+        },
+        "toolbox-infra": {
+            "path": "flatpak-spawn",
+            "args": ["--host", "toolbox", "enter", "infra"]
+        },
+        "host": {
+            "path": "flatpak-spawn",
+            "args": ["--host", "bash", "-l"]
+        }
+    },
+    "terminal.integrated.defaultProfile.linux": "toolbox-dev",
+    "dev.containers.dockerPath": "~/.local/bin/docker-host",
+    "dev.containers.dockerComposePath": "~/.local/bin/docker-compose-host"
+}

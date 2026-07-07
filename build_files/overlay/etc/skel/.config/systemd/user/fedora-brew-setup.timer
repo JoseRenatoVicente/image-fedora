@@ -1,9 +1,0 @@
-[Unit]
-Description=Fedora Brew First-Boot Setup Timer
-ConditionUser=!@system
-
-[Timer]
-OnStartupSec=5s
-
-[Install]
-WantedBy=timers.target

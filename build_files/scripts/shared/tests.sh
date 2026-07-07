@@ -149,6 +149,13 @@ REQUIRED_FILES=(
     /usr/libexec/fedora-shell-setup
     /usr/libexec/fedora-dev-setup
     /usr/libexec/fedora-brew-setup
+    /usr/libexec/fedora-toolbox-setup
+    /usr/libexec/fedora-first-setup-runner
+    /etc/profile.d/fedora-first-setup.sh
+    /etc/skel/.local/bin/docker-host
+    /etc/skel/.local/bin/docker-compose-host
+    /etc/skel/.local/share/flatpak/overrides/com.visualstudio.code
+    /etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json
     /etc/selinux/config
     /etc/chrony.conf
     /etc/rpm-ostreed.conf
