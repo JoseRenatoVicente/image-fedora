@@ -22,6 +22,12 @@ hr()   { printf '  %s\n' "──────────────────
 
 MARKER=/var/lib/tpm2-enrolled
 
+pause_for_user_visibility() {
+    local seconds="${1:-5}"
+    info "A continuar automaticamente em ${seconds}s..."
+    sleep "$seconds"
+}
+
 # ── Guard: só faz sentido se já houve um enroll prévio ──────────────────────
 [[ -f "$MARKER" ]] || exit 0
 
@@ -57,7 +63,7 @@ if ! read -rp "  Reenrolar o TPM2 agora com a senha que acabou de usar? [S/n]  "
     printf '\n'
     warn "Tempo esgotado — reenroll adiado."
     warn "Execute 'sudo tpm2-luks-enroll' para reactivar o auto-unlock."
-    read -rp "  Prima ENTER para continuar..." -t 10 _ || true
+    pause_for_user_visibility 5
     exit 0
 fi
 
@@ -65,7 +71,7 @@ if [[ "${choice,,}" == n ]]; then
     printf '\n'
     warn "Reenroll cancelado. O sistema vai continuar a pedir a senha até"
     warn "executar 'sudo tpm2-luks-enroll' manualmente."
-    read -rp "  Prima ENTER para continuar..." -t 10 _ || true
+    pause_for_user_visibility 5
     exit 0
 fi
 
@@ -73,12 +79,18 @@ printf '\n'
 info "Será pedida de novo a senha que acabou de usar (LUKS ou recovery key)."
 printf '\n'
 
-systemd-cryptenroll --wipe-slot=tpm2 "$TARGET_DEV" 2>/dev/null || true
+if systemd-cryptenroll "$TARGET_DEV" 2>/dev/null | grep -q 'tpm2'; then
+    info "Removendo token TPM2 antigo antes de reenrolar..."
+    systemd-cryptenroll --wipe-slot=tpm2 "$TARGET_DEV" \
+        || warn "Não foi possível remover o token TPM2 antigo; tentando adicionar um novo."
+    printf '\n'
+fi
+
 if ! systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 "$TARGET_DEV"; then
     printf '\n'
     err "Erro ao reenrolar o TPM2 (senha incorrecta ou TPM indisponível)."
     err "Execute 'sudo tpm2-luks-enroll' para tentar novamente."
-    read -rp "  Prima ENTER para continuar..." -t 30 _ || true
+    pause_for_user_visibility 10
     exit 1
 fi
 
@@ -88,5 +100,5 @@ ok "✓ TPM2 reenrolado com sucesso em $TARGET_DEV"
 hr
 info "Os próximos arranques voltam a desbloquear automaticamente."
 printf '\n'
-read -rp "  Prima ENTER para continuar... " -t 15 _ || true
+pause_for_user_visibility 5
 printf '\n'

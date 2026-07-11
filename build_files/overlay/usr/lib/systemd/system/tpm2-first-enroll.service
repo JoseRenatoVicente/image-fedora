@@ -5,15 +5,15 @@
 # prompt) — the LUKS passphrase is kept as a recovery key only.
 #
 # Ordering: runs after all local filesystems are mounted (so /var/lib is
-# writable) and before greetd (so the user sees the prompt before the
-# graphical login screen). The ConditionPathExists guard makes it a true
+# writable) and before the display manager (so the user sees the prompt before
+# the graphical login screen). The ConditionPathExists guard makes it a true
 # one-shot: once /var/lib/tpm2-enrolled exists, systemd skips the unit entirely.
 [Unit]
 Description=TPM2 First-Boot LUKS Auto-Unlock Setup
 Documentation=man:systemd-cryptenroll(1)
 ConditionPathExists=!/var/lib/tpm2-enrolled
 After=local-fs.target
-Before=greetd.service
+Before=display-manager.service plasmalogin.service sddm.service greetd.service
 
 [Service]
 Type=oneshot

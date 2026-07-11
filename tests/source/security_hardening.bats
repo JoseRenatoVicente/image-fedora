@@ -165,8 +165,12 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
-@test "tpm2-first-enroll service runs before greetd" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-first-enroll.service" 'Before=greetd.service'
+@test "TPM2 interactive services run before display managers" {
+    local first="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-first-enroll.service"
+    local reenroll="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-reenroll-check.service"
+
+    assert_contains "$first" 'Before=display-manager.service plasmalogin.service sddm.service greetd.service'
+    assert_contains "$reenroll" 'Before=display-manager.service plasmalogin.service sddm.service greetd.service'
 }
 
 @test "tpm2-first-enroll service uses one-time condition marker" {
@@ -177,6 +181,20 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-luks-enroll" 'rpm-ostree initramfs --enable'
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll" 'rpm-ostree initramfs --enable'
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll" 'tpm2-device=auto'
+}
+
+@test "tpm2-reenroll-check keeps cryptenroll prompts visible" {
+    local script="${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-reenroll-check"
+
+    assert_contains "$script" 'systemd-cryptenroll --wipe-slot=tpm2 "$TARGET_DEV"'
+    assert_not_contains "$script" 'systemd-cryptenroll --wipe-slot=tpm2 "$TARGET_DEV" 2>/dev/null'
+}
+
+@test "tpm2-reenroll-check does not block boot on ENTER-only pauses" {
+    local script="${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-reenroll-check"
+
+    assert_contains "$script" 'pause_for_user_visibility'
+    assert_not_contains "$script" 'Prima ENTER'
 }
 
 @test "DRM dracut config stays active by default" {
