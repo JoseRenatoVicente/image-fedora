@@ -27,4 +27,12 @@ kargs = [
   # isolamento o benefício é mais modesto, mas ainda reduz picos de latência
   # em cargas interativas. Derivado de XanMod/Clear Linux.
   "rcu_nocbs=all",
+  # preempt=full: selecciona o modelo de preempção total em runtime via
+  # CONFIG_PREEMPT_DYNAMIC (o kernel Fedora vem compilado com os 3 modelos
+  # disponíveis; default costuma ser voluntary). full prioriza latência de
+  # scheduling sobre throughput bruto — mesmo objectivo do BORE/scx_lavd já
+  # usados aqui, sem precisar de kernel/patch próprio. Custo: mais overhead
+  # de preempção em cargas 100% CPU-bound (compilação, encoding em lote).
+  # Derivado de CachyOS (CONFIG_CACHY / PREEMPT_DYNAMIC).
+  "preempt=full",
 ]

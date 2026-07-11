@@ -184,6 +184,10 @@ setup() {
     grep -q 'zswap.enabled=0' /usr/lib/bootc/kargs.d/20-performance.toml
 }
 
+@test "perf kargs select full preemption model" {
+    grep -q 'preempt=full' /usr/lib/bootc/kargs.d/20-performance.toml
+}
+
 @test "THP tuning tmpfiles configures defrag and shrinker" {
     grep -q 'transparent_hugepage/defrag' /usr/lib/tmpfiles.d/thp-tuning.conf
     grep -q 'max_ptes_none' /usr/lib/tmpfiles.d/thp-tuning.conf
