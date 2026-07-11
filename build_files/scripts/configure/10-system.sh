@@ -159,6 +159,8 @@ setfattr -n user.component -v "image-config" \
     /etc/systemd/system.conf.d/10-nofile-limit.conf \
     /etc/systemd/user.conf.d/10-nofile-limit.conf \
     /usr/lib/systemd/system/amd-cpb-boost.service \
+    /usr/lib/systemd/system/intel-pstate-floor.service \
+    /usr/lib/systemd/system/cpu-epp-tune.service \
     /etc/systemd/resolved.conf.d/60-security-dns.conf \
     /etc/systemd/resolved.conf.d/10-disable-llmnr.conf \
     /etc/chrony.conf \

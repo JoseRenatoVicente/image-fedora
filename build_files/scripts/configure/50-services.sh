@@ -38,6 +38,8 @@ enable_unit \
     sd-boot-migrate.service \
     selinux-booleans.service \
     amd-cpb-boost.service \
+    intel-pstate-floor.service \
+    cpu-epp-tune.service \
     tpm2-first-enroll.service \
     tpm2-reenroll-check.service
 

@@ -1,0 +1,44 @@
+# min_perf_pct=50: impede o intel_pstate de descer o P-state abaixo de 50% do
+# máximo, mesmo em idle. Evita a latência de ramp-up ao sair de P-states
+# baixos — mais responsivo em cargas interativas e builds em rajada, ao custo
+# de alguns W extras de consumo idle. Mesmo trade-off já aceito em
+# nvme_core.default_ps_max_latency_us=0 (kargs/20-performance.toml). Derivado
+# de Clear Linux (clr-power-tweaks/data.h: intel_pstate/min_perf_pct=50).
+#
+# energy_perf_bias=balance-performance (interface legada EPB, cpu*/power/):
+# mesma família Intel-only, aplicada junto para não multiplicar units
+# guardadas pelo mesmo ConditionPathExists. Nem toda plataforma Intel expõe
+# o MSR de EPB (SoCs sem suporte, ou HWP puro sem fallback legado) — por
+# isso o loop ignora falhas por caminho em vez de assumir presença.
+#
+# cpuidle/c1_demotion=1: atributo global do driver intel_idle (não existe sob
+# o cpuidle ACPI genérico usado por AMD) que permite ao governor demover para
+# C1 em vez de ficar preso num C-state mais fundo — reduz latência de saída
+# de idle. Testado com `[ -e ... ]` em vez de glob porque o caminho é único,
+# não por CPU.
+#
+# ConditionPathExists garante que em hardware AMD (imagem é mista Intel+AMD)
+# a unit é ignorada sem ruído no journal — mesmo padrão do amd-cpb-boost.service
+# equivalente do lado AMD.
+[Unit]
+Description=Floor do intel_pstate (min_perf_pct/EPB) para reduzir latência de ramp-up
+ConditionPathExists=/sys/devices/system/cpu/intel_pstate/min_perf_pct
+DefaultDependencies=no
+After=sysinit.target
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/bash -c '\
+    echo 50 > /sys/devices/system/cpu/intel_pstate/min_perf_pct; \
+    shopt -s nullglob; \
+    for f in /sys/devices/system/cpu/cpu*/power/energy_perf_bias; do \
+        echo balance-performance > "$f" 2>/dev/null || true; \
+    done; \
+    [ -e /sys/devices/system/cpu/cpuidle/c1_demotion ] && \
+        echo 1 > /sys/devices/system/cpu/cpuidle/c1_demotion 2>/dev/null; \
+    true'
+
+[Install]
+WantedBy=multi-user.target

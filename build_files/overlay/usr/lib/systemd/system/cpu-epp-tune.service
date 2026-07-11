@@ -1,0 +1,26 @@
+# energy_performance_preference=balance_performance: em vez de energy_perf_bias
+# (interface legada, só Intel/EPB), este atributo é exposto por
+# /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference tanto
+# pelo intel_pstate quanto pelo amd_pstate quando operam em modo activo com
+# EPP (HWP na Intel, CPPC na AMD) — não precisa de guard por fabricante,
+# só de nullglob para não estourar caminho literal onde o atributo não existe
+# (ex.: intel_pstate em modo passivo, ou driver acpi-cpufreq sem EPP).
+# Derivado de Clear Linux (clr-power-tweaks/data.h: energy_performance_preference).
+[Unit]
+Description=Ajusta Energy Performance Preference (EPP) para balance_performance
+ConditionPathExists=/sys/devices/system/cpu/cpufreq
+DefaultDependencies=no
+After=sysinit.target
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/bash -c '\
+    shopt -s nullglob; \
+    for f in /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference; do \
+        echo balance_performance > "$f" 2>/dev/null || true; \
+    done'
+
+[Install]
+WantedBy=multi-user.target

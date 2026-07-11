@@ -88,7 +88,7 @@ kargs = [
   "proc_mem.force_override=ptrace",
   "pti=on",
   "random.trust_bootloader=off",
-  "random.trust_cpu=off",
+  "random.trust_cpu=on",
   "randomize_kstack_offset=on",
   "slab_nomerge",
   # NOTA: slab_debug=FZ removido — sanity checks/red zones determinísticos

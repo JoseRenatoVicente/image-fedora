@@ -451,6 +451,21 @@ grep -q '^ConditionPathExists=/sys/devices/system/cpu/amd_pstate/cpb_boost$' \
 systemctl is-enabled amd-cpb-boost.service 2>/dev/null | grep -q "^enabled$" \
     || fail "amd-cpb-boost.service não habilitado"
 
+echo "=== Intel pstate floor (oneshot condicional) ==="
+[[ -f /usr/lib/systemd/system/intel-pstate-floor.service ]] \
+    || fail "intel-pstate-floor.service ausente"
+grep -q '^ConditionPathExists=/sys/devices/system/cpu/intel_pstate/min_perf_pct$' \
+    /usr/lib/systemd/system/intel-pstate-floor.service \
+    || fail "intel-pstate-floor.service sem ConditionPathExists (geraria ruído em AMD)"
+systemctl is-enabled intel-pstate-floor.service 2>/dev/null | grep -q "^enabled$" \
+    || fail "intel-pstate-floor.service não habilitado"
+
+echo "=== EPP tuning (oneshot vendor-neutro) ==="
+[[ -f /usr/lib/systemd/system/cpu-epp-tune.service ]] \
+    || fail "cpu-epp-tune.service ausente"
+systemctl is-enabled cpu-epp-tune.service 2>/dev/null | grep -q "^enabled$" \
+    || fail "cpu-epp-tune.service não habilitado"
+
 echo "=== Consistência de versão KDE ==="
 KDE_VER="$(rpm -q --qf '%{VERSION}' plasma-desktop 2>/dev/null || echo '')"
 KWIN_VER="$(rpm -q --qf '%{VERSION}' kwin 2>/dev/null || echo '')"
