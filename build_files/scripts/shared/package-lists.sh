@@ -97,11 +97,12 @@ REMOVE_PACKAGES=(
     # removida (cups-filters etc.). Confirmado: poppler/Okular não dependem de
     # ghostscript para renderizar PDF.
     libgs adobe-mappings-cmap adobe-mappings-cmap-deprecated
-    # espeak-ng/flite/lpcnetfreedv: backends TTS órfãos. qt6-qtspeech só tem o
-    # plugin "mock" instalado (nenhum plugin flite/espeak presente no disco) —
-    # nada os carrega. NOTA: qt6-qtspeech em si fica — tentativa anterior de
-    # removê-lo arrastou plasma-desktop/kwin/dolphin/konsole (ver comentário
-    # mais abaixo, junto ao COPR de packages).
+    # espeak-ng/flite/lpcnetfreedv: removidos aqui porque no base-atomic ainda
+    # não há nada a exigi-los. flite e lpcnetfreedv voltam depois do
+    # INSTALL_PACKAGES como hard-deps do ffmpeg-free (libflite.so por soname;
+    # codec2 Requires lpcnetfreedv) — ver nota junto a UNWANTED_PACKAGES, não
+    # são removidos de novo no Layer 2. espeak-ng não tem esse problema e fica
+    # fora da imagem final.
     espeak-ng flite lpcnetfreedv
 )
 
@@ -357,6 +358,13 @@ UNWANTED_PACKAGES=(
     vulkan-loader-devel
     libgs
     espeak-ng
-    flite
-    lpcnetfreedv
+    # NOTA: flite e lpcnetfreedv NÃO estão aqui (ver 70-build-deps.sh). Ambos
+    # reaparecem depois do INSTALL_PACKAGES como hard-deps do build ffmpeg-free/
+    # libavcodec-free do Fedora — ffmpeg-free liga-se a libflite.so (dependência
+    # por soname, invisível a `rpm -q --whatrequires flite`) e codec2 tem
+    # hard-Requires em lpcnetfreedv. ffmpeg-free é exigido por kpipewire/
+    # qt6-qtmultimedia/ffmpegthumbs, centrais do stack Plasma (screen recording,
+    # thumbnails, media). Testado ao vivo: remover qualquer um dos dois arrasta
+    # plasma-desktop/plasma-workspace/kwin/dolphin/ffmpeg-free. Mantê-los é o
+    # trade-off aceite.
 )
