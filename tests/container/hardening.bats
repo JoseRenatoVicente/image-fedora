@@ -189,6 +189,14 @@ setup() {
     grep -qE '^Delegate=.*\bmemory\b' /etc/systemd/system/user@.service.d/10-delegate.conf
 }
 
+@test "user@ sessions enable KSM memory merging" {
+    grep -qE '^MemoryKSM=yes' /etc/systemd/system/user@.service.d/10-ksm.conf
+}
+
+@test "KSM global scanner is enabled via tmpfiles" {
+    grep -q '/sys/kernel/mm/ksm/run' /usr/lib/tmpfiles.d/ksm-enable.conf
+}
+
 @test "systemd raises DefaultLimitNOFILE" {
     grep -qE '^DefaultLimitNOFILE=' /etc/systemd/system.conf.d/10-nofile-limit.conf
 }
