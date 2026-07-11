@@ -53,8 +53,12 @@ setup() {
     grep -qE '^net\.core\.netdev_max_backlog\s*=' /etc/sysctl.d/99-performance.conf
 }
 
-@test "split_lock_mitigate is NOT disabled (would weaken hardening)" {
-    ! grep -qE '^kernel\.split_lock_mitigate\s*=\s*0' /etc/sysctl.d/99-performance.conf
+@test "split_lock_mitigate is disabled for performance" {
+    grep -qE '^kernel\.split_lock_mitigate\s*=\s*0' /etc/sysctl.d/99-performance.conf
+}
+
+@test "nmi_watchdog is disabled for performance" {
+    grep -qE '^kernel\.nmi_watchdog\s*=\s*0' /etc/sysctl.d/99-performance.conf
 }
 
 # ── ZRAM ─────────────────────────────────────────────────────────────────────
@@ -195,6 +199,10 @@ setup() {
 
 @test "KSM global scanner is enabled via tmpfiles" {
     grep -q '/sys/kernel/mm/ksm/run' /usr/lib/tmpfiles.d/ksm-enable.conf
+}
+
+@test "audio group has realtime scheduling priority" {
+    grep -qE '^@audio\s+-\s+rtprio\s+99' /etc/security/limits.d/61-audio-rtprio.conf
 }
 
 @test "systemd raises DefaultLimitNOFILE" {
