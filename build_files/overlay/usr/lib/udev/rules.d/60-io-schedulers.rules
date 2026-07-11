@@ -1,7 +1,10 @@
-# SSD
-ACTION=="add|change", KERNEL=="sd[a-z]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="kyber"
-# NVMe — sem scheduler: o dispositivo gere a fila internamente (internal queue)
-ACTION=="add|change", KERNEL=="nvme[0-9]n[0-9]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+# SSD — nr_requests/read_ahead_kb derivados de Clear Linux (clr-power-tweaks/
+# data.h, classe SATA): fila mais funda e readahead maior que o default (128),
+# aproveitando NCQ sem prender o scheduler kyber num backlog raso.
+ACTION=="add|change", KERNEL=="sd[a-z]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="kyber", ATTR{queue/nr_requests}="4096", ATTR{queue/read_ahead_kb}="1024"
+# NVMe — sem scheduler: o dispositivo gere a fila internamente (internal queue).
+# nr_requests/read_ahead_kb derivados de Clear Linux (classe NVMe).
+ACTION=="add|change", KERNEL=="nvme[0-9]n[0-9]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none", ATTR{queue/nr_requests}="2048", ATTR{queue/read_ahead_kb}="1024"
 # MicroSD
 ACTION=="add|change", KERNEL=="mmcblk[0-9]p[0-9]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="bfq"
 # HDD

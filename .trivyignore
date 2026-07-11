@@ -22,3 +22,26 @@ CVE-2026-33814
 CVE-2026-39820
 CVE-2026-39836
 CVE-2026-42499
+
+# Pinned upstream release binaries (lazydocker in Containerfile.toolbox-dev;
+# terraform/kubectl/flux/talosctl in Containerfile.toolbox-infra) — all
+# installed as SHA256-verified upstream binaries, built by their own project
+# against whatever Go toolchain/vendored deps they shipped with at release
+# time. We don't control that build, only which pinned version we fetch.
+# CVE-2026-39822 (Go stdlib os.Root symlink traversal) and CVE-2026-42504
+# (Go net/mime DoS) are baked into every one of these binaries since they
+# predate the patched Go point releases (1.25.11/1.25.12, 1.26.4/1.26.5).
+# None of these tools run as a service accepting attacker-controlled
+# filesystem paths or MIME input in how they're used here (interactive CLIs
+# in a local toolbox talking to Docker/k8s/cloud APIs the user configures).
+# CVE-2026-25681, CVE-2026-27136 and CVE-2026-39821 are golang.org/x/net
+# (HTML parsing / Punycode/IDNA) CVEs vendored into kubectl — kubectl talks
+# to the Kubernetes API over TLS/JSON, it does not parse attacker-supplied
+# HTML or Punycode in normal use, so these are not reachable either.
+# Re-evaluate and drop the matching lines below once each tool's
+# *_VERSION is bumped to a release built with patched deps.
+CVE-2026-39822
+CVE-2026-42504
+CVE-2026-25681
+CVE-2026-27136
+CVE-2026-39821
