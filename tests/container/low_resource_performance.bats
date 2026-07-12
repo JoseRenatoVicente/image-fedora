@@ -15,9 +15,15 @@ setup() {
     grep -q 'zram-size = min(ram / 4, 4096)' /etc/systemd/zram-generator.conf
 }
 
-@test "low-resource sysctl is present in image" {
-    [ -f /etc/sysctl.d/100-low-resource.conf ]
-    grep -q 'vm.swappiness = 60' /etc/sysctl.d/100-low-resource.conf
+@test "low-resource sysctl template is present in image" {
+    [ -f /usr/share/image-fedora/low-resource/100-low-resource.conf ]
+    grep -q 'vm.swappiness = 60' /usr/share/image-fedora/low-resource/100-low-resource.conf
+}
+
+@test "low-resource tuning only activates on constrained hardware" {
+    [ -f /usr/lib/systemd/system/low-resource-tuning.service ]
+    grep -qE '^ConditionMemory=<=' /usr/lib/systemd/system/low-resource-tuning.service
+    systemctl is-enabled low-resource-tuning.service 2>/dev/null | grep -q "^enabled$"
 }
 
 @test "bluetooth service is disabled by preset" {

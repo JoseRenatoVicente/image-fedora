@@ -7,6 +7,12 @@ Before=display-manager.service
 # Só em sistemas UEFI com OSTree
 ConditionFirmware=uefi
 ConditionPathExists=/run/ostree-booted
+# Migração é opt-in: só corre se o utilizador pedir explicitamente
+# (sudo touch /etc/sd-boot-migrate-requested). Sem isto, a troca de
+# bootloader e a reescrita do tipo de partição do ESP aconteciam em TODO
+# boot UEFI/ostree sem ninguém pedir — apesar do comentário em
+# package-lists.sh já descrever a migração como "opt-in".
+ConditionPathExists=/etc/sd-boot-migrate-requested
 # Não repetir após sucesso (stamp em /boot/efi)
 ConditionPathExists=!/boot/efi/.sd-boot-migrated
 

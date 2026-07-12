@@ -4,10 +4,10 @@
 kargs = [
   # Boot appearance: quiet suppresses kernel/initrd text; rhgb é o trigger do
   # Plymouth no Fedora (o `splash` estilo Debian é ignorado pelo plymouthd do
-  # Fedora). Sem rhgb não há animação de boot — vê-se a consola de texto.
+  # Fedora — por isso NÃO está listado aqui). Sem rhgb não há animação de
+  # boot — vê-se a consola de texto.
   "quiet",
   "rhgb",
-  "splash",
   # debugfs=off: desactiva o debugfs completamente, evitando fuga de informação
   # do kernel via /sys/kernel/debug/ (endereços internos, estado de hardware).
   "debugfs=off",
@@ -44,7 +44,11 @@ kargs = [
   # confidentiality-only read restrictions (kcore, /dev/mem reads, some perf
   # paths, hibernation) in exchange for working BPF-based sandboxing.
   "lockdown=integrity",
-  "loglevel=0",
+  # loglevel=0 removido de propósito: quiet (acima) já suprime o ruído normal
+  # de boot; loglevel=0 também esconderia a mensagem de panic no console
+  # quando oops=panic + kernel.panic=-1 (sysctl) reiniciam a máquina — exatamente
+  # a informação que se quer ver num panic real. Conflitava com o
+  # kernel.printk do próprio initramfs de boot.
   # oops=panic: converte qualquer kernel oops num panic imediato.
   # Sem isto o kernel tenta continuar após um oops, deixando uma janela de
   # exploração num estado inconsistente. Combinado com kernel.panic=-1

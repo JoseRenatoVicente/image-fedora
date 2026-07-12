@@ -1,6 +1,8 @@
 #!/bin/bash
 # Migra de GRUB para systemd-boot em sistemas UEFI com OSTree/bootc.
 # Corre uma vez (verifica stamp em /boot/efi). Seguro para re-runs.
+# Opt-in: só é invocado pelo sd-boot-migrate.service, que exige
+# /etc/sd-boot-migrate-requested (ver /usr/bin/sd-boot-migrate-enable).
 set -euo pipefail
 
 STAMP=/boot/efi/.sd-boot-migrated
@@ -40,7 +42,7 @@ if [[ -d /sys/firmware/efi ]] && command -v mokutil >/dev/null 2>&1; then
         if ! mokutil --list-enrolled 2>/dev/null | grep -qi "image-fedora Secure Boot MOK"; then
             log "MOK do projecto ainda não enrolada — a adiar migração."
             log "Execute 'sudo mok-enroll' e reinicie para confirmar, depois"
-            log "corra 'sudo /usr/libexec/sd-boot-migrate' manualmente."
+            log "corra 'sudo sd-boot-migrate-enable' de novo."
             exit 0
         fi
     fi
@@ -58,7 +60,20 @@ DISK_NAME=$(lsblk -no PKNAME "$BOOT_PART")
 DISK="/dev/$DISK_NAME"
 PARTNO=$(lsblk -no PARTN "$BOOT_PART")
 
-log "disco: $DISK  partição /boot: $PARTNO"
+# Número da partição do ESP: NÃO assumir --part 1 (layouts com partição
+# BIOS-boot ou múltiplas partições antes do ESP têm o ESP noutro número).
+ESP_PART=$(findmnt -n -o SOURCE "$ESP")
+if [[ -z "$ESP_PART" ]]; then
+    log "ERRO: não foi possível determinar dispositivo do ESP ($ESP)"
+    exit 1
+fi
+ESP_PARTNO=$(lsblk -no PARTN "$ESP_PART")
+if [[ -z "$ESP_PARTNO" ]]; then
+    log "ERRO: não foi possível determinar o número de partição do ESP ($ESP_PART)"
+    exit 1
+fi
+
+log "disco: $DISK  partição /boot: $PARTNO  partição ESP: $ESP_PARTNO"
 
 # Verifica se já tem XBOOTLDR GUID
 CURRENT_TYPE=$(lsblk -no PARTTYPE "$BOOT_PART" | tr '[:upper:]' '[:lower:]')
@@ -105,7 +120,7 @@ fi
 bootctl set-default "" 2>/dev/null || true
 efibootmgr --create \
     --disk "$DISK" \
-    --part 1 \
+    --part "$ESP_PARTNO" \
     --label "Linux Boot Manager" \
     --loader '\EFI\systemd\systemd-bootx64.efi' \
     --unicode '' \

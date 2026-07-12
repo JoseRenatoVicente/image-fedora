@@ -35,10 +35,6 @@ setup() {
     assert_contains "$packages" 'thermald'
 }
 
-@test "packages include irqbalance" {
-    assert_contains "$packages" 'irqbalance'
-}
-
 @test "packages include tuned-ppd" {
     assert_contains "$packages" 'tuned-ppd'
 }
@@ -71,6 +67,10 @@ setup() {
 
 @test "runtime tests check for power-profiles-daemon" {
     assert_contains "$runtime_tests" 'power-profiles-daemon'
+}
+
+@test "irqbalance is removed, not just installed-and-masked" {
+    awk '/^REMOVE_PACKAGES=\(/,/^\)/' "$packages" | grep -q 'irqbalance'
 }
 
 # ── Thunderbolt/USB4 ────────────────────────────────────────────────────────

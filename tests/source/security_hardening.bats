@@ -131,8 +131,9 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/sysctl.d/60-security-hardening.conf" 'vm.max_map_count = 1048576'
 }
 
-@test "systemd DefaultEnvironment preloads hardened_malloc for all services" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system.conf.d/40-hardened_malloc.conf" 'LD_PRELOAD=libhardened_malloc.so'
+@test "hardened_malloc is preloaded via ld.so.preload only, not duplicated via systemd DefaultEnvironment" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/ld.so.preload" 'libhardened_malloc.so'
+    assert_file_not_exists "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system.conf.d/40-hardened_malloc.conf"
 }
 
 @test "public desktop config files are made world-readable during configure" {
@@ -142,10 +143,9 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/scripts/configure/10-system.sh" 'chmod 0644'
 }
 
-@test "sshd is enabled and host key generation is not masked" {
-    assert_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'sshd.service'
-    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'sshd-keygen.target'
-    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset" 'enable sshd.service'
+@test "sshd is disabled by default but host key generation is not masked" {
+    assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/50-services.sh" 'sshd.service'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset" 'disable sshd.service'
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset" 'enable sshd-keygen.target'
 }
 
@@ -208,9 +208,9 @@ setup() {
     assert_not_contains "${REPO_ROOT}/build_files/scripts/shared/initramfs.sh" '--no-hostonly'
 }
 
-@test "systemd preload only references installed hardened_malloc library" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system.conf.d/40-hardened_malloc.conf" 'LD_PRELOAD=libhardened_malloc.so'
-    assert_not_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system.conf.d/40-hardened_malloc.conf" 'libno_rlimit_as.so'
+@test "ld.so.preload only references installed hardened_malloc library" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/ld.so.preload" 'libhardened_malloc.so'
+    assert_not_contains "${REPO_ROOT}/build_files/overlay/etc/ld.so.preload" 'libno_rlimit_as.so'
 }
 
 @test "initramfs generation avoids tmpfs for dracut staging" {

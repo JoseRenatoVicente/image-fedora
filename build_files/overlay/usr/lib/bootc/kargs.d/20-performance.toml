@@ -16,11 +16,14 @@ kargs = [
   # de compactação de memória de "always" em cargas de trabalho genéricas de
   # desktop, mantendo o ganho de TLB onde a app sabe que compensa.
   "transparent_hugepage=madvise",
-  # tsc=reliable: salta as re-validações periódicas do Time Stamp Counter
-  # (watchdog clocksource) em CPUs com TSC invariante (Intel/AMD modernos,
-  # a esmagadora maioria do parque atual). Elimina overhead cíclico de
-  # verificação sem perder precisão de tempo. Derivado de XanMod/Clear Linux.
-  "tsc=reliable",
+  # tsc=reliable removido de propósito: desliga o watchdog de clocksource
+  # incondicionalmente, mesmo em CPUs mais antigas/defeituosas com TSC
+  # instável (drift silencioso de relógio sem detecção). Esta imagem é mista
+  # AMD+Intel/hardware variado e não tem mecanismo de kargs condicionais por
+  # hardware (ao contrário dos serviços oneshot com ConditionPathExists usados
+  # para amd-cpb-boost/intel-pstate-floor) — o overhead do watchdog é aceitável
+  # face ao risco de drift silencioso em hardware antigo. Derivado de
+  # XanMod/Clear Linux, mas não replicado aqui.
   # rcu_nocbs=all: tira o processamento de callbacks RCU do hot path de todos
   # os CPUs, reduzindo jitter/latência de scheduling. O ganho clássico é com
   # isolcpus (CPUs dedicados sem RCU), que não usamos aqui — em "all" sem

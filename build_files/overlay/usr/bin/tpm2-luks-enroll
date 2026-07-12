@@ -11,6 +11,19 @@
 #
 # Requisitos: Secure Boot ATIVO no firmware (senão a selagem em PCR 7 não
 # protege nada), TPM 2.0 presente, e a passphrase atual do LUKS à mão.
+#
+# AVISO — bypass físico conhecido e aceite (trade-off deliberado):
+#   PCR 7 mede o estado do Secure Boot, NÃO a linha de comando do kernel.
+#   Esta imagem também não define password no GRUB (decisão STIG deliberada —
+#   proteger o prompt do GRUB em todo boot é hostil para uso desktop). Um
+#   atacante com acesso FÍSICO à máquina pode editar a entrada do GRUB no
+#   boot (ex.: acrescentar init=/bin/bash ou rd.break) sem alterar PCR 7 — o
+#   TPM liberta a chave na mesma e o atacante obtém shell root no disco
+#   decifrado, sem senha nenhuma.
+#   Isto é aceite conscientemente para não impor PIN/password em cada boot.
+#   Se o modelo de ameaça incluir acesso físico não confiável, mitigue com
+#   `systemd-cryptenroll --tpm2-with-pin=yes` (PIN em cada boot) ou com uma
+#   password de superuser no GRUB — nenhuma das duas é feita aqui por defeito.
 set -euo pipefail
 
 err()  { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
@@ -45,6 +58,16 @@ refresh_initramfs() {
 }
 
 [[ $EUID -eq 0 ]] || { err "Execute como root (sudo tpm2-luks-enroll)."; exit 1; }
+
+warn "⚠ AVISO: este enroll é auto-unlock SEM PIN, selado apenas em PCR 7."
+warn "  PCR 7 mede o estado do Secure Boot, não a linha de comando do kernel,"
+warn "  e esta imagem não usa password de GRUB. Alguém com acesso FÍSICO à"
+warn "  máquina pode editar a entrada do GRUB (init=/bin/bash, rd.break) para"
+warn "  obter shell root no disco decifrado, sem senha nenhuma — o TPM não"
+warn "  detecta essa alteração. Se isso está fora do seu modelo de ameaça,"
+warn "  use antes: systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=$PCRS \\"
+warn "             --tpm2-with-pin=yes <dev>  (pede PIN em cada boot)."
+info ""
 
 # ── 1. Secure Boot ────────────────────────────────────────────────────────────
 if command -v mokutil >/dev/null 2>&1; then

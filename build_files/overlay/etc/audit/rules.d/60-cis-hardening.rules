@@ -61,20 +61,9 @@
 -a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k modules
 -a always,exit -F arch=b32 -S init_module,finit_module,delete_module -k modules
 
-## 6.3.3.9 — alterações de permissões DAC (chmod/chown/xattr) por utilizadores reais
--a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k perm_mod
--a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k perm_mod
--a always,exit -F arch=b64 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=unset -k perm_mod
--a always,exit -F arch=b32 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=unset -k perm_mod
--a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -k perm_mod
--a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -k perm_mod
-
-## 6.3.3.10 — tentativas de acesso a ficheiros sem permissão
--a always,exit -F arch=b64 -S open,openat,truncate,ftruncate,creat -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
--a always,exit -F arch=b64 -S open,openat,truncate,ftruncate,creat -F exit=-EPERM  -F auid>=1000 -F auid!=unset -k access
--a always,exit -F arch=b32 -S open,openat,truncate,ftruncate,creat -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
--a always,exit -F arch=b32 -S open,openat,truncate,ftruncate,creat -F exit=-EPERM  -F auid>=1000 -F auid!=unset -k access
-
-## 6.3.3.17 — eliminação/renomeação de ficheiros pelo utilizador
--a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
--a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
+## 6.3.3.9/10/17 — perm_mod/access/delete DELIBERADAMENTE OMITIDAS nesta imagem.
+## Capturam todo chmod/chown/unlink/rename/open->EACCES de qualquer uid>=1000 —
+## num desktop de dev, um build grande ou "npm install" gera milhões de
+## eventos (overhead por syscall mesmo sem logar, churn em /var/log/audit).
+## Ficam as famílias de identidade/sudoers/módulos/mounts/time-change acima,
+## que cobrem o que interessa num single-user desktop sem esse custo.

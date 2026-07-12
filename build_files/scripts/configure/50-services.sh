@@ -20,7 +20,6 @@ enable_unit() {
 }
 
 enable_unit \
-    sshd.service \
     podman.socket \
     tuned.service \
     firewalld.service \
@@ -41,7 +40,8 @@ enable_unit \
     intel-pstate-floor.service \
     cpu-epp-tune.service \
     tpm2-first-enroll.service \
-    tpm2-reenroll-check.service
+    tpm2-reenroll-check.service \
+    low-resource-tuning.service
 
 # /tmp como tmpfs (CIS 1.1.2.1) — a unit upstream já traz nosuid,nodev nas Options.
 # Fora do enable_unit: se a base marcar tmp.mount como 'static', o `enable` falha e

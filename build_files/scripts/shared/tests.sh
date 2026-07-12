@@ -232,8 +232,13 @@ grep -q '"quiet"' /usr/lib/bootc/kargs.d/10-hardening.toml \
     || fail "kargs: 'quiet' ausente (necessário para boot silencioso)"
 grep -q '"rhgb"' /usr/lib/bootc/kargs.d/10-hardening.toml \
     || fail "kargs: 'rhgb' ausente (trigger do Plymouth no Fedora)"
+# 'splash' é deliberadamente ausente: plymouthd do Fedora ignora-o, karg morto.
 grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml \
-    || fail "kargs: 'splash' ausente (necessário para Plymouth)"
+    && fail "kargs: 'splash' presente mas é ignorado pelo plymouthd do Fedora (karg morto)"
+grep -q '"loglevel=0"' /usr/lib/bootc/kargs.d/10-hardening.toml \
+    && fail "kargs: 'loglevel=0' esconderia a mensagem de panic (conflita com oops=panic/kernel.panic=-1)"
+grep -q '"tsc=reliable"' /usr/lib/bootc/kargs.d/20-performance.toml \
+    && fail "kargs: 'tsc=reliable' desliga o watchdog do clocksource incondicionalmente (sem gate por hardware)"
 
 echo "=== Locale, teclado e timezone ==="
 grep -qx 'LANG=pt_BR.UTF-8' /etc/locale.conf \
@@ -640,10 +645,14 @@ echo "=== Secure Boot: MOK para systemd-boot ==="
     || fail "SecureBoot: /usr/bin/mok-enroll ausente ou não executável"
 [[ -x /usr/libexec/sd-boot-migrate ]] \
     || fail "SecureBoot: /usr/libexec/sd-boot-migrate ausente ou não executável"
+[[ -x /usr/bin/sd-boot-migrate-enable ]] \
+    || fail "SecureBoot: /usr/bin/sd-boot-migrate-enable ausente ou não executável"
 [[ -s /usr/share/secureboot/MOK.der ]] \
     || fail "SecureBoot: /usr/share/secureboot/MOK.der ausente — mok-enroll não teria o que importar"
 systemctl is-enabled sd-boot-migrate.service 2>/dev/null | grep -q '^enabled$' \
     || fail "SecureBoot: sd-boot-migrate.service não está habilitado"
+grep -qE '^ConditionPathExists=/etc/sd-boot-migrate-requested$' /usr/lib/systemd/system/sd-boot-migrate.service \
+    || fail "SecureBoot: sd-boot-migrate.service não é opt-in (falta ConditionPathExists do flag)"
 
 echo "=== CIS Tier 1+2: banners, sudo, mounts, auditd, pwhistory ==="
 # Banners de aviso (CIS 1.7 / STIG 211020/255025): aviso de uso autorizado +

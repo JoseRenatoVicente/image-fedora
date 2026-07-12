@@ -14,15 +14,24 @@ setup() {
 }
 
 @test "low-resource sysctl exists and sets swappiness" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/etc/sysctl.d/100-low-resource.conf" 'vm.swappiness = 60'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/share/image-fedora/low-resource/100-low-resource.conf" 'vm.swappiness = 60'
 }
 
 @test "low-resource sysctl increases cache pressure" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/etc/sysctl.d/100-low-resource.conf" 'vm.vfs_cache_pressure = 200'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/share/image-fedora/low-resource/100-low-resource.conf" 'vm.vfs_cache_pressure = 200'
 }
 
 @test "low-resource sysctl disables swap read-ahead" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/etc/sysctl.d/100-low-resource.conf" 'vm.page-cluster = 0'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/share/image-fedora/low-resource/100-low-resource.conf" 'vm.page-cluster = 0'
+}
+
+@test "low-resource tuning is gated behind a RAM condition, not unconditional" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/low-resource-tuning.service" 'ConditionMemory=<=6G'
+    assert_file_not_exists "${REPO_ROOT}/build_files/overlay/etc/sysctl.d/100-low-resource.conf"
+}
+
+@test "99-performance.conf swappiness is not shadowed by an unconditional overlay" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/sysctl.d/99-performance.conf" 'vm.swappiness = 180'
 }
 
 @test "bluetooth is disabled by preset" {

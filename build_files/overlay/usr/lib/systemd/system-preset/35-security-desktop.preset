@@ -23,9 +23,11 @@ disable rpcbind.service
 disable rpcbind.socket
 disable rpcbind.target
 
-# SSH server is enabled for remote administration. Keep sshd-keygen available so
-# first boot can create host keys before sshd starts.
-enable sshd.service
+# SSH server is disabled by default (nothing exposed out of the box; the
+# firewalld zone also blocks port 22 regardless). sshd-keygen stays enabled so
+# host keys already exist if/when someone opts in with `systemctl enable --now
+# sshd.service` + opens the firewall port themselves.
+disable sshd.service
 enable sshd-keygen.target
 disable sshd.socket
 disable sshd-unix-local.socket

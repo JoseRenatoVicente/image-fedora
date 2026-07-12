@@ -47,6 +47,9 @@ REMOVE_PACKAGES=(
     sssd-common sssd-kcm
     # ModemManager: sem modem celular neste hardware — removido (serviço também mascarado)
     ModemManager
+    # irqbalance: serviço mascarado em 50-services.sh; sem o pacote da base o
+    # mascaramento seria peso morto para um binário nunca executado
+    irqbalance
 
     # Outros
     sos fpaste words pinfo lrzsz kmscon
@@ -142,7 +145,12 @@ INSTALL_PACKAGES=(
     # O kameleon kded (accent color dinâmico) vem do kdeplasma-addons; sem ele o
     # plasma_accentcolor_service usa AccentColor fixo do skel — kded6rc desativa autoload.
     plasma-pa plasma-nm plasma-nm-openvpn
-    bluedevil polkit-kde plasma-drkonqi kinfocenter plasma-systemmonitor
+    # plasma-drkonqi excluído de propósito: coredumps estão desativados em 3
+    # camadas (DumpCore=no em system/user.conf.d, limits core 0, Storage=none
+    # em coredump.conf.d — ver política NSA/STIG contra exposição de dados
+    # sensíveis em cores). Sem coredump, o DrKonqi nunca é invocado; instalar
+    # o pacote seria peso morto que contradiz a própria política.
+    bluedevil polkit-kde kinfocenter plasma-systemmonitor
     # Integração
     kde-gtk-config flatpak-kcm kio-admin pam-kwallet pinentry-qt
     libappindicator-gtk3
@@ -193,9 +201,11 @@ INSTALL_PACKAGES=(
     # Auditoria (CIS §6.3): auditd + augenrules. Regras em /etc/audit/rules.d/.
     audit
 
-    # Dell/Intel laptop support
+    # Dell/Intel laptop support. irqbalance de propósito fora: o serviço é
+    # mascarado em 50-services.sh (scheduling de IRQ manual/scx nesta imagem),
+    # e sem o serviço o pacote é só peso morto.
     fprintd fprintd-pam libfprint
-    bolt iio-sensor-proxy irqbalance
+    bolt iio-sensor-proxy
     thermald
     alsa-sof-firmware alsa-ucm
     fwupd
@@ -278,7 +288,6 @@ REQUIRED_PACKAGES=(
     bolt
     iio-sensor-proxy
     thermald
-    irqbalance
     tuned-ppd
     alsa-sof-firmware
     alsa-ucm
@@ -334,6 +343,10 @@ UNWANTED_PACKAGES=(
     open-vm-tools-desktop virtualbox-guest-additions
     # ModemManager removido (sem modem celular; serviço mascarado)
     ModemManager
+    # irqbalance removido (serviço mascarado; pacote seria peso morto)
+    irqbalance
+    # plasma-drkonqi removido (coredumps desativados; nunca seria invocado)
+    plasma-drkonqi
     # input-remapper substituído por keyd
     input-remapper
     plasma-workspace-wallpapers

@@ -174,8 +174,16 @@ setup() {
     grep -q '"rhgb"' /usr/lib/bootc/kargs.d/10-hardening.toml
 }
 
-@test "kargs include splash" {
-    grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml
+@test "kargs do not include dead splash karg (ignored by Fedora's plymouthd)" {
+    ! grep -q '"splash"' /usr/lib/bootc/kargs.d/10-hardening.toml
+}
+
+@test "kargs do not include loglevel=0 (would hide panic messages)" {
+    ! grep -q '"loglevel=0"' /usr/lib/bootc/kargs.d/10-hardening.toml
+}
+
+@test "kargs do not include unconditional tsc=reliable" {
+    ! grep -q '"tsc=reliable"' /usr/lib/bootc/kargs.d/20-performance.toml
 }
 
 # ── Performance (cachyos-settings-derived) ───────────────────────────────────
@@ -197,8 +205,9 @@ setup() {
     grep -qE '^Delegate=.*\bmemory\b' /etc/systemd/system/user@.service.d/10-delegate.conf
 }
 
-@test "user@ sessions enable KSM memory merging" {
-    grep -qE '^MemoryKSM=yes' /etc/systemd/system/user@.service.d/10-ksm.conf
+@test "KSM memory merging is scoped to machine.slice, not the whole user session" {
+    grep -qE '^MemoryKSM=yes' /etc/systemd/system/machine.slice.d/10-ksm.conf
+    [ ! -e /etc/systemd/system/user@.service.d/10-ksm.conf ]
 }
 
 @test "KSM global scanner is enabled via tmpfiles" {

@@ -1,0 +1,22 @@
+[Unit]
+Description=Apply low-resource sysctl tuning on constrained hardware
+Documentation=man:systemd.unit(5)
+# 99-performance.conf (swappiness=180) é o perfil por defeito para
+# workstation/dev. Este profile alternativo (swappiness=60, cache_pressure
+# mais agressivo) só faz sentido em hardware com pouca RAM — por isso corre
+# condicionado em vez de ser um overlay incondicional em /etc/sysctl.d/
+# (que sobrepunha 99-performance.conf em TODAS as máquinas por ordem lexical).
+ConditionMemory=<=6G
+ConditionPathExists=!/etc/sysctl.d/100-low-resource.conf
+DefaultDependencies=no
+After=sysinit.target
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/install -Dm0644 /usr/share/image-fedora/low-resource/100-low-resource.conf /etc/sysctl.d/100-low-resource.conf
+ExecStart=/usr/lib/systemd/systemd-sysctl /etc/sysctl.d/100-low-resource.conf
+
+[Install]
+WantedBy=multi-user.target
