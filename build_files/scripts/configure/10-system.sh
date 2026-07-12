@@ -172,6 +172,7 @@ setfattr -n user.component -v "image-config" \
     /usr/libexec/fedora-kinoite-plasmalogin-workaround \
     /usr/libexec/kwin-vm-compat.sh \
     /etc/xdg/kwinrc \
+    /etc/xdg/breezerc \
     /etc/xdg/kdeglobals \
     /etc/systemd/journald.conf.d/size-limit.conf \
     /etc/plasmalogin.conf.d/10-theme.conf \

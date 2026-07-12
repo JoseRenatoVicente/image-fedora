@@ -1,2 +1,34 @@
 [Xwayland]
 XwaylandEavesdrops=None
+
+# Enforced desktop look (no border / no rounded corners / no blur), pushed via
+# the /etc/xdg cascade so it reaches existing user homes on image update too —
+# /etc/skel only applies at account creation, it never retrofits existing users.
+# $i locks these specific keys so a stale ~/.config/kwinrc can't override them;
+# ButtonsOnLeft/Right, library and theme stay as regular (overridable) defaults.
+[Plugins][$i]
+blurEnabled=false
+kwin4_effect_roundcornersEnabled=false
+roundcornersEnabled=false
+shapeCornersEnabled=false
+shapecornersEnabled=false
+
+[Round-Corners][$i]
+ActiveOutlineAlpha=0
+ActiveOutlineUseCustom=true
+ActiveOutlineUsePalette=false
+InactiveOutlineAlpha=0
+InactiveOutlineThickness=0
+InactiveOutlineUseCustom=true
+InactiveOutlineUsePalette=false
+InactiveSecondOutlineThickness=0
+OutlineThickness=0
+SecondOutlineThickness=0
+
+[org.kde.kdecoration2]
+BorderSize[$i]=None
+BorderSizeAuto[$i]=false
+ButtonsOnLeft=
+ButtonsOnRight=IAX
+library=org.kde.breeze
+theme=Breeze

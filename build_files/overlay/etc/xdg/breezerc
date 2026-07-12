@@ -1,0 +1,7 @@
+# Enforced via the /etc/xdg cascade (see /etc/xdg/kwinrc comment): this reaches
+# existing user homes on image update, unlike /etc/skel/.config/breezerc which
+# only applies to brand-new accounts.
+[Common]
+OutlineEnabled[$i]=false
+OutlineIntensity[$i]=OutlineOff
+RoundedCorners[$i]=false

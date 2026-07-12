@@ -83,6 +83,22 @@ setup() {
     assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh" '--group Plugins --key kwin4_effect_roundcornersEnabled "false"'
 }
 
+@test "xdg cascade enforces opaque decoration for existing user homes too" {
+    # /etc/skel only seeds brand-new accounts; existing homes (already updated
+    # via image update) never get retrofitted from it. These same border/blur
+    # settings must also live in /etc/xdg, immutable ($i), so KDE's config
+    # cascade applies them on top of whatever an existing ~/.config already has.
+    local xdg_kwinrc="${REPO_ROOT}/build_files/overlay/etc/xdg/kwinrc"
+    local xdg_breezerc="${REPO_ROOT}/build_files/overlay/etc/xdg/breezerc"
+    assert_contains "$xdg_kwinrc" '[Plugins][$i]'
+    assert_contains "$xdg_kwinrc" 'blurEnabled=false'
+    assert_contains "$xdg_kwinrc" '[Round-Corners][$i]'
+    assert_contains "$xdg_kwinrc" 'BorderSize[$i]=None'
+    assert_contains "$xdg_kwinrc" 'BorderSizeAuto[$i]=false'
+    assert_contains "$xdg_breezerc" 'OutlineEnabled[$i]=false'
+    assert_contains "$xdg_breezerc" 'RoundedCorners[$i]=false'
+}
+
 @test "configure disables Mokka adaptive transparency" {
     local skel_configure="${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh"
     assert_contains "$skel_configure" '--group AdaptiveTransparency --key enabled "false"'
