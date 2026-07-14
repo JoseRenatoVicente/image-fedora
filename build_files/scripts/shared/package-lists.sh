@@ -256,6 +256,12 @@ BUILD_DEPS=(
     # sbsign (assinatura Secure Boot do systemd-boot em 65-secureboot-sign.sh).
     # Só necessário durante o build; removido daqui como os outros build deps.
     sbsigntools
+    # ukify (fornecido por systemd-ukify): compõe o Unified Kernel Image
+    # (kernel+initrd+cmdline+PCR11 signed policy) em 80-initramfs.sh, via
+    # `bootc container ukify`. Só usado no build — o cliente nunca regenera
+    # o UKI localmente (ver tpm2-first-enroll), por isso não precisa ficar
+    # instalado na imagem final.
+    systemd-ukify
 )
 
 # ── Verificação runtime: pacotes que DEVEM estar presentes ───────────────────

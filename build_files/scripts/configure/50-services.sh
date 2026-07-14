@@ -35,6 +35,7 @@ enable_unit \
     systemd-oomd.service \
     auditd.service \
     sd-boot-migrate.service \
+uki-migrate.service \
     selinux-booleans.service \
     amd-cpb-boost.service \
     intel-pstate-floor.service \

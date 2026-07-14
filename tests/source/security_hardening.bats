@@ -177,10 +177,32 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-first-enroll.service" 'ConditionPathExists=!/var/lib/tpm2-enrolled'
 }
 
-@test "TPM2 enroll scripts refresh initramfs through rpm-ostree" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-luks-enroll" 'rpm-ostree initramfs --enable'
-    assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll" 'rpm-ostree initramfs --enable'
+@test "TPM2 enroll scripts use Signed PCR Policy (PCR 11), not local initramfs regen" {
+    # UKI é construído e assinado só no build (chave privada nunca sai do CI)
+    # — o cliente não pode regenerar/assinar um UKI localmente, por isso estes
+    # scripts não devem tentar 'rpm-ostree initramfs --enable' nem selar em
+    # PCR 7 (raw, instável nalguns firmwares).
+    for script in tpm2-luks-enroll tpm2-first-enroll tpm2-reenroll-check; do
+        assert_not_contains "${REPO_ROOT}/build_files/overlay/usr/bin/$script" 'rpm-ostree initramfs --enable'
+        assert_not_contains "${REPO_ROOT}/build_files/overlay/usr/bin/$script" 'tpm2-pcrs=7'
+    done
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll" 'tpm2-device=auto'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-first-enroll" 'tpm2-public-key-pcrs=11'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-luks-enroll" 'tpm2-public-key-pcrs="$PCRS"'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/bin/tpm2-reenroll-check" 'tpm2-public-key-pcrs=11'
+}
+
+@test "uki-migrate mirrors sd-boot-migrate's opt-in pattern" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/uki-migrate.service" 'ConditionPathExists=/etc/uki-migrate-requested'
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/uki-migrate.service" 'ConditionPathExists=!/var/lib/uki-migrated'
+    run test -x "${REPO_ROOT}/build_files/overlay/usr/libexec/uki-migrate"
+    [ "$status" -eq 0 ]
+    run test -x "${REPO_ROOT}/build_files/overlay/usr/bin/uki-migrate-enable"
+    [ "$status" -eq 0 ]
+}
+
+@test "uki-migrate refuses to run without a password/recovery LUKS keyslot" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/libexec/uki-migrate" "grep -qE 'password|recovery'"
 }
 
 @test "tpm2-reenroll-check keeps cryptenroll prompts visible" {

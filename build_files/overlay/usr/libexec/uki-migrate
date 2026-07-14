@@ -1,0 +1,68 @@
+#!/bin/bash
+# uki-migrate — migra um deployment existente (BLS: vmlinuz+initramfs
+# separados) para arrancar via UKI (Unified Kernel Image assinado, PCR11
+# signed policy) depois de um `bootc upgrade` para uma imagem que já produz
+# o UKI (ver Containerfile stage `uki`, build-uki.sh).
+#
+# Corre UMA vez (stamp em /var/lib/uki-migrated). Seguro para re-runs.
+# Opt-in: só é invocado por uki-migrate.service, que exige
+# /etc/uki-migrate-requested (ver /usr/bin/uki-migrate-enable) — mesmo padrão
+# do sd-boot-migrate.
+#
+# O que este script NÃO faz: não constrói nem assina o UKI (isso só acontece
+# no build da imagem — a chave privada nunca sai do CI) e não reenrola o
+# TPM2 (precisa da passphrase LUKS actual, interactivo — ver
+# /usr/bin/tpm2-luks-enroll, que já se recusa a correr sem UKI presente).
+# Este script só garante as pré-condições e que o UKI fica como entrada de
+# arranque por omissão — mantém as entradas BLS antigas como fallback no
+# menu do systemd-boot, nunca as apaga.
+set -euo pipefail
+
+STAMP=/var/lib/uki-migrated
+UKI_DIR=/boot/EFI/Linux
+
+log() { echo "[uki-migrate] $*"; }
+
+# Já migrado
+[[ -f "$STAMP" ]] && { log "já migrado, nada a fazer"; exit 0; }
+
+# Só UEFI + systemd-boot (a migração GRUB→systemd-boot é pré-requisito
+# separado, ver sd-boot-migrate)
+[[ -d /sys/firmware/efi ]] || { log "sistema não é UEFI, ignorar"; exit 0; }
+if ! bootctl --path=/boot/efi is-installed 2>/dev/null; then
+    log "systemd-boot ainda não instalado (ver sd-boot-migrate-enable) — a adiar."
+    exit 0
+fi
+
+# Pré-condição: este deployment já produziu um UKI assinado. Sem isto não há
+# nada para migrar ainda — o próximo `bootc upgrade` pode trazê-lo.
+mapfile -t UKIS < <(ls "$UKI_DIR"/*.efi 2>/dev/null || true)
+if [[ ${#UKIS[@]} -eq 0 ]]; then
+    log "nenhum UKI em $UKI_DIR ainda — corra 'bootc upgrade' para uma imagem mais recente."
+    exit 0
+fi
+UKI="${UKIS[0]}"
+UKI_NAME=$(basename "$UKI")
+
+# Pré-condição de segurança: recusa migrar se não houver keyslot LUKS de
+# password/recovery além do TPM2 — sem isto, um UKI mal assinado ou uma
+# chave PCR revogada trancaria o disco sem forma de o recuperar.
+mapfile -t LUKS_DEVS < <(lsblk -rpno NAME,FSTYPE | awk '$2=="crypto_LUKS"{print $1}')
+if [[ ${#LUKS_DEVS[@]} -gt 0 ]]; then
+    DEV="${LUKS_DEVS[0]}"
+    if ! systemd-cryptenroll "$DEV" 2>/dev/null | grep -qE 'password|recovery'; then
+        log "ERRO: $DEV não tem keyslot de password/recovery — recusar migração."
+        log "Garanta uma senha/recovery key LUKS válida antes de tentar novamente."
+        exit 1
+    fi
+fi
+
+# Garante que o UKI é a entrada de arranque por omissão (o menu do
+# systemd-boot mantém as entradas BLS antigas como fallback — nunca são
+# apagadas por este script).
+log "a definir '$UKI_NAME' como entrada de arranque por omissão…"
+bootctl set-default "$UKI_NAME" 2>&1 | while read -r line; do log "  $line"; done
+
+touch "$STAMP"
+log "migração para UKI concluída — próximo boot arranca via $UKI_NAME"
+log "Para activar o desbloqueio automático do disco: sudo tpm2-luks-enroll"

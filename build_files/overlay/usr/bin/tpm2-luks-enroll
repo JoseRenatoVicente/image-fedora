@@ -6,24 +6,39 @@
 #
 # Política desta imagem (escolhida no build):
 #   • auto-unlock (sem PIN) — desbloqueia se o estado de boot bater
-#   • selagem em PCR 7 (estado do Secure Boot) — sobrevive a updates de
-#     kernel/initramfs (frequentes no bootc) sem reenrolar
+#   • Signed PCR Policy no PCR 11 (medição do UKI pelo systemd-stub, NÃO do
+#     firmware): o LUKS enrola contra a CHAVE PÚBLICA
+#     (/usr/share/secureboot/tpm2-pcr-public.pem), não contra o valor do PCR
+#     em si — um UKI novo a cada update do bootc continua a desbloquear sem
+#     reenroll, desde que assinado com a mesma chave (ver build-uki.sh).
+#     Trocado de PCR 7 (estado do Secure Boot medido pelo FIRMWARE) porque
+#     nalguns firmwares de consumo o PCR 7 não é determinístico entre boots
+#     — o unseal falha sempre, mesmo sem nada ter mudado.
 #
-# Requisitos: Secure Boot ATIVO no firmware (senão a selagem em PCR 7 não
-# protege nada), TPM 2.0 presente, e a passphrase atual do LUKS à mão.
+# Requisitos: Secure Boot ATIVO no firmware, TPM 2.0 presente, deployment
+# actual já com UKI assinado (ver /usr/libexec/uki-migrate), e a passphrase
+# atual do LUKS à mão.
+#
+# Importante: ao contrário do esquema antigo (PCR 7), este NÃO regenera nada
+# localmente — o UKI só é construído e assinado no build da imagem (a chave
+# privada nunca sai do CI). Se o deployment actual ainda não tem UKI, este
+# script recusa-se a enrolar (ver verificação abaixo).
 #
 # AVISO — bypass físico conhecido e aceite (trade-off deliberado):
-#   PCR 7 mede o estado do Secure Boot, NÃO a linha de comando do kernel.
-#   Esta imagem também não define password no GRUB (decisão STIG deliberada —
-#   proteger o prompt do GRUB em todo boot é hostil para uso desktop). Um
-#   atacante com acesso FÍSICO à máquina pode editar a entrada do GRUB no
-#   boot (ex.: acrescentar init=/bin/bash ou rd.break) sem alterar PCR 7 — o
-#   TPM liberta a chave na mesma e o atacante obtém shell root no disco
-#   decifrado, sem senha nenhuma.
-#   Isto é aceite conscientemente para não impor PIN/password em cada boot.
+#   PCR 11 mede o UKI completo (kernel+initrd+cmdline), incluindo a linha de
+#   comando do kernel — ao contrário do esquema antigo em PCR 7, editar
+#   parâmetros de boot AGORA invalida o selo. Mas esta imagem não define
+#   password no GRUB/systemd-boot (decisão STIG deliberada — proteger o
+#   prompt em todo boot é hostil para uso desktop); o loader.conf do
+#   systemd-boot tem `editor no` (ver sd-boot-migrate), o que já bloqueia a
+#   edição de kargs no menu de boot pela via normal. Um atacante com acesso
+#   FÍSICO e recursos para contornar isso (ex.: substituir o UKI por um não
+#   assinado) não seria aceite pelo Secure Boot; substituir por um UKI antigo
+#   mas validamente assinado ainda seria aceite pelo TPM — não há proteção
+#   contra rollback para um UKI assinado mais antigo.
 #   Se o modelo de ameaça incluir acesso físico não confiável, mitigue com
-#   `systemd-cryptenroll --tpm2-with-pin=yes` (PIN em cada boot) ou com uma
-#   password de superuser no GRUB — nenhuma das duas é feita aqui por defeito.
+#   `systemd-cryptenroll --tpm2-with-pin=yes` (PIN em cada boot) — não é
+#   feito aqui por defeito.
 set -euo pipefail
 
 err()  { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
@@ -31,41 +46,28 @@ ok()   { printf '\033[1;32m%s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m%s\033[0m\n' "$*"; }
 info() { printf '%s\n' "$*"; }
 
-PCRS="7"
-
-refresh_initramfs() {
-    if command -v rpm-ostree >/dev/null 2>&1 && rpm-ostree status >/dev/null 2>&1; then
-        info "Regenerando initramfs transacional via rpm-ostree..."
-        if rpm-ostree initramfs --enable; then
-            ok "✓ Initramfs agendado para regeneração no próximo deployment."
-            warn "  Reinicie para activar o desbloqueio automático via TPM2."
-            return 0
-        fi
-        warn "Não foi possível executar 'rpm-ostree initramfs --enable'."
-        warn "Execute manualmente: sudo rpm-ostree initramfs --enable"
-        return 1
-    fi
-
-    if command -v dracut >/dev/null 2>&1; then
-        info "Regenerando initramfs via dracut..."
-        dracut --force --regenerate-all
-        ok "✓ Initramfs regenerado."
-        return 0
-    fi
-
-    warn "Nenhum regenerador de initramfs encontrado."
-    return 1
-}
+PCRS="11"
+PCR_PUBKEY=/usr/share/secureboot/tpm2-pcr-public.pem
 
 [[ $EUID -eq 0 ]] || { err "Execute como root (sudo tpm2-luks-enroll)."; exit 1; }
 
-warn "⚠ AVISO: este enroll é auto-unlock SEM PIN, selado apenas em PCR 7."
-warn "  PCR 7 mede o estado do Secure Boot, não a linha de comando do kernel,"
-warn "  e esta imagem não usa password de GRUB. Alguém com acesso FÍSICO à"
-warn "  máquina pode editar a entrada do GRUB (init=/bin/bash, rd.break) para"
-warn "  obter shell root no disco decifrado, sem senha nenhuma — o TPM não"
-warn "  detecta essa alteração. Se isso está fora do seu modelo de ameaça,"
-warn "  use antes: systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=$PCRS \\"
+if [[ ! -s "$PCR_PUBKEY" ]]; then
+    err "Chave pública PCR ausente: $PCR_PUBKEY"
+    err "Este deployment não foi construído com suporte a UKI+PCR11 — actualize primeiro."
+    exit 1
+fi
+
+if ! ls /boot/EFI/Linux/*.efi &>/dev/null; then
+    err "Nenhum UKI encontrado em /boot/EFI/Linux/."
+    err "Corra 'sudo uki-migrate' primeiro (converte o deployment actual para UKI)."
+    exit 1
+fi
+
+warn "⚠ AVISO: este enroll é auto-unlock SEM PIN, selado numa Signed PCR Policy"
+warn "  no PCR 11 (medição do UKI: kernel+initrd+cmdline). Esta imagem não usa"
+warn "  password de GRUB/systemd-boot. Se isso está fora do seu modelo de"
+warn "  ameaça, use antes: systemd-cryptenroll --tpm2-device=auto \\"
+warn "             --tpm2-public-key=$PCR_PUBKEY --tpm2-public-key-pcrs=$PCRS \\"
 warn "             --tpm2-with-pin=yes <dev>  (pede PIN em cada boot)."
 info ""
 
@@ -76,8 +78,8 @@ if command -v mokutil >/dev/null 2>&1; then
         ok "✓ Secure Boot ativo."
     else
         warn "⚠ Secure Boot NÃO está ativo ($SB_STATE)."
-        warn "  Selar em PCR 7 sem Secure Boot não oferece proteção real —"
-        warn "  qualquer kernel/bootloader não-assinado teria o mesmo PCR 7."
+        warn "  Sem Secure Boot, nada impede um atacante de arrancar um UKI"
+        warn "  arbitrário (não assinado) que o TPM ainda liberte a chave."
         warn "  Ative o Secure Boot no firmware antes de confiar neste enroll."
         read -rp "  Continuar mesmo assim? [s/N] " a; [[ "${a,,}" == s ]] || exit 1
     fi
@@ -120,8 +122,10 @@ read -rp "Prosseguir? [s/N] " a; [[ "${a,,}" == s ]] || exit 1
 
 # Remove enroll TPM2 antigo (idempotência) e enrola de novo
 systemd-cryptenroll --wipe-slot=tpm2 "$DEV" 2>/dev/null || true
-systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs="$PCRS" "$DEV"
-ok "✓ TPM2 enrolado em $DEV (PCR $PCRS, auto-unlock)."
+systemd-cryptenroll --tpm2-device=auto \
+    --tpm2-public-key="$PCR_PUBKEY" --tpm2-public-key-pcrs="$PCRS" \
+    "$DEV"
+ok "✓ TPM2 enrolado em $DEV (Signed PCR Policy, PCR $PCRS, auto-unlock)."
 
 # ── 5. crypttab: garantir tpm2-device=auto ──────────────────────────────────
 # O systemd-cryptsetup recente tenta o token TPM2 automaticamente, mas a opção
@@ -139,8 +143,6 @@ if [[ -n "$UUID" ]] && [[ -f /etc/crypttab ]] && grep -q "$UUID" /etc/crypttab; 
     fi
 fi
 
-refresh_initramfs || warn "O próximo boot pode continuar pedindo a senha até o initramfs ser regenerado."
-
 # ── 6. Recovery key (recomendado) ────────────────────────────────────────────
 info ""
 warn "RECOMENDADO: adicione uma recovery key offline (fallback se o TPM/PCR mudar)."
@@ -148,11 +150,11 @@ read -rp "Gerar uma recovery key agora? [S/n] " a
 if [[ "${a,,}" != n ]]; then
     systemd-cryptenroll --recovery-key "$DEV"
     warn "⚠ GUARDE esta recovery key OFFLINE (papel/cofre/pendrive cifrado)."
-    warn "  Sem ela, um update de firmware que altere o estado do Secure Boot"
+    warn "  Sem ela, um UKI corrompido/mal assinado ou uma chave PCR revogada"
     warn "  pode trancar o disco."
 fi
 
 info ""
 ok "Concluído. Teste reiniciando: o disco deve abrir sem pedir passphrase."
 info "Para inspecionar os slots:  systemd-cryptenroll $DEV"
-info "Para ler os PCRs atuais:    tpm2_pcrread sha256:7"
+info "Para ler os PCRs atuais:    tpm2_pcrread sha256:11"

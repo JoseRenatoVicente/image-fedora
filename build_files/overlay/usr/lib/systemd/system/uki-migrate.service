@@ -1,0 +1,24 @@
+[Unit]
+Description=Migrate boot entry from BLS (vmlinuz+initramfs) to UKI
+Documentation=man:bootctl(1)
+# Corre cedo, antes do display manager, mas depois do ESP estar montado
+After=local-fs.target
+Before=display-manager.service
+# Só em sistemas UEFI com OSTree/bootc
+ConditionFirmware=uefi
+ConditionPathExists=/run/ostree-booted
+# Migração é opt-in: só corre se o utilizador pedir explicitamente
+# (sudo uki-migrate-enable) — mesmo padrão do sd-boot-migrate.service.
+ConditionPathExists=/etc/uki-migrate-requested
+# Não repetir após sucesso (stamp em /var/lib)
+ConditionPathExists=!/var/lib/uki-migrated
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/usr/libexec/uki-migrate
+# Falha não impede o boot
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=multi-user.target
