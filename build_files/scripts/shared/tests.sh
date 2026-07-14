@@ -635,10 +635,32 @@ grep -q 'tpm2-tss' /etc/dracut.conf.d/90-luks-security.conf \
 # Serviço de primeiro arranque habilitado (activa TPM2 antes do greetd)
 systemctl is-enabled tpm2-first-enroll.service 2>/dev/null | grep -q '^enabled$' \
     || fail "FDE: tpm2-first-enroll.service não está habilitado"
-# Serviço de deteção de drift do selo TPM2 habilitado (reenroll após updates
-# de bootloader que mudem o PCR 7)
+# Serviço de deteção de falha do unseal (Signed PCR Policy PCR 11) habilitado
 systemctl is-enabled tpm2-reenroll-check.service 2>/dev/null | grep -q '^enabled$' \
     || fail "FDE: tpm2-reenroll-check.service não está habilitado"
+# Selagem por PCR 7 (raw, instável nalguns firmwares) removida em favor de
+# Signed PCR Policy no PCR 11 — nenhum script de enrollment deve referenciar
+# --tpm2-pcrs=7 nem regenerar initramfs localmente (o UKI só é assinado no CI).
+for _f in /usr/bin/tpm2-luks-enroll /usr/bin/tpm2-first-enroll /usr/bin/tpm2-reenroll-check; do
+    grep -q -- '--tpm2-pcrs=7' "$_f" \
+        && fail "FDE: $_f ainda referencia --tpm2-pcrs=7 (deveria ser Signed PCR Policy em PCR 11)"
+    grep -q 'rpm-ostree initramfs' "$_f" \
+        && fail "FDE: $_f ainda tenta regenerar initramfs localmente (UKI só é assinado no CI)"
+    grep -q -- '--tpm2-public-key-pcrs=11' "$_f" \
+        || fail "FDE: $_f não usa Signed PCR Policy em PCR 11 (--tpm2-public-key-pcrs=11)"
+done
+
+echo "=== UKI: Unified Kernel Image com Signed PCR Policy ==="
+[[ -s /usr/share/secureboot/tpm2-pcr-public.pem ]] \
+    || fail "UKI: /usr/share/secureboot/tpm2-pcr-public.pem ausente — tpm2-luks-enroll não teria contra o que enrolar"
+[[ -x /usr/libexec/uki-migrate ]] \
+    || fail "UKI: /usr/libexec/uki-migrate ausente ou não executável"
+[[ -x /usr/bin/uki-migrate-enable ]] \
+    || fail "UKI: /usr/bin/uki-migrate-enable ausente ou não executável"
+systemctl is-enabled uki-migrate.service 2>/dev/null | grep -q '^enabled$' \
+    || fail "UKI: uki-migrate.service não está habilitado"
+grep -qE '^ConditionPathExists=/etc/uki-migrate-requested$' /usr/lib/systemd/system/uki-migrate.service \
+    || fail "UKI: uki-migrate.service não é opt-in (falta ConditionPathExists do flag)"
 
 echo "=== Secure Boot: MOK para systemd-boot ==="
 [[ -x /usr/bin/mok-enroll ]] \

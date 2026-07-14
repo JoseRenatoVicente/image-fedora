@@ -1,13 +1,17 @@
 #!/usr/bin/bash
-# tpm2-reenroll-check — deteta drift do selo TPM2 (PCR 7) e oferece reenroll.
+# tpm2-reenroll-check — deteta falha do unseal do TPM2 (Signed PCR Policy no
+# PCR 11) e oferece reenroll.
 #
 # Complemento a tpm2-first-enroll: aquele corre UMA vez para activar o
 # auto-unlock; este corre em TODOS os arranques seguintes e só age quando o
-# unseal do TPM2 falhou neste boot (ex.: um update do bootloader via bootupd
-# mudou a "Authority" medida em PCR 7, mesmo o kernel/initramfs não sendo
-# normalmente relevantes para esse PCR). Nesse caso o systemd-cryptsetup já
-# caiu para a passphrase de recovery para chegar até aqui — sem reenroll, TODO
-# arranque seguinte volta a pedir a senha manualmente.
+# unseal do TPM2 falhou neste boot. Ao contrário do esquema antigo em PCR 7
+# (onde isto era esperado a cada update de bootloader), com Signed PCR Policy
+# um UKI legítimo assinado pela mesma chave NÃO deveria falhar o unseal —
+# se falhou, é sinal de algo genuinamente anómalo: UKI substituído/corrompido,
+# chave de assinatura errada, ou um deployment antigo sem UKI ainda por
+# migrar. Nesse caso o systemd-cryptsetup já caiu para a passphrase de
+# recovery para chegar até aqui — sem investigar e (se legítimo) reenrolar,
+# TODO arranque seguinte volta a pedir a senha manualmente.
 #
 # Exits imediatamente e em silêncio se:
 #   • Ainda não há enroll TPM2 prévio (isso é trabalho do tpm2-first-enroll)
@@ -21,6 +25,7 @@ info() { printf '  %s\n' "$*"; }
 hr()   { printf '  %s\n' "────────────────────────────────────────────────────"; }
 
 MARKER=/var/lib/tpm2-enrolled
+PCR_PUBKEY=/usr/share/secureboot/tpm2-pcr-public.pem
 
 pause_for_user_visibility() {
     local seconds="${1:-5}"
@@ -32,8 +37,8 @@ pause_for_user_visibility() {
 [[ -f "$MARKER" ]] || exit 0
 
 # ── Guard: o unseal do TPM2 falhou mesmo neste arranque? ────────────────────
-# systemd-cryptsetup regista o erro da tpm2-tss (Esys_Unseal) quando o PCR
-# selado já não bate com o estado actual do Secure Boot.
+# systemd-cryptsetup regista o erro da tpm2-tss (Esys_Unseal) quando a
+# assinatura da Signed PCR Policy não valida contra o UKI actual.
 if ! journalctl -b 0 -u 'systemd-cryptsetup@*' --no-pager 2>/dev/null \
         | grep -qiE 'esys_unseal|Esys Finish ErrorCode|tpm2.*unseal.*fail'; then
     exit 0
@@ -42,6 +47,11 @@ fi
 # ── Descobrir o(s) dispositivo(s) LUKS ──────────────────────────────────────
 mapfile -t LUKS_DEVS < <(lsblk -rpno NAME,FSTYPE | awk '$2=="crypto_LUKS"{print $1}')
 [[ ${#LUKS_DEVS[@]} -gt 0 ]] || exit 0
+
+# Sem a chave PCR pública neste deployment, nem vale a pena oferecer reenroll
+# (systemd-cryptenroll --tpm2-public-key precisa dela) — provavelmente um
+# deployment antigo ainda por migrar via uki-migrate.
+[[ -s "$PCR_PUBKEY" ]] || exit 0
 
 TARGET_DEV="${LUKS_DEVS[0]}"
 
@@ -52,8 +62,11 @@ printf '  O TPM2 NÃO CONSEGUIU DESBLOQUEAR O DISCO AUTOMATICAMENTE\n'
 hr
 printf '\n'
 info "Chegou até aqui porque introduziu a senha de recuperação do LUKS."
-info "Isto normalmente acontece quando o Secure Boot mudou de estado"
-info "(ex.: uma actualização do bootloader) e invalidou o selo TPM2 antigo."
+info "Com a Signed PCR Policy (PCR 11), isto NÃO é esperado num update normal"
+info "do sistema — um UKI novo continua assinado pela mesma chave. Pode indicar"
+info "um UKI corrompido/substituído, ou uma chave de assinatura diferente."
+info "Só reenrole se souber a origem desta mudança (ex.: reinstalação, migração"
+info "manual)."
 printf '\n'
 info "Dispositivo: $TARGET_DEV"
 printf '\n'
@@ -86,7 +99,9 @@ if systemd-cryptenroll "$TARGET_DEV" 2>/dev/null | grep -q 'tpm2'; then
     printf '\n'
 fi
 
-if ! systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 "$TARGET_DEV"; then
+if ! systemd-cryptenroll --tpm2-device=auto \
+        --tpm2-public-key="$PCR_PUBKEY" --tpm2-public-key-pcrs=11 \
+        "$TARGET_DEV"; then
     printf '\n'
     err "Erro ao reenrolar o TPM2 (senha incorrecta ou TPM indisponível)."
     err "Execute 'sudo tpm2-luks-enroll' para tentar novamente."

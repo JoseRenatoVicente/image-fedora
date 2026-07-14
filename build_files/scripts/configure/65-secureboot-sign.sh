@@ -20,11 +20,19 @@ EFI_BIN=/usr/lib/systemd/boot/efi/systemd-bootx64.efi
 CERT=/ctx/assets/secureboot/MOK.crt
 DER=/ctx/assets/secureboot/MOK.der
 KEY=/run/secrets/mok_key
+PCR_PUB=/ctx/assets/secureboot/pcr-signing-public.pem
 
 # Certificado público: sempre instalado (é preciso para mokutil --import nas
 # máquinas, independentemente de este build ter ou não a chave para assinar).
 install -Dm644 "$DER" /usr/share/secureboot/MOK.der
 setfattr -n user.component -v "security-hardening" /usr/share/secureboot/MOK.der
+
+# Chave pública da PCR signing key: sempre instalada, pelo mesmo motivo — é
+# contra ela que tpm2-luks-enroll/tpm2-first-enroll enrolam o LUKS
+# (systemd-cryptenroll --tpm2-public-key=...), independentemente de este
+# build ter ou não a privada para assinar o UKI (ver build-uki.sh).
+install -Dm644 "$PCR_PUB" /usr/share/secureboot/tpm2-pcr-public.pem
+setfattr -n user.component -v "security-hardening" /usr/share/secureboot/tpm2-pcr-public.pem
 
 if [[ ! -f "$EFI_BIN" ]]; then
     echo "INFO: $EFI_BIN ausente (systemd-boot-unsigned não instalado?), a saltar assinatura."

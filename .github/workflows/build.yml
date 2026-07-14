@@ -168,6 +168,17 @@ jobs:
           # "sem chave" e salta a assinatura sem falhar o build.
           printf '%s' "${MOK_SIGNING_KEY:-}" > "${{ runner.temp }}/mok.key"
 
+      # Chave privada usada para assinar a signed PCR policy do UKI (ver
+      # 80-initramfs.sh, ukify --pcr-private-key). Mesmo tratamento do
+      # mok_key acima: só existe como secret, ficheiro vazio em builds sem
+      # o secret (PRs de forks), best-effort no script que a consome.
+      - name: Write PCR signing key
+        env:
+          PCR_SIGNING_KEY: ${{ secrets.PCR_SIGNING_KEY }}
+        run: |
+          umask 077
+          printf '%s' "${PCR_SIGNING_KEY:-}" > "${{ runner.temp }}/pcr.key"
+
       - name: Build Image
         id: build_image
         uses: redhat-actions/buildah-build@061ffd31bb5c3f8733a6f9bbdf00a9fb02eb708c # v2 (node24)
@@ -188,10 +199,13 @@ jobs:
             --layers
             --cache-from=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
             --secret=id=mok_key,src=${{ runner.temp }}/mok.key
+            --secret=id=pcr_key,src=${{ runner.temp }}/pcr.key
 
-      - name: Remove MOK signing key from runner
+      - name: Remove signing keys from runner
         if: always()
-        run: shred -u "${{ runner.temp }}/mok.key" 2>/dev/null || rm -f "${{ runner.temp }}/mok.key"
+        run: |
+          shred -u "${{ runner.temp }}/mok.key" 2>/dev/null || rm -f "${{ runner.temp }}/mok.key"
+          shred -u "${{ runner.temp }}/pcr.key" 2>/dev/null || rm -f "${{ runner.temp }}/pcr.key"
 
       # ── Vulnerability scan (runs on all builds including PRs) ───────────
       - name: Export image for scanning

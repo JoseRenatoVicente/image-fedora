@@ -7,10 +7,18 @@
 #   • No TPM2 chip is present (VMs, old hardware)
 #   • No LUKS-encrypted device is found (unencrypted installs)
 #   • TPM2 is already enrolled on the root LUKS device
+#   • This deployment has no signed UKI yet (still BLS-only — run
+#     uki-migrate first; enrolling against PCR 7 was dropped, see below)
 #
-# PCR 7 binds the seal to Secure Boot state; survives kernel/initramfs updates
-# without requiring re-enrollment. Secure Boot MUST be active for PCR 7 to
-# provide meaningful protection.
+# Signed PCR Policy on PCR 11 (measured by the systemd-stub from the UKI
+# itself: kernel+initrd+cmdline) — NOT PCR 7 (raw firmware measurement of
+# Secure Boot state). LUKS enrolls against the PCR PUBLIC KEY
+# (/usr/share/secureboot/tpm2-pcr-public.pem), so a new UKI each bootc update
+# still unlocks without re-enrollment, as long as it's signed with the same
+# key (see build-uki.sh). PCR 7 was dropped because on some consumer
+# firmware it isn't deterministic across boots — unseal fails every time,
+# even with nothing changed. Secure Boot MUST still be active for the
+# signature on the UKI itself to mean anything.
 set -euo pipefail
 
 err()  { printf '\033[1;31m  %s\033[0m\n' "$*" >&2; }
@@ -20,31 +28,9 @@ info() { printf '  %s\n' "$*"; }
 hr()   { printf '  %s\n' "────────────────────────────────────────────────────"; }
 
 MARKER=/var/lib/tpm2-enrolled
+PCR_PUBKEY=/usr/share/secureboot/tpm2-pcr-public.pem
 
 mark_done() { touch "$MARKER" 2>/dev/null || true; }
-
-refresh_initramfs() {
-    if command -v rpm-ostree >/dev/null 2>&1 && rpm-ostree status >/dev/null 2>&1; then
-        info "Regenerando initramfs transacional via rpm-ostree..."
-        if rpm-ostree initramfs --enable; then
-            ok "✓ Initramfs agendado para regeneração no próximo deployment."
-            return 0
-        fi
-        warn "Não foi possível executar 'rpm-ostree initramfs --enable'."
-        warn "Execute depois: sudo rpm-ostree initramfs --enable"
-        return 1
-    fi
-
-    if command -v dracut >/dev/null 2>&1; then
-        info "Regenerando initramfs via dracut..."
-        dracut --force --regenerate-all
-        ok "✓ Initramfs regenerado."
-        return 0
-    fi
-
-    warn "Nenhum regenerador de initramfs encontrado."
-    return 1
-}
 
 # ── Guard: TPM2 present ──────────────────────────────────────────────────────
 if ! systemd-cryptenroll --tpm2-device=list >/dev/null 2>&1; then
@@ -54,6 +40,14 @@ fi
 # ── Guard: LUKS device(s) present ───────────────────────────────────────────
 mapfile -t LUKS_DEVS < <(lsblk -rpno NAME,FSTYPE | awk '$2=="crypto_LUKS"{print $1}')
 if [[ ${#LUKS_DEVS[@]} -eq 0 ]]; then
+    mark_done; exit 0
+fi
+
+# ── Guard: this deployment has a signed UKI + PCR public key ────────────────
+# Older deployments (pre-UKI) don't have either yet — uki-migrate handles
+# the BLS→UKI conversion + reenroll for those; first-enroll only applies once
+# a deployment already boots via UKI.
+if [[ ! -s "$PCR_PUBKEY" ]] || ! ls /boot/EFI/Linux/*.efi &>/dev/null; then
     mark_done; exit 0
 fi
 
@@ -126,7 +120,9 @@ printf '\n'
 # Wipe any stale TPM2 slot (idempotency) then enroll
 systemd-cryptenroll --wipe-slot=tpm2 "$TARGET_DEV" 2>/dev/null || true
 
-if ! systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 "$TARGET_DEV"; then
+if ! systemd-cryptenroll --tpm2-device=auto \
+        --tpm2-public-key="$PCR_PUBKEY" --tpm2-public-key-pcrs=11 \
+        "$TARGET_DEV"; then
     printf '\n'
     err "Erro ao configurar o TPM2 (senha incorrecta ou TPM indisponível)."
     err "Execute 'sudo tpm2-luks-enroll' para tentar novamente após o arranque."
@@ -144,8 +140,6 @@ if [[ -n "$UUID" ]] && grep -q "$UUID" /etc/crypttab 2>/dev/null; then
     fi
 fi
 
-refresh_initramfs || warn "O próximo boot pode continuar pedindo a senha até o initramfs ser regenerado."
-
 mark_done
 
 printf '\n'
@@ -157,7 +151,7 @@ info "Os próximos arranques desbloquearão o disco automaticamente."
 info ""
 warn "IMPORTANTE: a sua senha LUKS é agora a chave de recuperação."
 warn "Guarde-a num local seguro fora do computador (papel, cofre, pendrive cifrado)."
-warn "Sem ela, uma actualização de firmware que altere o Secure Boot"
+warn "Sem ela, um UKI mal assinado ou uma chave PCR revogada"
 warn "pode impedir o acesso ao disco."
 printf '\n'
 read -rp "  Prima ENTER para terminar e iniciar o sistema... " -t 30 _ || true

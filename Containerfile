@@ -22,7 +22,7 @@ ARG PKG_CACHE_KEY=""
 ARG CONFIG_CACHE_KEY=""
 
 # Base Image
-FROM quay.io/fedora-ostree-desktops/base-atomic:44@sha256:01edd4dc7e952a3750f8ed7b199e85543025d07b159c68698f9a0101b0a936b1
+FROM quay.io/fedora-ostree-desktops/base-atomic:44@sha256:01edd4dc7e952a3750f8ed7b199e85543025d07b159c68698f9a0101b0a936b1 AS base
 
 ARG IMAGE_NAME="fedora"
 ARG IMAGE_PRETTY_NAME="Fedora"
@@ -60,5 +60,26 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     SHA_HEAD_SHORT="${SHA_HEAD_SHORT}" \
     SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}" \
     /ctx/scripts/build-configure.sh
+
+# ── Layer 3: Unified Kernel Image (UKI), signed PCR11 + Secure Boot ──────────
+# `bootc container ukify` recusa-se a operar sobre um rootfs ACTIVO (precisa
+# de computar o digest composefs de um alvo estático) — corre por isso num
+# stage à parte que monta `base` (já configurado, incl. remoção dos build
+# deps em 70-build-deps.sh) como alvo somente-leitura. Ver build-uki.sh.
+FROM base AS uki
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=tmpfs,dst=/tmp \
+    dnf5 install -y systemd-ukify sbsigntools
+RUN --mount=type=bind,from=base,source=/,target=/target \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=secret,id=mok_key,target=/run/secrets/mok_key \
+    --mount=type=secret,id=pcr_key,target=/run/secrets/pcr_key \
+    /ctx/scripts/build-uki.sh
+
+FROM base AS final
+# Sem secrets (forks/PRs externas), /uki-out fica vazio — COPY de um
+# directório vazio é um no-op válido, a imagem fica só com as entradas BLS.
+COPY --from=uki /uki-out/ /boot/EFI/Linux/
 
 RUN bootc container lint
