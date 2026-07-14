@@ -646,7 +646,8 @@ for _f in /usr/bin/tpm2-luks-enroll /usr/bin/tpm2-first-enroll /usr/bin/tpm2-ree
         && fail "FDE: $_f ainda referencia --tpm2-pcrs=7 (deveria ser Signed PCR Policy em PCR 11)"
     grep -q 'rpm-ostree initramfs' "$_f" \
         && fail "FDE: $_f ainda tenta regenerar initramfs localmente (UKI só é assinado no CI)"
-    grep -q -- '--tpm2-public-key-pcrs=11' "$_f" \
+    # tpm2-luks-enroll usa a variável $PCRS (="11"); os outros hardcodam =11.
+    grep -qE -- '--tpm2-public-key-pcrs=(11|"\$PCRS")' "$_f" \
         || fail "FDE: $_f não usa Signed PCR Policy em PCR 11 (--tpm2-public-key-pcrs=11)"
 done
 
