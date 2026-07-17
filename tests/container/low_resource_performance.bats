@@ -12,7 +12,7 @@ setup() {
 @test "zram-generator.conf is present in image" {
     [ -f /etc/systemd/zram-generator.conf ]
     grep -q 'compression-algorithm=zstd' /etc/systemd/zram-generator.conf
-    grep -q 'zram-size = min(ram / 4, 4096)' /etc/systemd/zram-generator.conf
+    grep -q 'zram-size = min(ram / 4 + 1024, 4096)' /etc/systemd/zram-generator.conf
 }
 
 @test "low-resource sysctl template is present in image" {

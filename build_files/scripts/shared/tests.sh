@@ -265,8 +265,8 @@ grep -q 'vm.max_map_count' /etc/sysctl.d/99-performance.conf \
     || fail "vm.max_map_count não configurado"
 grep -q 'compression-algorithm=zstd' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não configurado com zstd"
-grep -q 'zram-size = min(ram / 4, 4096)' /etc/systemd/zram-generator.conf \
-    || fail "ZRAM não limitado a min(ram / 4, 4096)"
+grep -q 'zram-size = min(ram / 4 + 1024, 4096)' /etc/systemd/zram-generator.conf \
+    || fail "ZRAM não limitado a min(ram / 4 + 1024, 4096)"
 
 echo "=== DNF wrapper ==="
 grep -q 'rpm-ostree' /usr/bin/dnf \

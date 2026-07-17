@@ -10,7 +10,7 @@ setup() {
 }
 
 @test "zram-generator.conf limits RAM usage" {
-    assert_contains "${REPO_ROOT}/build_files/overlay/etc/systemd/zram-generator.conf" 'zram-size = min(ram / 4, 4096)'
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/systemd/zram-generator.conf" 'zram-size = min(ram / 4 + 1024, 4096)'
 }
 
 @test "low-resource sysctl exists and sets swappiness" {
