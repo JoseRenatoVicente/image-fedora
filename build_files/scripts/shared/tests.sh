@@ -59,6 +59,7 @@ REQUIRED_UNITS=(
     thermald.service
     rpm-ostreed-automatic.timer
     podman-auto-update.timer
+    zram-recompress.timer
 )
 # bolt e fwupd são ativados por D-Bus/udev — não têm WantedBy; presença verificada abaixo
 for unit in bolt.service fwupd.service; do
@@ -160,6 +161,10 @@ REQUIRED_FILES=(
     /etc/chrony.conf
     /etc/rpm-ostreed.conf
     /etc/systemd/zram-generator.conf
+    /usr/libexec/zram-recompress
+    /usr/lib/systemd/system/zram-recompress.service
+    /usr/lib/systemd/system/zram-recompress.timer
+    /etc/systemd/system/user.slice.d/15-memory-high.conf
     /etc/systemd/system.conf.d/timeout.conf
     /etc/systemd/user.conf.d/timeout.conf
     /etc/security/limits.d/50-memlock.conf
@@ -262,6 +267,17 @@ grep -q 'compression-algorithm=zstd' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não configurado com zstd"
 grep -q 'zram-size = min(ram / 4 + 1024, 4096)' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não limitado a min(ram / 4 + 1024, 4096)"
+# Recompressão em camadas (memória densa estilo macOS): helper executável +
+# regista algoritmo secundário denso + recomprime só páginas idle.
+[[ -x /usr/libexec/zram-recompress ]] \
+    || fail "zram-recompress: helper ausente ou não executável"
+grep -q 'recomp_algorithm' /usr/libexec/zram-recompress \
+    || fail "zram-recompress: não regista algoritmo secundário (recomp_algorithm)"
+grep -q 'type=idle' /usr/libexec/zram-recompress \
+    || fail "zram-recompress: não recomprime só páginas idle (type=idle)"
+# Reclaim proativo (soft limit) na user.slice — actua antes do oomd.
+grep -q '^MemoryHigh=' /etc/systemd/system/user.slice.d/15-memory-high.conf \
+    || fail "user.slice: MemoryHigh (reclaim proativo) não configurado"
 grep -q '^Hidden=true$' /etc/xdg/autostart/geoclue-demo-agent.desktop \
     || fail "geoclue-demo-agent.desktop não está com Hidden=true"
 for unit in mpris-proxy.service obex.service; do

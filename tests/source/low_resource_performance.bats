@@ -49,6 +49,22 @@ setup() {
     assert_contains "$service" '/sys/devices/system/cpu/cpufreq/boost'
 }
 
+@test "zram tiered recompression helper registers a dense secondary algorithm" {
+    local helper="${REPO_ROOT}/build_files/overlay/usr/libexec/zram-recompress"
+    assert_contains "$helper" 'recomp_algorithm'
+    assert_contains "$helper" 'type=idle'
+    assert_contains "$helper" 'algo=zstd level=15 priority=1'
+}
+
+@test "zram-recompress runs on a periodic timer, not unconditionally at boot" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/zram-recompress.timer" 'OnUnitActiveSec='
+    assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/zram-recompress.service" 'ConditionPathExists=/sys/block/zram0/recompress'
+}
+
+@test "user.slice enables proactive MemoryHigh reclaim before oomd kills" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/systemd/system/user.slice.d/15-memory-high.conf" 'MemoryHigh='
+}
+
 @test "orphaned session helpers are masked to /dev/null" {
     for unit in mpris-proxy.service obex.service; do
         local path="${REPO_ROOT}/build_files/overlay/etc/systemd/user/${unit}"

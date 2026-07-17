@@ -1,0 +1,33 @@
+#!/usr/bin/bash
+# Recomprime páginas idle do zram com um algoritmo mais denso (zstd de nível
+# alto) — memória em camadas ao estilo do compressor do macOS. As páginas
+# quentes ficam no zstd rápido do write-path (comp_algorithm, priority 0);
+# as páginas frias (sem acesso há >120s) são recomprimidas mais densamente,
+# libertando RAM extra sem tocar no disco. A descompressão do zstd é
+# independente do nível, por isso a leitura de volta continua rápida.
+#
+# Idempotente e tolerante: se uma feature do kernel faltar (idle tracking,
+# multi-comp, level=), degrada em silêncio sem falhar a unit.
+set -uo pipefail
+
+ZDEV=/sys/block/zram0
+
+# Sem zram activo (ex. swap desligado), nada a fazer.
+[[ -w "$ZDEV/recompress" ]] || exit 0
+
+# Regista o algoritmo secundário (denso) uma única vez por boot. Tenta o nível
+# alto primeiro; cai para zstd simples e depois deflate se o kernel recusar.
+if [[ ! -e /run/zram-recomp-setup ]]; then
+    for spec in "algo=zstd level=15 priority=1" "algo=zstd priority=1" "algo=deflate priority=1"; do
+        if echo "$spec" > "$ZDEV/recomp_algorithm" 2>/dev/null; then
+            break
+        fi
+    done
+    : > /run/zram-recomp-setup
+fi
+
+# Marca páginas sem acesso há >120s como idle (fallback: todas), depois
+# recomprime só as idle acima de 1 KiB comprimido — as que valem densificar.
+echo 120 > "$ZDEV/idle" 2>/dev/null || echo all > "$ZDEV/idle" 2>/dev/null || true
+echo "type=idle threshold=1024" > "$ZDEV/recompress" 2>/dev/null \
+    || echo "type=idle" > "$ZDEV/recompress" 2>/dev/null || true
