@@ -45,13 +45,37 @@ for public_config_dir in \
     [[ -d "$public_config_dir" ]] && find "$public_config_dir" -type f -exec chmod 0644 {} +
 done
 
-# systemd-sysusers is the single authority for system accounts. Copying the
-# altfiles databases into /etc freezes their previous UID allocation; adding a
-# new account later can then make two services share an UID (for example,
-# dnsmasq and cosmic-greeter). Materialize the current sysusers definitions
-# only after all package transactions and overlays are in place.
+# systemd-sysusers is the primary authority for system accounts. Copying the
+# altfiles databases into /etc wholesale would freeze their previous UID
+# allocation; adding a new account later could then make two services share
+# an UID (for example, dnsmasq and cosmic-greeter). Materialize the current
+# sysusers definitions only after all package transactions and overlays are
+# in place.
 echo "Materializando contas de sistema com systemd-sysusers..."
 systemd-sysusers
+
+# systemd-sysusers only covers accounts defined via sysusers.d. The legacy
+# Unix groups (audio, disk, kvm, tty, video, render, input, lp, etc.) are
+# static entries shipped in /usr/lib/group, normally resolved at runtime via
+# the NSS "altfiles" module — but systemd-tmpfiles-setup-dev-early and
+# systemd-udevd try to resolve groups before the full NSS stack is up,
+# producing "Failed to resolve group" errors at boot. Only entries still
+# missing after systemd-sysusers are appended, so already-materialized
+# accounts keep the UIDs/GIDs sysusers assigned them.
+echo "Sincronizando grupos padrão de /usr/lib/group para /etc/group..."
+while IFS=: read -r name _ gid _; do
+    [[ -z "$name" || "$name" == \#* ]] && continue
+    grep -q "^${name}:" /etc/group 2>/dev/null || echo "${name}:x:${gid}:" >> /etc/group
+done < /usr/lib/group
+
+# Analogous to the group sync: service users such as tss (TPM2) are expected
+# in /usr/lib/passwd but may be missing from /etc/passwd, and udev /
+# tmpfiles-setup-dev-early fail to resolve them at boot otherwise.
+echo "Sincronizando utilizadores padrão de /usr/lib/passwd para /etc/passwd..."
+while IFS=: read -r name _ uid gid gecos home shell; do
+    [[ -z "$name" || "$name" == \#* ]] && continue
+    grep -q "^${name}:" /etc/passwd 2>/dev/null || echo "${name}:x:${uid}:${gid}:${gecos}:${home}:${shell}" >> /etc/passwd
+done < /usr/lib/passwd
 
 # Executables from the mirrored tree need explicit permission bits.
 chmod 755 /usr/bin/dnf

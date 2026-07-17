@@ -129,10 +129,23 @@ setup() {
         || { echo "expected /usr/bin/dnf removal before usr overlay copy"; return 1; }
 }
 
-@test "system accounts are materialized by sysusers without copying altfiles" {
+@test "system accounts run sysusers before the legacy altfiles merge" {
     assert_contains "$system_configure" 'systemd-sysusers'
-    assert_not_contains "$system_configure" 'done < /usr/lib/passwd'
-    assert_not_contains "$system_configure" 'done < /usr/lib/group'
+    # systemd-sysusers only materializes sysusers.d-defined accounts; static
+    # legacy groups (audio, disk, kvm, tty, video, render, input) live in
+    # /usr/lib/group and still need the altfiles merge below to reach
+    # /etc/group before boot. The merge only fills entries still missing, so
+    # it must run after systemd-sysusers to avoid re-freezing UIDs/GIDs
+    # sysusers already assigned.
+    assert_contains "$system_configure" 'done < /usr/lib/passwd'
+    assert_contains "$system_configure" 'done < /usr/lib/group'
+    local sysusers_line group_sync_line
+    sysusers_line=$(grep -n '^systemd-sysusers$' "$system_configure" | head -1 | cut -d: -f1)
+    group_sync_line=$(grep -n 'done < /usr/lib/group' "$system_configure" | head -1 | cut -d: -f1)
+    if (( sysusers_line >= group_sync_line )); then
+        echo "systemd-sysusers (linha $sysusers_line) deve correr antes do merge de /usr/lib/group (linha $group_sync_line)" >&2
+        return 1
+    fi
 }
 
 @test "fedora-kinoite-plasmalogin-workaround does not exist (KDE-only, removed)" {
