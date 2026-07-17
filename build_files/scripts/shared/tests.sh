@@ -267,6 +267,14 @@ grep -q 'compression-algorithm=zstd' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não configurado com zstd"
 grep -q 'zram-size = min(ram / 4 + 1024, 4096)' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não limitado a min(ram / 4 + 1024, 4096)"
+grep -q '^Indexing-Enabled=false$' /etc/xdg/baloofilerc \
+    || fail "Baloo não está desativado por padrão em /etc/xdg/baloofilerc"
+grep -q '^Hidden=true$' /etc/xdg/autostart/geoclue-demo-agent.desktop \
+    || fail "geoclue-demo-agent.desktop não está com Hidden=true"
+for unit in mpris-proxy.service obex.service plasma-kactivitymanagerd.service; do
+    [[ -L "/etc/systemd/user/${unit}" && "$(readlink "/etc/systemd/user/${unit}")" == "/dev/null" ]] \
+        || fail "/etc/systemd/user/${unit} não está mascarado para /dev/null"
+done
 
 echo "=== DNF wrapper ==="
 grep -q 'rpm-ostree' /usr/bin/dnf \

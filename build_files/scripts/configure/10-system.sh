@@ -155,6 +155,8 @@ setfattr -n user.component -v "image-config" \
     /usr/share/image-fedora/low-resource/100-low-resource.conf \
     /usr/lib/systemd/system/low-resource-tuning.service \
     /etc/systemd/zram-generator.conf \
+    /etc/xdg/baloofilerc \
+    /etc/xdg/autostart/geoclue-demo-agent.desktop \
     /usr/lib/bootc/kargs.d/20-performance.toml \
     /usr/lib/tmpfiles.d/thp-tuning.conf \
     /etc/systemd/system/user@.service.d/10-delegate.conf \

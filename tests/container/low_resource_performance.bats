@@ -29,3 +29,20 @@ setup() {
 @test "bluetooth service is disabled by preset" {
     systemctl is-enabled bluetooth.service 2>/dev/null | grep -q "^disabled$"
 }
+
+@test "baloo file indexing is disabled by default" {
+    [ -f /etc/xdg/baloofilerc ]
+    grep -q '^Indexing-Enabled=false$' /etc/xdg/baloofilerc
+}
+
+@test "geoclue-demo-agent autostart is hidden" {
+    [ -f /etc/xdg/autostart/geoclue-demo-agent.desktop ]
+    grep -q '^Hidden=true$' /etc/xdg/autostart/geoclue-demo-agent.desktop
+}
+
+@test "orphaned session helpers are masked" {
+    for unit in mpris-proxy.service obex.service plasma-kactivitymanagerd.service; do
+        [ -L "/etc/systemd/user/${unit}" ]
+        [ "$(readlink "/etc/systemd/user/${unit}")" = "/dev/null" ]
+    done
+}

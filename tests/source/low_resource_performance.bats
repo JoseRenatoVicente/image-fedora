@@ -37,3 +37,19 @@ setup() {
 @test "bluetooth is disabled by preset" {
     assert_contains "${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system-preset/35-security-desktop.preset" 'disable bluetooth.service'
 }
+
+@test "baloo file indexing is disabled by default" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/xdg/baloofilerc" 'Indexing-Enabled=false'
+}
+
+@test "geoclue-demo-agent autostart is hidden" {
+    assert_contains "${REPO_ROOT}/build_files/overlay/etc/xdg/autostart/geoclue-demo-agent.desktop" 'Hidden=true'
+}
+
+@test "orphaned session helpers are masked to /dev/null" {
+    for unit in mpris-proxy.service obex.service plasma-kactivitymanagerd.service; do
+        local path="${REPO_ROOT}/build_files/overlay/etc/systemd/user/${unit}"
+        [ -L "$path" ]
+        [ "$(readlink "$path")" = "/dev/null" ]
+    done
+}
