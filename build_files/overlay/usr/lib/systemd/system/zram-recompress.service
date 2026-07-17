@@ -1,0 +1,11 @@
+# Recompressão em camadas do zram (memória densa estilo macOS). Disparado pelo
+# zram-recompress.timer. Ver /usr/libexec/zram-recompress para os detalhes.
+[Unit]
+Description=Recomprime páginas idle do zram com algoritmo denso (memória em camadas)
+ConditionPathExists=/sys/block/zram0/recompress
+After=systemd-zram-setup@zram0.service
+Wants=systemd-zram-setup@zram0.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/zram-recompress

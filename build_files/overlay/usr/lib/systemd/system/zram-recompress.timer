@@ -1,0 +1,12 @@
+# Varre páginas idle do zram para o tier denso a cada 3 min. Custo baixo:
+# só toca páginas frias acima de 1 KiB (threshold no helper).
+[Unit]
+Description=Recompressão periódica de páginas idle do zram
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=3min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

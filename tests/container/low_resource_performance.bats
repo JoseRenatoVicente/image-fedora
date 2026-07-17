@@ -35,6 +35,21 @@ setup() {
     grep -q '^Hidden=true$' /etc/xdg/autostart/geoclue-demo-agent.desktop
 }
 
+@test "zram tiered recompression helper is present and executable" {
+    [ -x /usr/libexec/zram-recompress ]
+    grep -q 'recomp_algorithm' /usr/libexec/zram-recompress
+    grep -q 'type=idle' /usr/libexec/zram-recompress
+}
+
+@test "zram-recompress timer is enabled" {
+    systemctl is-enabled zram-recompress.timer 2>/dev/null | grep -q "^enabled$"
+}
+
+@test "user.slice has proactive MemoryHigh reclaim" {
+    [ -f /etc/systemd/system/user.slice.d/15-memory-high.conf ]
+    grep -q '^MemoryHigh=' /etc/systemd/system/user.slice.d/15-memory-high.conf
+}
+
 @test "orphaned session helpers are masked" {
     for unit in mpris-proxy.service obex.service; do
         [ -L "/etc/systemd/user/${unit}" ]

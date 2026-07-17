@@ -78,6 +78,7 @@ chmod 755 /usr/libexec/fedora-shell-setup \
           /usr/libexec/fedora-brew-setup \
           /usr/libexec/fedora-toolbox-setup \
           /usr/libexec/fedora-first-setup-runner \
+          /usr/libexec/zram-recompress \
           /usr/libexec/image-fedora-selinux-setup
 # Wrappers docker-cli usados pelo VSCode (Flatpak) via flatpak-spawn --host —
 # ver dev.containers.dockerPath no settings.json do skel.
@@ -153,6 +154,10 @@ setfattr -n user.component -v "image-config" \
     /usr/share/image-fedora/low-resource/100-low-resource.conf \
     /usr/lib/systemd/system/low-resource-tuning.service \
     /etc/systemd/zram-generator.conf \
+    /usr/lib/systemd/system/zram-recompress.service \
+    /usr/lib/systemd/system/zram-recompress.timer \
+    /usr/libexec/zram-recompress \
+    /etc/systemd/system/user.slice.d/15-memory-high.conf \
     /etc/xdg/autostart/geoclue-demo-agent.desktop \
     /usr/lib/bootc/kargs.d/20-performance.toml \
     /usr/lib/tmpfiles.d/thp-tuning.conf \
