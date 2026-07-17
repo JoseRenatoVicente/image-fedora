@@ -1,6 +1,6 @@
 #!/bin/bash
 # Layer 2 — driver de configuração.
-# Orquestra os módulos em build_files/configure/ (overlay, theming, skel, KDE,
+# Orquestra os módulos em build_files/configure/ (overlay, theming, skel COSMIC,
 # serviços, hardening, initramfs, cleanup) e os scripts de validação em
 # build_files/shared/. Os pacotes já foram instalados pelo Layer 1
 # (build-packages.sh). Cache invalidado quando qualquer ficheiro em
@@ -38,9 +38,8 @@ run_step() {
 
 # ─── Configuração (ordem importa: 10 espelha a árvore antes dos restantes) ────
 run_step "$CONFIGURE_DIR/10-system.sh"
-run_step "$CONFIGURE_DIR/20-plasmalogin.sh"
 run_step "$CONFIGURE_DIR/30-theming.sh"
-run_step "$CONFIGURE_DIR/40-skel-kde.sh"
+run_step "$CONFIGURE_DIR/40-skel-cosmic.sh"
 run_step "$CONFIGURE_DIR/50-services.sh"
 run_step "$CONFIGURE_DIR/60-selinux-suid.sh"
 run_step "$CONFIGURE_DIR/65-secureboot-sign.sh"

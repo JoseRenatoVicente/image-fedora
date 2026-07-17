@@ -13,8 +13,7 @@ setup() {
     system_configure="${REPO_ROOT}/build_files/scripts/configure/10-system.sh"
     cleanup_configure="${REPO_ROOT}/build_files/scripts/configure/90-cleanup.sh"
     install_assets="${REPO_ROOT}/build_files/scripts/install-assets.sh"
-    plasmalogin_configure="${REPO_ROOT}/build_files/scripts/configure/20-plasmalogin.sh"
-    skel_configure="${REPO_ROOT}/build_files/scripts/configure/40-skel-kde.sh"
+    skel_configure="${REPO_ROOT}/build_files/scripts/configure/40-skel-cosmic.sh"
     services_configure="${REPO_ROOT}/build_files/scripts/configure/50-services.sh"
     overlay="${REPO_ROOT}/build_files/overlay"
     installer_flatpaks="${REPO_ROOT}/installer/flatpaks"
@@ -105,8 +104,9 @@ setup() {
     assert_contains "$utility_just" 'rm -rf _build-bib.* _build-test.* _build_podman_scp.*'
 }
 
-@test "log collector grep capture filters applet loading errors" {
-    assert_contains "$log_collector" 'grep -iE "error.*loading.*applet|applet.*error"'
+@test "log collector captures COSMIC theme and session state" {
+    assert_contains "$log_collector" 'com.system76.CosmicTheme.Dark'
+    assert_contains "$log_collector" 'cosmic-greeter.service'
 }
 
 @test "package filtering is centralized" {
@@ -129,16 +129,9 @@ setup() {
         || { echo "expected /usr/bin/dnf removal before usr overlay copy"; return 1; }
 }
 
-@test "plasmalogin workaround files live in overlay" {
-    assert_file_exists "$overlay/usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service"
-    assert_file_exists "$overlay/usr/libexec/fedora-kinoite-plasmalogin-workaround"
-    assert_contains "$overlay/usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service" 'ExecStart=/usr/libexec/fedora-kinoite-plasmalogin-workaround'
-}
-
-@test "plasmalogin configure script does not generate static files" {
-    assert_not_contains "$plasmalogin_configure" 'cat > /usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service'
-    assert_not_contains "$plasmalogin_configure" 'cat > /usr/libexec/fedora-kinoite-plasmalogin-workaround'
-    assert_not_contains "$plasmalogin_configure" 'cat >> /usr/lib/systemd/system-preset/35-security-desktop.preset'
+@test "fedora-kinoite-plasmalogin-workaround does not exist (KDE-only, removed)" {
+    assert_file_not_exists "$overlay/usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service"
+    assert_file_not_exists "$overlay/usr/libexec/fedora-kinoite-plasmalogin-workaround"
 }
 
 @test "tuned active profile files live in overlay" {
@@ -148,7 +141,7 @@ setup() {
     assert_contains "$overlay/etc/tuned/profile_mode" 'auto'
 }
 
-@test "KDE first-boot user setup is dispatched without systemd --user" {
+@test "First-boot user setup is dispatched without systemd --user" {
     assert_file_exists "$overlay/etc/profile.d/fedora-first-setup.sh"
     assert_file_exists "$overlay/usr/libexec/fedora-first-setup-runner"
     for script in fedora-shell-setup fedora-dev-setup fedora-brew-setup fedora-toolbox-setup; do
@@ -165,16 +158,9 @@ setup() {
     assert_contains "$qemu_config" 'max_core = 0'
 }
 
-@test "local Plasma desktop layout lives in overlay" {
-    assert_file_exists "$overlay/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc"
-    assert_contains "$skel_configure" '/ctx/overlay/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc'
-    assert_not_contains "$skel_configure" '/ctx/skel/.config/plasma-org.kde.plasma.desktop-appletsrc'
-}
-
-@test "kwin VM compatibility files live in overlay" {
-    assert_file_exists "$overlay/usr/libexec/kwin-vm-compat.sh"
-    assert_file_exists "$overlay/etc/xdg/autostart/kwin-vm-compat.desktop"
-    assert_contains "$overlay/etc/xdg/autostart/kwin-vm-compat.desktop" 'Exec=/usr/libexec/kwin-vm-compat.sh'
+@test "kwin-vm-compat files do not exist (KDE-only, removed)" {
+    assert_file_not_exists "$overlay/usr/libexec/kwin-vm-compat.sh"
+    assert_file_not_exists "$overlay/etc/xdg/autostart/kwin-vm-compat.desktop"
 }
 
 @test "skel configure script does not install overlay-owned static files" {

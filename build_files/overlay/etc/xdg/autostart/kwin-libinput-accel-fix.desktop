@@ -1,7 +1,0 @@
-[Desktop Entry]
-Name=KWin Libinput Pointer Acceleration Fix
-Comment=Applies pointer acceleration to touchpad/pointer devices via D-Bus (kcminputrc default is not honored for this key)
-Type=Application
-Exec=/usr/libexec/kwin-libinput-accel-fix.sh
-X-KDE-autostart-phase=2
-Hidden=false

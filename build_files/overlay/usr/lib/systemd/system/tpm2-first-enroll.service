@@ -13,7 +13,7 @@ Description=TPM2 First-Boot LUKS Auto-Unlock Setup
 Documentation=man:systemd-cryptenroll(1)
 ConditionPathExists=!/var/lib/tpm2-enrolled
 After=local-fs.target
-Before=display-manager.service plasmalogin.service sddm.service greetd.service
+Before=display-manager.service greetd.service
 
 [Service]
 Type=oneshot

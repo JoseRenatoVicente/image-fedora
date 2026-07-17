@@ -1,6 +1,6 @@
 # VM Log Uploader
 
-Servidor local para coletar logs da VM Fedora/KDE e receber o arquivo gerado.
+Servidor local para coletar logs da VM Fedora/COSMIC e receber o arquivo gerado.
 
 ## Subir no host
 
@@ -42,9 +42,7 @@ http://localhost:3000/
 ## O que o script coleta
 
 - `journalctl -b` e `journalctl --user -b`
-- `plasma-org.kde.plasma.desktop-appletsrc`
-- `plasmashellrc`, `kdeglobals`, `plasmarc`, `kscreenlockerrc`
-- `/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc`
-- Pacotes KDE/Plasma instalados
-- Verificação de applets referenciados sem pacote instalado
-- Arquivos Mokka look-and-feel relevantes
+- Journal de `cosmic-greeter.service` e `cosmic-session` (sessão de utilizador)
+- Pacotes `cosmic-*`/`greetd` instalados
+- `~/.config/cosmic/` (config COSMIC do utilizador)
+- Tema Catppuccin Mocha Mauve system-wide (`/usr/share/cosmic/com.system76.CosmicTheme.Dark*`)

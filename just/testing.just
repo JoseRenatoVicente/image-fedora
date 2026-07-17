@@ -107,7 +107,7 @@ test-boot timeout="420":
 
     # Boot headless:
     #   -display none       → descarta output VGA (sem janela)
-    #   -device virtio-vga  → VGA existe (SDDM/KDE precisa de um device)
+    #   -device virtio-vga  → VGA existe (cosmic-greeter/cosmic-comp precisa de um device)
     #   -serial mon:stdio   → serial (ttyS0) capturado em stdout → log
     # NÃO usar -nographic aqui: implica sem VGA device e redirects serial
     # de forma diferente — conflita com -display none + -serial explícito.

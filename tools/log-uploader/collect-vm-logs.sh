@@ -14,7 +14,7 @@ command -v tar >/dev/null 2>&1 || { echo "tar não encontrado" >&2; exit 1; }
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 HOSTNAME_SAFE="$(hostname 2>/dev/null | tr -c 'A-Za-z0-9._-' '_' || echo fedora-vm)"
 WORKDIR="$(mktemp -d -t vm-logs.XXXXXX)"
-ARCHIVE="/tmp/${HOSTNAME_SAFE}-${TS}-plasma-logs.tar.gz"
+ARCHIVE="/tmp/${HOSTNAME_SAFE}-${TS}-cosmic-logs.tar.gz"
 trap 'rm -rf "$WORKDIR"' EXIT
 
 run_capture() {
@@ -36,29 +36,21 @@ copy_if_exists() {
 }
 
 cat >"$WORKDIR/README.txt" <<EOF
-VM Plasma diagnostics
+VM COSMIC diagnostics
 Timestamp UTC: $TS
 User: ${USER:-unknown}
 Home: ${HOME:-unknown}
 Upload URL: $UPLOAD_URL
 EOF
 
-run_capture journal-plasma-errors journalctl -b --no-pager -o short-iso
+run_capture journal-boot-errors journalctl -b --no-pager -o short-iso
 run_capture journal-current-user journalctl --user -b --no-pager -o short-iso
-run_capture grep-error-loading-applet bash -lc 'journalctl -b --no-pager -o short-iso | grep -iE "error.*loading.*applet|applet.*error" || true'
-run_capture system-info bash -lc 'printf "hostname="; hostname; printf "kernel="; uname -a; printf "os-release:\n"; cat /etc/os-release; printf "\nplasma packages:\n"; rpm -qa | grep -Ei "plasma|kwin|kde" | sort'
-run_capture appletsrc-focused bash -lc 'grep -nE "^\[Containments\]|^\[Containments\].*Applets|^plugin=|SystrayContainmentId|extraItems=|knownItems=" ~/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null || true'
-run_capture missing-applets bash -lc 'while IFS= read -r plugin; do [ -z "$plugin" ] && continue; [ -d "/usr/share/plasma/plasmoids/$plugin" ] || [ -d "/usr/share/kpackage/genericqml/$plugin" ] || echo "MISSING: $plugin"; done < <(sed -n "s/^plugin=//p" ~/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null | sort -u)'
-run_capture skel-focused bash -lc 'grep -nE "SystrayContainmentId|org\.kde\.plasma\.private\.systemtray|^\[Containments\].*Applets|^plugin=|extraItems=|knownItems=" /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null || true'
-run_capture look-and-feel bash -lc 'find /usr/share/plasma/look-and-feel/Mokka ~/.local/share/plasma/look-and-feel/Mokka -maxdepth 4 -type f 2>/dev/null | sort; printf "\n--- defaults ---\n"; cat /usr/share/plasma/look-and-feel/Mokka/contents/defaults 2>/dev/null || true'
+run_capture journal-cosmic-session bash -lc 'journalctl -b --no-pager -o short-iso -u cosmic-greeter.service --user -u cosmic-session 2>/dev/null || true'
+run_capture system-info bash -lc 'printf "hostname="; hostname; printf "kernel="; uname -a; printf "os-release:\n"; cat /etc/os-release; printf "\ncosmic packages:\n"; rpm -qa | grep -Ei "cosmic|greetd" | sort'
+run_capture cosmic-theme bash -lc 'for d in /usr/share/cosmic/com.system76.CosmicTheme.Dark /usr/share/cosmic/com.system76.CosmicTheme.Dark.Builder; do echo "--- $d ---"; cat "$d/v1/name" 2>/dev/null; echo; cat "$d/v1/palette" 2>/dev/null | head -5; echo; done'
 run_capture keyd journalctl -b --no-pager -o short-iso -u keyd.service
 
-copy_if_exists "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" "home/.config/plasma-org.kde.plasma.desktop-appletsrc"
-copy_if_exists "$HOME/.config/plasmashellrc" "home/.config/plasmashellrc"
-copy_if_exists "$HOME/.config/kdeglobals" "home/.config/kdeglobals"
-copy_if_exists "$HOME/.config/plasmarc" "home/.config/plasmarc"
-copy_if_exists "$HOME/.config/kscreenlockerrc" "home/.config/kscreenlockerrc"
-copy_if_exists "/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc" "etc-skel/.config/plasma-org.kde.plasma.desktop-appletsrc"
+copy_if_exists "$HOME/.config/cosmic" "home/.config/cosmic"
 
 tar -C "$WORKDIR" -czf "$ARCHIVE" .
 

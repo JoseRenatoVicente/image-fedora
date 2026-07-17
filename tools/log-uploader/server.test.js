@@ -40,7 +40,7 @@ test('serves collector script', async () => {
     assert.equal(response.status, 200);
     assert.match(response.headers.get('content-type'), /text\/x-shellscript/);
     assert.match(body, /journalctl -b/);
-    assert.match(body, /plasma-org\.kde\.plasma\.desktop-appletsrc/);
+    assert.match(body, /com\.system76\.CosmicTheme\.Dark/);
   });
 });
 

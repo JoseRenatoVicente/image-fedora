@@ -21,8 +21,9 @@ ARG SOURCE_DATE_EPOCH=""
 ARG PKG_CACHE_KEY=""
 ARG CONFIG_CACHE_KEY=""
 
-# Base Image
-FROM quay.io/fedora-ostree-desktops/base-atomic:44@sha256:01edd4dc7e952a3750f8ed7b199e85543025d07b159c68698f9a0101b0a936b1 AS base
+# Base Image — imagem oficial COSMIC da Fedora (já traz cosmic-session, cosmic-comp,
+# cosmic-panel, cosmic-files, cosmic-greeter/greetd, xdg-desktop-portal-cosmic, etc.)
+FROM quay.io/fedora-ostree-desktops/cosmic-atomic:44@sha256:7fac154d5b0e3bdf4e0818744d58e5e3a210ca70192ef754310ddf8cebc5632b AS base
 
 ARG IMAGE_NAME="fedora"
 ARG IMAGE_PRETTY_NAME="Fedora"

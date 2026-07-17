@@ -22,7 +22,7 @@ setup() {
     [ "${#REMOVE_PACKAGES[@]}"  -gt 0 ]
     [ "${#BUILD_DEPS[@]}"       -gt 0 ]
     [ "${#REQUIRED_PACKAGES[@]}" -gt 0 ]
-    [ "${#KDE_REQUIRED[@]}"     -gt 0 ]
+    [ "${#COSMIC_REQUIRED[@]}"     -gt 0 ]
     [ "${#UNWANTED_PACKAGES[@]}" -gt 0 ]
 }
 
@@ -46,7 +46,7 @@ setup() {
 }
 
 @test "nenhum pacote requerido está na lista de remoção" {
-    for pkg in "${REQUIRED_PACKAGES[@]}" "${KDE_REQUIRED[@]}"; do
+    for pkg in "${REQUIRED_PACKAGES[@]}" "${COSMIC_REQUIRED[@]}"; do
         if in_list "$pkg" "${REMOVE_PACKAGES[@]}"; then
             echo "Contradição: '$pkg' é REQUIRED mas está em REMOVE_PACKAGES"
             return 1
@@ -55,7 +55,7 @@ setup() {
 }
 
 @test "nenhum pacote requerido está excluído da instalação" {
-    for pkg in "${REQUIRED_PACKAGES[@]}" "${KDE_REQUIRED[@]}"; do
+    for pkg in "${REQUIRED_PACKAGES[@]}" "${COSMIC_REQUIRED[@]}"; do
         if in_list "$pkg" "${INSTALL_EXCLUDES[@]}"; then
             echo "Contradição: '$pkg' é REQUIRED mas está em INSTALL_EXCLUDES"
             return 1
@@ -65,19 +65,11 @@ setup() {
 
 @test "build deps não constam nas verificações de presença (são removidas)" {
     for pkg in "${BUILD_DEPS[@]}"; do
-        if in_list "$pkg" "${REQUIRED_PACKAGES[@]}" "${KDE_REQUIRED[@]}"; then
+        if in_list "$pkg" "${REQUIRED_PACKAGES[@]}" "${COSMIC_REQUIRED[@]}"; then
             echo "Contradição: build dep '$pkg' é verificada como REQUIRED mas é removida no build"
             return 1
         fi
     done
-}
-
-@test "rounded-corners COPR best-effort is not an unconditional requirement" {
-    assert_contains "$build_packages" 'WARN: kwin-effect-roundcorners não instalado'
-    if in_list kwin-effect-roundcorners "${REQUIRED_PACKAGES[@]}" "${KDE_REQUIRED[@]}"; then
-        echo "Contradição: kwin-effect-roundcorners é best-effort mas está em REQUIRED/KDE_REQUIRED"
-        return 1
-    fi
 }
 
 @test "required hardened_malloc COPR install fails fast" {
@@ -86,12 +78,12 @@ setup() {
     fi
 }
 
-@test "remoção de build deps não faz autoremove de runtime KDE" {
+@test "remoção de build deps não faz autoremove de runtime em uso" {
     assert_not_contains "${REPO_ROOT}/build_files/scripts/configure/70-build-deps.sh" '--setopt=clean_requirements_on_remove=True'
     assert_contains "${REPO_ROOT}/build_files/scripts/configure/70-build-deps.sh" '--setopt=clean_requirements_on_remove=False'
 }
 
-@test "limpeza de órfãos não remove dependências do runtime KDE" {
+@test "limpeza de órfãos não remove dependências de media em uso (flite/lpcnetfreedv)" {
     run grep -Eq '^[[:space:]]*qt6-qtspeech([[:space:]]|$)' "${REPO_ROOT}/build_files/scripts/build-packages.sh"
     [ "$status" -ne 0 ]
     run grep -Eq '^[[:space:]]*qt6-qtspeech-flite([[:space:]]|$)' "${REPO_ROOT}/build_files/scripts/build-packages.sh"

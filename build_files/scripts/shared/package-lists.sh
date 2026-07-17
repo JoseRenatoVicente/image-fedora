@@ -32,8 +32,8 @@ REMOVE_PACKAGES=(
     cldr-emoji-annotation
 
     # IBus / input methods asiáticos (~160 MB)
-    ibus-anthy ibus-chewing ibus-hangul
-    ibus-libpinyin ibus-m17n ibus-typing-booster
+    ibus-anthy ibus-anthy-python ibus-chewing ibus-hangul
+    ibus-libpinyin ibus-m17n ibus-typing-booster ibus-panel python3-ibus
 
     # Firefox (vem na base-atomic, não é usado — substituído por flatpak)
     firefox firefox-langpacks
@@ -113,15 +113,11 @@ REMOVE_PACKAGES=(
 INSTALL_EXCLUDES=(
     PackageKit
     PackageKit-glib
-    plasma-pk-updates
     tracker
     tracker-miners
     localsearch
     tinysparql
-    plasma-x11
-    plasma-workspace-x11
     mariadb-server-utils
-    qt5-qtbase
     kde-connect
     firefox
     orca
@@ -133,42 +129,20 @@ INSTALL_EXCLUDES=(
 )
 
 # ── Pacotes Fedora a instalar ────────────────────────────────────────────────
+# NOTA: a base é a imagem oficial cosmic-atomic (ver Containerfile) — já traz
+# cosmic-session/cosmic-comp/cosmic-panel/cosmic-files/cosmic-greeter/greetd,
+# xdg-desktop-portal-cosmic, gnome-keyring e o stack Xwayland/mesa/vulkan.
+# Esta lista só acrescenta o que a imagem base NÃO traz.
 INSTALL_PACKAGES=(
     # dnf5-plugins (necessário para copr_install_isolated)
     dnf5-plugins
 
-    # ── KDE Plasma (mínimo) ───────────────────────────────────────────────────
-    # Core desktop
-    plasma-desktop plasma-workspace kwin kscreenlocker kscreen
-    plasma-login-manager kde-settings-plasmalogin kcm-plasmalogin
-    # Painel e rede. kdeplasma-addons exclui-se: hard-dep em qt6-qtwebengine (290 MB).
-    # O kameleon kded (accent color dinâmico) vem do kdeplasma-addons; sem ele o
-    # plasma_accentcolor_service usa AccentColor fixo do skel — kded6rc desativa autoload.
-    plasma-pa plasma-nm plasma-nm-openvpn
-    # plasma-drkonqi excluído de propósito: coredumps estão desativados em 3
-    # camadas (DumpCore=no em system/user.conf.d, limits core 0, Storage=none
-    # em coredump.conf.d — ver política NSA/STIG contra exposição de dados
-    # sensíveis em cores). Sem coredump, o DrKonqi nunca é invocado; instalar
-    # o pacote seria peso morto que contradiz a própria política.
-    bluedevil polkit-kde kinfocenter plasma-systemmonitor
-    # Integração
-    kde-gtk-config flatpak-kcm kio-admin pam-kwallet pinentry-qt
-    libappindicator-gtk3
-    # File manager e utilitários
-    dolphin konsole kwrite ark kdialog
-    ffmpegthumbs kdegraphics-thumbnailers audiocd-kio kamera
-    # Display
-    xorg-x11-server-Xwayland xwaylandvideobridge
-    mesa-dri-drivers mesa-vulkan-drivers libva-intel-media-driver
-    # Portais
-    xdg-desktop-portal xdg-desktop-portal-kde
-    # Temas fallback
-    plasma-breeze breeze-icon-theme aurorae
-    # Extras Kinoite
-    plasma-keyboard
-    # Pesquisa/Overview kwin: org.kde.milou QML module
-    plasma-milou
+    # ── Hardware/media adicional ao que a imagem base cosmic-atomic já traz ──
+    libva-intel-media-driver
     vulkan-tools mobile-broadband-provider-info NetworkManager-ppp
+    # Ícones de tray (StatusNotifierItem/AppIndicator) para apps de terceiros
+    # (Flatpak, Electron) — cosmic-applets não substitui isto.
+    libappindicator-gtk3
 
     # ── Ferramentas do utilizador ─────────────────────────────────────────────
     # Dev tools (git-core já vem na base-atomic; full git entra via git-credential-libsecret)
@@ -214,11 +188,8 @@ INSTALL_PACKAGES=(
     podman-docker podman-compose
     # WinApps / KVM: backend libvirt para integração de apps Windows via RDP
     freerdp libvirt qemu-kvm virt-manager dialog
-    # KDE / temas
-    kvantum qt6ct
     flameshot
-    # KDE integrations
-    git-credential-libsecret ksshaskpass ksystemlog plasma-firewall
+    git-credential-libsecret
     # Hardware monitoring
     lm_sensors nvtop powertop
     # Peripheral support
@@ -244,15 +215,10 @@ INSTALL_PACKAGES=(
 )
 
 # ── Build deps (instaladas no Layer 1, removidas no Layer 2 70-build-deps.sh) ─
-# Lista única partilhada entre a instalação e a remoção. cpp/gcc são deps de
-# gcc-c++ mas são listados explicitamente para remoção garantida.
+# Lista única partilhada entre a instalação e a remoção. Muito mais curta do
+# que na era KDE: os temas COSMIC são ficheiros RON (sem compilação); só
+# sobram as ferramentas de assinatura/UKI do Secure Boot.
 BUILD_DEPS=(
-    gcc-c++ cpp gcc
-    cmake extra-cmake-modules
-    libplasma-devel
-    kf6-kcoreaddons-devel kf6-kirigami-devel kf6-kpackage-devel kf6-kwindowsystem-devel
-    libsass sassc
-    rsync
     # sbsign (assinatura Secure Boot do systemd-boot em 65-secureboot-sign.sh).
     # Só necessário durante o build; removido daqui como os outros build deps.
     sbsigntools
@@ -278,13 +244,10 @@ REQUIRED_PACKAGES=(
     zoxide
     android-tools
     kitty
-    ksshaskpass
-    ksystemlog
     lm_sensors
     neovim
     nvtop
     pam-u2f
-    plasma-firewall
     podman-docker
     tuned
     # Dell/Intel laptop support
@@ -316,19 +279,17 @@ REQUIRED_PACKAGES=(
     qemu-kvm
     hunspell-pt-BR
     audit
-    # KDE pesquisa/Overview (kwin): org.kde.milou QML module
-    plasma-milou
     # SCX scheduler: best-effort (ver build-packages.sh); ausência não é falha
 )
 
-# ── Verificação runtime: pacotes KDE essenciais ──────────────────────────────
-KDE_REQUIRED=(
-    plasma-desktop
-    plasma-workspace
-    kwin
-    plasma-login-manager
-    dolphin
-    konsole
+# ── Verificação runtime: pacotes COSMIC essenciais (vêm da imagem base) ──────
+COSMIC_REQUIRED=(
+    cosmic-session
+    cosmic-comp
+    cosmic-panel
+    cosmic-files
+    cosmic-greeter
+    greetd
 )
 
 # ── Verificação runtime: pacotes que DEVEM estar ausentes ────────────────────
@@ -359,6 +320,13 @@ UNWANTED_PACKAGES=(
     kde-connect
     akonadi-server
     mariadb-server
+    # KDE Plasma — migração para COSMIC (regressão se algum destes voltar)
+    plasma-desktop
+    plasma-workspace
+    kwin
+    dolphin
+    plasma-login-manager
+    sddm
     # Bloat órfão removido por tamanho (~650 MB) — regressão se voltar
     qt6-qtwebengine
     python3-botocore
@@ -381,9 +349,9 @@ UNWANTED_PACKAGES=(
     # reaparecem depois do INSTALL_PACKAGES como hard-deps do build ffmpeg-free/
     # libavcodec-free do Fedora — ffmpeg-free liga-se a libflite.so (dependência
     # por soname, invisível a `rpm -q --whatrequires flite`) e codec2 tem
-    # hard-Requires em lpcnetfreedv. ffmpeg-free é exigido por kpipewire/
-    # qt6-qtmultimedia/ffmpegthumbs, centrais do stack Plasma (screen recording,
-    # thumbnails, media). Testado ao vivo: remover qualquer um dos dois arrasta
-    # plasma-desktop/plasma-workspace/kwin/dolphin/ffmpeg-free. Mantê-los é o
-    # trade-off aceite.
+    # hard-Requires em lpcnetfreedv. ffmpeg-free continua a ser exigido por
+    # pipewire/gstreamer (media, screencast via xdg-desktop-portal-cosmic) na
+    # imagem COSMIC. A cadeia exata (herdada da era KDE, onde arrastava
+    # plasma-desktop/kwin/dolphin) precisa de reconfirmação ao vivo nesta base;
+    # mantê-los é o trade-off aceite até lá.
 )

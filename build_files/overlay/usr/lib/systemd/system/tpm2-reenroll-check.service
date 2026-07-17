@@ -8,7 +8,7 @@ Description=TPM2 LUKS Seal Drift Check
 Documentation=man:systemd-cryptenroll(1)
 ConditionPathExists=/var/lib/tpm2-enrolled
 After=local-fs.target tpm2-first-enroll.service
-Before=display-manager.service plasmalogin.service sddm.service greetd.service
+Before=display-manager.service greetd.service
 
 [Service]
 Type=oneshot

@@ -78,8 +78,6 @@ chmod 755 /usr/libexec/fedora-shell-setup \
           /usr/libexec/fedora-brew-setup \
           /usr/libexec/fedora-toolbox-setup \
           /usr/libexec/fedora-first-setup-runner \
-          /usr/libexec/kwin-vm-compat.sh \
-          /usr/libexec/fedora-kinoite-plasmalogin-workaround \
           /usr/libexec/image-fedora-selinux-setup
 # Wrappers docker-cli usados pelo VSCode (Flatpak) via flatpak-spawn --host —
 # ver dev.containers.dockerPath no settings.json do skel.
@@ -155,7 +153,6 @@ setfattr -n user.component -v "image-config" \
     /usr/share/image-fedora/low-resource/100-low-resource.conf \
     /usr/lib/systemd/system/low-resource-tuning.service \
     /etc/systemd/zram-generator.conf \
-    /etc/xdg/baloofilerc \
     /etc/xdg/autostart/geoclue-demo-agent.desktop \
     /usr/lib/bootc/kargs.d/20-performance.toml \
     /usr/lib/tmpfiles.d/thp-tuning.conf \
@@ -172,15 +169,7 @@ setfattr -n user.component -v "image-config" \
     /etc/security/faillock.conf \
     /usr/lib/NetworkManager/conf.d/40-hardening.conf \
     /usr/lib/systemd/system-preset/35-security-desktop.preset \
-    /usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service \
-    /usr/libexec/fedora-kinoite-plasmalogin-workaround \
-    /usr/libexec/kwin-vm-compat.sh \
-    /etc/xdg/kwinrc \
-    /etc/xdg/breezerc \
-    /etc/xdg/kdeglobals \
     /etc/systemd/journald.conf.d/size-limit.conf \
-    /etc/plasmalogin.conf.d/10-theme.conf \
-    /etc/xdg/kscreenlockerrc \
     /etc/profile.d/tmout.sh \
     /etc/scx_loader/config.toml \
     /etc/security/limits.d/60-gaming-nice.conf \

@@ -66,10 +66,6 @@ echo "::endgroup::"
 
 # ─── COPR packages (isolados) ────────────────────────────────────────────────
 echo "::group:: COPR packages"
-# kwin-effect-roundcorners não está nos repos Fedora
-copr_install_isolated "matinlotfali/KDE-Rounded-Corners" \
-    kwin-effect-roundcorners kwin-effect-roundcorners-x11 \
-    || echo "WARN: kwin-effect-roundcorners não instalado"
 # keyd (remapeamento de teclado ao nível do uinput) não está nos repos Fedora —
 # vem do COPR alternateved/keyd, que tem builds fedora-44. Best-effort: se o COPR
 # estiver indisponível, a config /etc/keyd/default.conf (via overlay) ainda é
@@ -86,9 +82,10 @@ copr_install_isolated "secureblue/packages" \
     hardened_malloc
 echo "::endgroup::"
 
-# qt6-qtspeech/flite parecem bloat, mas no Fedora 44 a transação de remoção
-# leva junto plasma-desktop, kwin, dolphin, konsole e ffmpeg-free. Mantemos essa
-# pilha para preservar o runtime KDE validado em shared/tests.sh.
+# flite/lpcnetfreedv parecem bloat, mas no Fedora 44 a transação de remoção
+# arrasta ffmpeg-free (usado por pipewire/gstreamer/cosmic-files para media e
+# thumbnails). Mantemos essa pilha para preservar o runtime validado em
+# shared/tests.sh — ver nota junto a UNWANTED_PACKAGES em package-lists.sh.
 
 # ─── Checkpoint da rpmdb (sqlite) ────────────────────────────────────────────
 # O backend sqlite do rpm mantém um WAL (rpmdb.sqlite-wal) que só é fundido no

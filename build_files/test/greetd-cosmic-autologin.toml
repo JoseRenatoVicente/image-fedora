@@ -1,0 +1,20 @@
+# Imagem de teste apenas — sobrescreve /etc/greetd/cosmic-greeter.toml por
+# inteiro (greetd não suporta drop-ins) para logar automaticamente o testuser
+# numa sessão cosmic-session, saltando o cosmic-greeter interativo. O
+# [default_session] normal (greeter gráfico) fica intacto para consistência
+# com a imagem de produção; só acrescentamos [initial_session] para a VT1.
+# Modelado em installer/sessions.d/livesys-cosmic (mesma técnica usada no
+# live ISO para autologin do liveuser).
+[terminal]
+vt = "1"
+
+[general]
+service = "cosmic-greeter"
+
+[default_session]
+command = "cosmic-greeter-start"
+user = "cosmic-greeter"
+
+[initial_session]
+command = "cosmic-session"
+user = "testuser"

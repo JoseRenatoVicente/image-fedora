@@ -68,50 +68,65 @@ _install_tela_circle() {
     rm -rf /usr/share/icons/Tela-circle-dracula-light
 }
 
-# Complex installer for Garuda Mokka (multiple rsync targets + skel)
-_install_garuda_mokka() {
+# Tema COSMIC Catppuccin Mocha/Mauve — substituto do Mokka (KDE).
+#
+# O COSMIC guarda config em ficheiros RON, um por chave, sob
+# /usr/share/cosmic/<app-id>/v1/<chave> (fallback system-wide usado pelo
+# cosmic-config quando o utilizador não tem override próprio). O repositório
+# catppuccin/cosmic-desktop publica o tema como um único ThemeBuilder RON
+# (formato "importável" via cosmic-settings), cujo schema de topo (palette,
+# bg_color, accent, success, warning, destructive, window_hint, neutral_tint,
+# text_tint, primary_container_bg, secondary_container_bg, is_frosted, gaps,
+# active_hint, corner_radii, spacing) foi confirmado, campo a campo, contra o
+# /usr/share/cosmic/com.system76.CosmicTheme.Dark.Builder/v1/ real da imagem
+# cosmic-atomic — os dois batem exactamente, por isso a decomposição abaixo é
+# uma cópia directa (sem risco de mismatch de schema).
+#
+# Para o tema efectivamente RENDERIZADO (CosmicTheme.Dark, não o Builder), o
+# cálculo dos estados hover/pressed/disabled/etc. de cada cor é feito pelo
+# crate cosmic-theme (Rust) e não está disponível neste ambiente de build.
+# Aproximamo-lo com escalonamento de luminosidade em HSL, calibrado empiricamente
+# a partir do par (accent seed → accent computado) do tema "cosmic-dark" de
+# origem — aproximação best-effort, não os valores exactos que o COSMIC
+# produziria; ajustar depois de testar visualmente numa sessão real.
+_install_catppuccin_cosmic() {
     tar -xzf "$ARCHIVE" -C "$TMPDIR_ASSETS"
-    local dir="$TMPDIR_ASSETS/garuda-mokka-${GARUDA_MOKKA_VERSION}"
-    if [[ ! -d "$dir" ]]; then
-        warn "Tarball do Garuda Mokka não encontrado em $dir. Pulando."
+    local dir="$TMPDIR_ASSETS/cosmic-desktop-${CATPPUCCIN_COSMIC_COMMIT}"
+    local settings_ron="$dir/themes/cosmic-settings/catppuccin-mocha-mauve+round.ron"
+    local term_ron="$dir/themes/cosmic-term/catppuccin-mocha.ron"
+    if [[ ! -f "$settings_ron" ]]; then
+        warn "Tema catppuccin-mocha-mauve+round.ron não encontrado em $dir. Pulando."
         return
     fi
 
-    _copy_if_exists() {
-        if [[ -d "$1" ]]; then
-            mkdir -p "$2"
-            rsync -a "$1"/ "$2"/
-        fi
-    }
-    _copy_if_exists "$dir/usr/share/plasma/look-and-feel"  /usr/share/plasma/look-and-feel
-    _copy_if_exists "$dir/usr/share/color-schemes"         /usr/share/color-schemes
-    _copy_if_exists "$dir/usr/share/plasma/desktoptheme"   /usr/share/plasma/desktoptheme
-    _copy_if_exists "$dir/usr/share/aurorae/themes"        /usr/share/aurorae/themes
-    _copy_if_exists "$dir/usr/share/wallpapers"            /usr/share/wallpapers
-    # O pacote Mokka inclui o wallpaper "Next" com imagens de até 7680x2160
-    # (~40 MB). Não é usado como padrão (o greeter usa Mokka-tree), por isso
-    # removemos para economizar espaço na ISO.
-    rm -rf /usr/share/wallpapers/Next
-    _copy_if_exists "$dir/usr/share/konsole"               /usr/share/konsole
-    _copy_if_exists "$dir/usr/share/Kvantum"               /usr/share/Kvantum
-    _copy_if_exists "$dir/usr/share/sddm"                  /usr/share/sddm
+    python3 "$(dirname "$0")/../assets/cosmic-theme-derive.py" "$settings_ron"
 
-    if [[ -d "$dir/etc/skel" ]]; then
-        log "Aplicando skel do Garuda Mokka"
-        rsync -a "$dir/etc/skel"/ /etc/skel/
-    else
-        warn "Skel não encontrado no tarball do Garuda Mokka."
+    # cosmic-term: sem diretório de defaults system-wide nesta base (a app não
+    # traz /usr/share/cosmic/com.system76.CosmicTerm/); fica disponível para
+    # import manual em ~/.config caso um utilizador queira aplicá-lo.
+    if [[ -f "$term_ron" ]]; then
+        install -Dm644 "$term_ron" /usr/share/cosmic-term-themes/catppuccin-mocha.ron
     fi
-}
 
-_install_catppuccin_aurorae() {
-    mkdir -p /usr/share/aurorae/themes
-    tar -xzf "$ARCHIVE" -C /usr/share/aurorae/themes/
-}
-
-_install_catppuccin_sddm() {
-    mkdir -p /usr/share/sddm/themes
-    unzip -qo "$ARCHIVE" -d /usr/share/sddm/themes/
+    # Wallpaper: reaproveita um dos assets já incluídos pelo pacote
+    # cosmic-wallpapers da imagem base (nebulosa escura, combina com a
+    # paleta Mocha/Mauve) em vez de trazer um novo binário de imagem.
+    local wallpaper=/usr/share/backgrounds/cosmic/orion_nebula_nasa_heic0601a.jpg
+    if [[ -f "$wallpaper" ]]; then
+        install -Dm644 /dev/stdin /usr/share/cosmic/com.system76.CosmicBackground/v1/all <<EOF
+(
+    output: "all",
+    source: Path("$wallpaper"),
+    filter_by_theme: false,
+    rotation_frequency: 3600,
+    filter_method: Lanczos,
+    scaling_mode: Zoom,
+    sampling_method: Alphanumeric,
+)
+EOF
+    else
+        warn "Wallpaper padrão do cosmic-wallpapers não encontrado: $wallpaper"
+    fi
 }
 
 _install_catppuccin_gtk() {

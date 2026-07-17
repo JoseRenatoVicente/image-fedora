@@ -54,7 +54,8 @@ restorecon -FRv /usr 2>/dev/null || true
 #   sudo/su               — kdesu + escalada normal
 #   pkexec                — anaconda-live/liveinst eleva via polkit
 #   polkit-agent-helper-1 — autentica via PAM para polkit (sem SUID, TODA a
-#                           autenticação administrativa falha no KDE)
+#                           autenticação administrativa falha — cosmic-osd
+#                           depende do polkit para elevação de privilégios)
 #   passwd                — necessita SUID para escrever /etc/shadow
 #   libhardened_malloc    — glibc exige SUID no .so para preload em binários SUID
 find /usr -type f -perm /6000 -print0 | while IFS= read -r -d '' binary; do

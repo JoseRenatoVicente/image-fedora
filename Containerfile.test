@@ -7,14 +7,15 @@ FROM ${BASE}
 # Console serial para o health check escrever resultados capturáveis pelo QEMU
 COPY build_files/test/test-kargs.toml /usr/lib/bootc/kargs.d/20-test-console.toml
 
-# Auto-login: inicia sessão KDE sem interação humana. O DM é o plasma-login-manager
-# (plasmalogin), que lê /etc/plasmalogin.conf.d/ — não /etc/sddm.conf.d/. Sem isto o
-# autologin é ignorado e cai no greeter, cujo compositor falha no render headless.
-COPY build_files/test/sddm-autologin.conf /etc/plasmalogin.conf.d/20-autologin.conf
+# Auto-login: inicia sessão COSMIC sem interação humana. cosmic-greeter.service
+# (já preset/enabled pela imagem base, Alias=display-manager.service) lê
+# /etc/greetd/cosmic-greeter.toml — greetd não suporta drop-ins, por isso
+# sobrescrevemos o ficheiro inteiro com um [initial_session] de autologin.
+COPY build_files/test/greetd-cosmic-autologin.toml /etc/greetd/cosmic-greeter.toml
 
-# Render de software: sem GPU real numa VM headless, o KWin Wayland precisa de
-# llvmpipe/QPainter para arrancar. Sourced por startplasma-wayland.
-COPY build_files/test/plasma-software-render.sh /etc/xdg/plasma-workspace/env/99-test-software-render.sh
+# Render de software: sem GPU real numa VM headless, o cosmic-comp pode
+# precisar de llvmpipe para arrancar (ver comentário no próprio ficheiro).
+COPY build_files/test/cosmic-software-render.conf /etc/environment.d/99-test-software-render.conf
 
 # Utilizador de teste — padrão correto para imagem atómica bootc:
 #   sysusers.d declara o utilizador; tmpfiles.d cria o home a partir do skel no primeiro boot
@@ -33,7 +34,7 @@ COPY build_files/test/boot-health-check.service /usr/lib/systemd/system/boot-hea
 
 RUN chmod +x /usr/lib/bootc-test/boot-health-check.sh && \
     chmod 644 /usr/lib/systemd/system/boot-health-check.service && \
-    chmod +x /etc/xdg/plasma-workspace/env/99-test-software-render.sh && \
+    chmod 644 /etc/environment.d/99-test-software-render.conf && \
     mkdir -p /usr/lib/systemd/system/graphical.target.wants && \
     ln -sf ../boot-health-check.service \
         /usr/lib/systemd/system/graphical.target.wants/boot-health-check.service

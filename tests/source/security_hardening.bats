@@ -169,8 +169,8 @@ setup() {
     local first="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-first-enroll.service"
     local reenroll="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/tpm2-reenroll-check.service"
 
-    assert_contains "$first" 'Before=display-manager.service plasmalogin.service sddm.service greetd.service'
-    assert_contains "$reenroll" 'Before=display-manager.service plasmalogin.service sddm.service greetd.service'
+    assert_contains "$first" 'Before=display-manager.service greetd.service'
+    assert_contains "$reenroll" 'Before=display-manager.service greetd.service'
 }
 
 @test "tpm2-first-enroll service uses one-time condition marker" {

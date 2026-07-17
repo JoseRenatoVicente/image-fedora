@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Container tests — run inside the built image
-# Tests: required packages, KDE Plasma packages, unwanted packages, repos, wrappers
+# Tests: required packages, COSMIC packages, unwanted packages, repos, wrappers
 
 setup() {
     load '../helpers/common'
@@ -132,30 +132,30 @@ setup() {
     rpm -q zsh
 }
 
-# ── KDE Plasma packages ──────────────────────────────────────────────────────
+# ── COSMIC packages ──────────────────────────────────────────────────────────
 
-@test "plasma-desktop is installed" {
-    rpm -q plasma-desktop
+@test "cosmic-session is installed" {
+    rpm -q cosmic-session
 }
 
-@test "plasma-workspace is installed" {
-    rpm -q plasma-workspace
+@test "cosmic-comp is installed" {
+    rpm -q cosmic-comp
 }
 
-@test "kwin is installed" {
-    rpm -q kwin
+@test "cosmic-panel is installed" {
+    rpm -q cosmic-panel
 }
 
-@test "konsole is installed" {
-    rpm -q konsole
+@test "cosmic-files is installed" {
+    rpm -q cosmic-files
 }
 
-@test "dolphin is installed" {
-    rpm -q dolphin
+@test "cosmic-greeter is installed" {
+    rpm -q cosmic-greeter
 }
 
-@test "plasma-login-manager is installed" {
-    rpm -q plasma-login-manager
+@test "greetd is installed" {
+    rpm -q greetd
 }
 
 # ── Unwanted packages ───────────────────────────────────────────────────────
@@ -240,18 +240,33 @@ setup() {
     [ "$status" -ne 0 ]
 }
 
-@test "cosmic-session is not installed" {
-    run rpm -q cosmic-session
+@test "plasma-desktop is not installed" {
+    run rpm -q plasma-desktop
     [ "$status" -ne 0 ]
 }
 
-@test "cosmic-comp is not installed" {
-    run rpm -q cosmic-comp
+@test "plasma-workspace is not installed" {
+    run rpm -q plasma-workspace
     [ "$status" -ne 0 ]
 }
 
-@test "cosmic-greeter is not installed" {
-    run rpm -q cosmic-greeter
+@test "kwin is not installed" {
+    run rpm -q kwin
+    [ "$status" -ne 0 ]
+}
+
+@test "dolphin is not installed" {
+    run rpm -q dolphin
+    [ "$status" -ne 0 ]
+}
+
+@test "plasma-login-manager is not installed" {
+    run rpm -q plasma-login-manager
+    [ "$status" -ne 0 ]
+}
+
+@test "sddm is not installed" {
+    run rpm -q sddm
     [ "$status" -ne 0 ]
 }
 

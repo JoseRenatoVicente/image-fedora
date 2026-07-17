@@ -30,7 +30,7 @@ if [[ -n "${SHA_HEAD_SHORT}" ]]; then
     echo "BUILD_ID=\"${SHA_HEAD_SHORT}\"" >> /usr/lib/os-release
 fi
 
-# IMAGE_REF lets plasma-discover/Discover find the correct registry for update checks.
+# IMAGE_REF lets cosmic-store/app updaters find the correct registry for update checks.
 # Only set when IMAGE_VENDOR is known (i.e. CI builds pushed to ghcr.io).
 if [[ -n "${IMAGE_VENDOR}" ]]; then
     echo "IMAGE_REF=\"ostree-image-signed:docker://ghcr.io/${IMAGE_VENDOR}/${IMAGE_NAME}\"" \

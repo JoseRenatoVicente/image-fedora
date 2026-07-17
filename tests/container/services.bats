@@ -36,8 +36,8 @@ setup() {
     systemctl is-enabled flathub-system-setup.service 2>/dev/null | grep -q "^enabled$"
 }
 
-@test "plasmalogin.service is enabled" {
-    systemctl is-enabled plasmalogin.service 2>/dev/null | grep -q "^enabled$"
+@test "cosmic-greeter.service is enabled" {
+    systemctl is-enabled cosmic-greeter.service 2>/dev/null | grep -q "^enabled$"
 }
 
 @test "thermald.service is enabled" {

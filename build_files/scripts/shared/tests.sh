@@ -5,7 +5,7 @@ set -euo pipefail
 FAILED=0
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
 
-# Listas de pacotes (REQUIRED_PACKAGES, KDE_REQUIRED, UNWANTED_PACKAGES) vêm da
+# Listas de pacotes (REQUIRED_PACKAGES, COSMIC_REQUIRED, UNWANTED_PACKAGES) vêm da
 # fonte única partilhada com o build — evita drift entre instalar e verificar.
 # shellcheck source=package-lists.sh
 source "$(dirname "$0")/package-lists.sh"
@@ -21,9 +21,9 @@ for pkg in "${REQUIRED_PACKAGES[@]}"; do
     fi
 done
 
-echo "=== Pacotes KDE essenciais ==="
-for pkg in "${KDE_REQUIRED[@]}"; do
-    rpm -q "$pkg" > /dev/null 2>&1 || fail "Pacote KDE ausente: $pkg"
+echo "=== Pacotes COSMIC essenciais ==="
+for pkg in "${COSMIC_REQUIRED[@]}"; do
+    rpm -q "$pkg" > /dev/null 2>&1 || fail "Pacote COSMIC ausente: $pkg"
 done
 
 echo "=== Pacotes indesejados ==="
@@ -36,8 +36,8 @@ done
     || fail "Repo VS Code não deve existir na imagem base: /etc/yum.repos.d/vscode.repo"
 
 echo "=== sudo → run0 (alias) ==="
-# Nota: o pacote sudo NÃO é removido — plasma-workspace exige kdesu→sudo. Apenas
-# adicionamos run0 + alias interativo.
+# Nota: o pacote sudo NÃO é removido — pkexec/elevação administrativa continuam
+# a exigi-lo. Apenas adicionamos run0 + alias interativo.
 [[ -x /usr/bin/run0 ]] || fail "run0 ausente (deveria vir com o systemd)"
 grep -q "alias sudo='run0'" /etc/profile.d/run0-alias.sh \
     || fail "alias sudo→run0 ausente em /etc/profile.d/run0-alias.sh"
@@ -55,7 +55,7 @@ REQUIRED_UNITS=(
     chronyd.service
     flatpak-nuke-fedora.service
     flathub-system-setup.service
-    fedora-kinoite-plasmalogin-workaround.service
+    cosmic-greeter.service
     thermald.service
     rpm-ostreed-automatic.timer
     podman-auto-update.timer
@@ -159,8 +159,6 @@ REQUIRED_FILES=(
     /etc/selinux/config
     /etc/chrony.conf
     /etc/rpm-ostreed.conf
-    /etc/plasmalogin.conf.d/10-theme.conf
-    /etc/xdg/plasma-welcomerc
     /etc/systemd/zram-generator.conf
     /etc/systemd/system.conf.d/timeout.conf
     /etc/systemd/user.conf.d/timeout.conf
@@ -169,7 +167,7 @@ REQUIRED_FILES=(
     /usr/lib/systemd/system/flatpak-nuke-fedora.service
     /usr/lib/systemd/system/flathub-system-setup.service
     /usr/share/flatpak/flathub.flatpakrepo
-    /etc/plasma-setup-done
+    /etc/cosmic-setup-done
     /etc/keyd/default.conf
     /etc/locale.conf
     /etc/vconsole.conf
@@ -185,7 +183,6 @@ REQUIRED_FILES=(
     /usr/share/qt6/qtlogging.ini
     /usr/share/wireplumber/wireplumber.conf.d/51-disable-suspension.conf
     /usr/bin/dnf
-    /usr/lib/tmpfiles.d/fedora-kde-root-theme.conf
     /usr/lib/bootupd/grub2-static/configs.d/05_timeout.cfg
     /etc/udisks2/mount_options.conf
     /etc/tmpfiles.d/99-proc-hardening.conf
@@ -199,10 +196,8 @@ REQUIRED_FILES=(
     /etc/tmpfiles.d/audit-log-dir.conf
     /etc/tmpfiles.d/home.conf
     /etc/security/pwhistory.conf
-    /etc/xdg/kdedrc
     /usr/lib/bootc/kargs.d/30-audit.toml
     # STIG Tier A
-    /etc/xdg/kscreenlockerrc
     /etc/profile.d/tmout.sh
 )
 for f in "${REQUIRED_FILES[@]}"; do
@@ -267,11 +262,9 @@ grep -q 'compression-algorithm=zstd' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não configurado com zstd"
 grep -q 'zram-size = min(ram / 4 + 1024, 4096)' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não limitado a min(ram / 4 + 1024, 4096)"
-grep -q '^Indexing-Enabled=false$' /etc/xdg/baloofilerc \
-    || fail "Baloo não está desativado por padrão em /etc/xdg/baloofilerc"
 grep -q '^Hidden=true$' /etc/xdg/autostart/geoclue-demo-agent.desktop \
     || fail "geoclue-demo-agent.desktop não está com Hidden=true"
-for unit in mpris-proxy.service obex.service plasma-kactivitymanagerd.service; do
+for unit in mpris-proxy.service obex.service; do
     [[ -L "/etc/systemd/user/${unit}" && "$(readlink "/etc/systemd/user/${unit}")" == "/dev/null" ]] \
         || fail "/etc/systemd/user/${unit} não está mascarado para /dev/null"
 done
@@ -282,79 +275,12 @@ grep -q 'rpm-ostree' /usr/bin/dnf \
 [[ -x /usr/bin/dnf ]] \
     || fail "/usr/bin/dnf não é executável"
 
-echo "=== Plasma: plugins do skel ==="
-APPLETSRC="/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc"
-if [[ -f "$APPLETSRC" ]]; then
-    # Apanha plugins VAZIOS — causa do "error when loading applet """
-    # Valida plugins referenciados no skel contra os diretórios de pacote Plasma.
-    # Alguns built-ins não vivem em plasmoids/ (ex.: org.kde.panel), mas os applets
-    # e containments declarados explicitamente aqui devem existir onde aplicável.
-    while IFS= read -r plugin; do
-        [[ -z "$plugin" ]] && fail "Plugin vazio em appletsrc (causa de 'error when loading applet \"\"')" && continue
-        case "$plugin" in
-            org.kde.panel|org.kde.plasma.digitalclock|org.kde.plasma.kickoff|org.kde.plasma.marginsseparator|org.kde.plasma.pager|org.kde.plasma.showdesktop|org.kde.plasma.systemtray|org.kde.plasma.taskmanager)
-                continue
-                ;;
-            org.kde.plasma.desktop)
-                fail "Plugin inválido no skel: org.kde.plasma.desktop (Plasma 6 usa org.kde.plasma.folder)"
-                continue
-                ;;
-        esac
-        # Plugin de terceiros: deve ter directório em plasmoids/
-        [[ -d "/usr/share/plasma/plasmoids/$plugin" ]] ||
-            [[ -d "/usr/share/kpackage/genericqml/$plugin" ]] ||
-            fail "Plugin referenciado no skel não encontrado em plasmoids/kpackage: $plugin"
-    done < <(grep "^plugin=" "$APPLETSRC" | sed 's/^plugin=//')
-    # Systemtray: extraItems= / knownItems= com string vazia são parseados como
-    # lista com um elemento "" → systemtray tenta carregar applet com plugin="" →
-    # "error when loading applet """. Estas chaves devem estar AUSENTES (auto-descoberta)
-    # ou conter IDs reais separados por vírgula.
-    for key in extraItems knownItems; do
-        if grep -qE "^${key}=\$" "$APPLETSRC" 2>/dev/null; then
-            fail "Systemtray: ${key}= é string vazia no appletsrc (causa 'error when loading applet'; remover a chave)"
-        fi
-    done
-    # O skel deve manter o systray mínimo. Deixar o Plasma 6 gerar os sub-applets
-    # evita migração/criação parcial no arranque, que produz "File name empty!" e
-    # "error when loading applet \"\"" mesmo sem plugin vazio persistido.
-    grep -q 'SystrayContainmentId' "$APPLETSRC" && \
-        fail "Systemtray: SystrayContainmentId legado presente; usar applets aninhados do Plasma 6"
-    grep -q '^plugin=org\.kde\.plasma\.private\.systemtray$' "$APPLETSRC" && \
-        fail "Systemtray: containment legado org.kde.plasma.private.systemtray presente; usar applets aninhados do Plasma 6"
-    grep -q '^\[Containments\]\[2\]\[Applets\]\[7\]\[Applets\]\[[0-9][0-9]*\]$' "$APPLETSRC" && \
-        fail "Systemtray: skel pré-popula sub-applets; deixar Plasma gerar em runtime"
-else
-    fail "appletsrc de skel ausente: $APPLETSRC"
-fi
-
-echo "=== Login (plasmalogin) tema ==="
-# O DM é o plasma-login-manager (plasmalogin): greeter QML próprio, não usa temas SDDM.
-# Aparência configurada via:
-#   1. /etc/xdg/kdeglobals — LookAndFeelPackage=Mokka (lido por startplasma-login-wayland)
-#   2. /etc/plasmalogin.conf.d/10-theme.conf — WallpaperPluginId + Image (greeter wallpaper)
-PLASMALOGIN_CONF="/etc/plasmalogin.conf.d/10-theme.conf"
-PLASMALOGIN_KDEGLOBALS="/etc/xdg/kdeglobals"
-[[ -f "$PLASMALOGIN_CONF" ]] || fail "Login: ficheiro de config ausente: $PLASMALOGIN_CONF"
-grep -q '^WallpaperPluginId=org.kde.image$' "$PLASMALOGIN_CONF" \
-    || fail "plasmalogin: WallpaperPluginId não é org.kde.image"
-grep -q '^Image=file:///usr/share/wallpapers/Mokka-tree/' "$PLASMALOGIN_CONF" \
-    || fail "plasmalogin: wallpaper Mokka-tree não configurado"
-[[ -f "$PLASMALOGIN_KDEGLOBALS" ]] || fail "Login: kdeglobals ausente: $PLASMALOGIN_KDEGLOBALS"
-grep -q '^LookAndFeelPackage=Mokka$' "$PLASMALOGIN_KDEGLOBALS" \
-    || fail "Login: LookAndFeelPackage não é Mokka em $PLASMALOGIN_KDEGLOBALS"
-
-echo "=== Lock screen ==="
-LOCK_CFG="/etc/skel/.config/kscreenlockerrc"
-if [[ -f "$LOCK_CFG" ]]; then
-    grep -q '^Theme=Mokka' "$LOCK_CFG" \
-        && fail "kscreenlockerrc: Theme=Mokka inválido (Mokka não tem QML de lockscreen)"
-    LOCK_WALL=$(sed -n '/^\[Greeter\]\[Wallpaper\]\[org.kde.image\]\[General\]$/,/^\[/{s/^Image=//p}' \
-        "$LOCK_CFG" 2>/dev/null | head -1)
-    if [[ -n "$LOCK_WALL" ]]; then
-        LOCK_WALL_PATH="${LOCK_WALL#file://}"
-        [[ -e "$LOCK_WALL_PATH" ]] || fail "Lock screen: wallpaper não existe: $LOCK_WALL_PATH"
-    fi
-fi
+echo "=== COSMIC: greeter e sessão ==="
+# cosmic-greeter.service (Alias=display-manager.service) já vem preseted pela
+# imagem base cosmic-atomic; verificado como unit obrigatória em REQUIRED_UNITS
+# acima. Aqui só confirmamos que a sessão wayland certa está exposta.
+[[ -f /usr/share/wayland-sessions/cosmic.desktop ]] \
+    || fail "COSMIC: sessão wayland cosmic.desktop ausente (usada pelo installer/ para autodetecção)"
 
 echo "=== GTK tema ==="
 GTK3_CONF="/etc/skel/.config/gtk-3.0/settings.ini"
@@ -366,76 +292,31 @@ if [[ -f "$GTK3_CONF" ]]; then
     fi
 fi
 
-echo "=== Tema Mokka ==="
-MOKKA_DIR="/usr/share/plasma/look-and-feel/Mokka"
-[[ -d "$MOKKA_DIR" ]] || fail "Mokka: look-and-feel ausente: $MOKKA_DIR"
+echo "=== Tema Catppuccin Mocha Mauve (COSMIC) ==="
+# Substituto do Mokka: RON system-wide em /usr/share/cosmic/, decomposto por
+# install-assets.sh (_install_catppuccin_cosmic) a partir do ThemeBuilder
+# oficial do catppuccin/cosmic-desktop. Ver build_files/assets/assets-manifest.sh.
+COSMIC_THEME_DARK="/usr/share/cosmic/com.system76.CosmicTheme.Dark/v1"
+COSMIC_THEME_BUILDER="/usr/share/cosmic/com.system76.CosmicTheme.Dark.Builder/v1"
+[[ -d "$COSMIC_THEME_DARK" ]] || fail "Catppuccin: diretório de tema ausente: $COSMIC_THEME_DARK"
+[[ -d "$COSMIC_THEME_BUILDER" ]] || fail "Catppuccin: diretório de builder ausente: $COSMIC_THEME_BUILDER"
+grep -q 'Catppuccin-Mocha-Mauve' "$COSMIC_THEME_DARK/palette" 2>/dev/null \
+    || fail "Catppuccin: palette do tema não é Catppuccin-Mocha-Mauve em $COSMIC_THEME_DARK/palette"
+grep -q 'Catppuccin-Mocha-Mauve' "$COSMIC_THEME_BUILDER/palette" 2>/dev/null \
+    || fail "Catppuccin: palette do builder não é Catppuccin-Mocha-Mauve em $COSMIC_THEME_BUILDER/palette"
+[[ -f "$COSMIC_THEME_DARK/accent" ]] || fail "Catppuccin: accent do tema ausente"
+[[ -f "$COSMIC_THEME_DARK/accent_button" ]] || fail "Catppuccin: accent_button do tema ausente"
 
-SPLASH_QML="$MOKKA_DIR/contents/splash/Splash.qml"
-[[ -f "$SPLASH_QML" ]] || fail "Mokka: Splash.qml ausente"
-grep -wq 'sizes' "$SPLASH_QML" && fail "Mokka Splash.qml: variável 'sizes' não corrigida (patch não aplicado)"
-
-MOKKA_DEFAULTS="$MOKKA_DIR/contents/defaults"
-[[ -f "$MOKKA_DEFAULTS" ]] || fail "Mokka: ficheiro defaults ausente"
-grep -q 'Catppuccin-Mocha-Mauve-splash' "$MOKKA_DEFAULTS" && \
-    fail "Mokka defaults: KSplash ainda referencia 'Catppuccin-Mocha-Mauve-splash' (patch não aplicado)"
-grep -q 'garuda-mokka' "$MOKKA_DEFAULTS" && \
-    fail "Mokka defaults: ainda referencia path 'garuda-mokka' (wallpaper lock screen não corrigido)"
-grep -q 'Catppuccin-Mocha-Mauve-Cursors' "$MOKKA_DEFAULTS" && \
-    fail "Mokka defaults: cursorTheme ainda referencia 'Catppuccin-Mocha-Mauve-Cursors' (patch não aplicado; quebra cursor no greeter)"
-
-# layout.js deve ter sido removido — a sua existência activa o pipeline de layout
-# do Plasma, que pode criar containments fantasma com plugin vazio.
-LAYOUT_DIR="$MOKKA_DIR/contents/layouts"
-[[ -d "$LAYOUT_DIR" ]] && \
-    fail "Mokka: directório layouts/ ainda existe (deve ser removido para evitar ghost containments)"
-
-# layout.js user-local (skel): o rsync do Garuda copia o pacote Mokka completo
-# para /etc/skel/.local/share/. Plasma resolve caminhos user-local ANTES dos
-# system-wide, então um layout.js em ~/.local/share/ anula a remoção de
-# /usr/share/. O build deve limpar esta cópia.
-SKEL_LOCAL_MOKKA="/etc/skel/.local/share/plasma/look-and-feel/Mokka"
-[[ -d "$SKEL_LOCAL_MOKKA" ]] && \
-    fail "Mokka: skel user-local look-and-feel existe ($SKEL_LOCAL_MOKKA) — deve ser removido (overrides system-wide)"
-
-# Assets Mokka redundantes no skel: instalados system-wide por install-assets.sh,
-# não devem existir também em user-local (duplicação + conflito em updates).
-for skel_dup in \
-    "/etc/skel/.local/share/plasma/desktoptheme/Mokka" \
-    "/etc/skel/.local/share/color-schemes/Mokka.colors" \
-    "/etc/skel/.local/share/wallpapers/Mokka-tree" \
-    "/etc/skel/.local/share/konsole/Mokka.colorscheme" \
-    "/etc/skel/.local/share/Kvantum/Mokka"; do
-    [[ -e "$skel_dup" ]] && \
-        fail "Mokka: asset user-local duplicado no skel: $skel_dup (já instalado em /usr/share/)"
+# Regressão: assets Mokka/Garuda não devem sobreviver à migração.
+for mokka_leftover in \
+    /usr/share/plasma/look-and-feel/Mokka \
+    /usr/share/plasma/desktoptheme/Mokka \
+    /usr/share/color-schemes/Mokka.colors \
+    /usr/share/aurorae/themes \
+    /usr/share/sddm/themes; do
+    [[ -e "$mokka_leftover" ]] && \
+        fail "Mokka: resquício não removido da migração para COSMIC: $mokka_leftover"
 done
-
-[[ -f "/usr/share/color-schemes/Mokka.colors" ]] || fail "Mokka: color scheme ausente"
-[[ -d "/usr/share/plasma/desktoptheme/Mokka" ]]  || fail "Mokka: desktop theme ausente"
-MOKKA_PLASMARC="/usr/share/plasma/desktoptheme/Mokka/plasmarc"
-grep -q '^enabled=false$' <(sed -n '/^\[AdaptiveTransparency\]/,/^\[/{p}' "$MOKKA_PLASMARC" 2>/dev/null) \
-    || fail "Mokka: AdaptiveTransparency não está desativado em $MOKKA_PLASMARC"
-grep -q '^enabled=true$' <(sed -n '/^\[BlurBehindEffect\]/,/^\[/{p}' "$MOKKA_PLASMARC" 2>/dev/null) \
-    || fail "Mokka: BlurBehindEffect não está alinhado ao host em $MOKKA_PLASMARC"
-
-APPLETSRC_WALL=$(grep '^Image=' /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc 2>/dev/null | head -1 | sed 's|^Image=file://||')
-if [[ -n "$APPLETSRC_WALL" ]]; then
-    [[ -e "$APPLETSRC_WALL" ]] || fail "Mokka: wallpaper referenciado no skel não existe: $APPLETSRC_WALL"
-fi
-
-ICON_THEME=$(sed -n '/^\[Icons\]/,/^\[/{s/^Theme=//p}' /etc/skel/.config/kdeglobals 2>/dev/null | head -1)
-[[ -n "$ICON_THEME" ]] && { [[ -d "/usr/share/icons/$ICON_THEME" ]] || fail "Mokka: tema de ícones ausente: $ICON_THEME"; }
-
-echo "=== Plasma: Panel Colorizer (se instalado) ==="
-PC_DIR="/usr/share/plasma/plasmoids/luisbocanegra.panelcolorizer"
-if [[ -d "$PC_DIR" ]]; then
-    PC_META="$PC_DIR/metadata.json"
-    if [[ -f "$PC_META" ]]; then
-        PLUGIN_ID=$(python3 -c "import json; d=json.load(open('$PC_META')); print(d.get('KPlugin',{}).get('Id',''))" 2>/dev/null || echo "")
-        [[ -n "$PLUGIN_ID" ]] || fail "Panel Colorizer: metadata.json sem plugin ID"
-    else
-        fail "Panel Colorizer instalado mas sem metadata.json"
-    fi
-fi
 
 echo "=== wpctl Steam wrapper ==="
 [[ -x /usr/bin/wpctl.real ]] || fail "wpctl.real ausente (wrapper não instalado)"
@@ -479,13 +360,6 @@ echo "=== EPP tuning (oneshot vendor-neutro) ==="
 systemctl is-enabled cpu-epp-tune.service 2>/dev/null | grep -q "^enabled$" \
     || fail "cpu-epp-tune.service não habilitado"
 
-echo "=== Consistência de versão KDE ==="
-KDE_VER="$(rpm -q --qf '%{VERSION}' plasma-desktop 2>/dev/null || echo '')"
-KWIN_VER="$(rpm -q --qf '%{VERSION}' kwin 2>/dev/null || echo '')"
-if [[ -n "$KDE_VER" && -n "$KWIN_VER" && "$KDE_VER" != "$KWIN_VER" ]]; then
-    fail "Mismatch de versão KDE: plasma-desktop=${KDE_VER} kwin=${KWIN_VER}"
-fi
-
 echo "=== login.defs hardening ==="
 grep -qE '^UMASK[[:space:]]+027' /etc/login.defs \
     || fail "login.defs: UMASK não é 027 (ficheiros novos serão world-readable)"
@@ -508,7 +382,7 @@ echo "=== SUID removal ==="
 [[ ! -f /usr/bin/chfn ]]   || fail "chfn deve ter sido removido (SUID desnecessário)"
 [[ -x /usr/bin/pkexec ]]    || fail "pkexec deve existir para fluxos polkit/liveinst"
 [[ -u /usr/bin/pkexec ]]    || fail "pkexec deve manter SUID para elevar via polkit/liveinst"
-[[ -u /usr/bin/sudo ]]     || fail "sudo perdeu bit SUID (necessário para KDE/kdesu)"
+[[ -u /usr/bin/sudo ]]     || fail "sudo perdeu bit SUID (necessário para elevação administrativa)"
 mapfile -d '' _hmalloc_libs < <(find /usr/lib /usr/lib64 -type f -name 'libhardened_malloc*.so' -print0 2>/dev/null || true)
 ((${#_hmalloc_libs[@]} > 0)) || fail "hardened_malloc: bibliotecas não encontradas"
 for _hmalloc_lib in "${_hmalloc_libs[@]}"; do
@@ -711,12 +585,6 @@ grep -qE '^tmpfs[[:space:]]+/dev/shm.*nosuid' "$DEVSHM_FSTAB" || fail "fstab: /d
 grep -qE '^tmpfs[[:space:]]+/dev/shm.*nodev'  "$DEVSHM_FSTAB" || fail "fstab: /dev/shm sem nodev (CIS 1.1.2.3)"
 grep -qE '^tmpfs[[:space:]]+/dev/shm.*noexec' "$DEVSHM_FSTAB" || fail "fstab: /dev/shm sem noexec (CIS 1.1.2.3)"
 
-# kded6 módulos problemáticos desabilitados (kdedrc)
-KDEDRC="/etc/xdg/kdedrc"
-grep -qE '^\[Module-wpad-detector\]'  "$KDEDRC" || fail "kdedrc: seção [Module-wpad-detector] ausente"
-grep -qE '^autoload=false' <(grep -A2 '\[Module-wpad-detector\]' "$KDEDRC") \
-    || fail "kdedrc: wpad-detector autoload=false ausente"
-
 # tmpfiles OSTree: home.conf override usa caminhos reais (/var/home, /var/srv)
 HOMECF="/etc/tmpfiles.d/home.conf"
 grep -qE '^[Qq][[:space:]]+/var/home' "$HOMECF" || fail "tmpfiles home.conf: entrada /var/home ausente"
@@ -758,13 +626,14 @@ grep -qE '^Compress=yes' /etc/systemd/journald.conf.d/size-limit.conf \
     || fail "journald: Compress=yes ausente (CIS 6.2)"
 
 echo "=== STIG Tier A: lock de ecrã, TMOUT, inatividade de contas ==="
-# Bloqueio de ecrã KDE (STIG 271055/271065/271075) — imutável via [$i]
-KSL="/etc/xdg/kscreenlockerrc"
-grep -qE '^\[Daemon\]\[\$i\]' "$KSL" || fail "kscreenlockerrc: grupo [Daemon] não é imutável ([\$i]) (STIG 271060/271070/271080)"
-grep -qE '^Autolock=true' "$KSL"     || fail "kscreenlockerrc: Autolock!=true (STIG 271055)"
-grep -qE '^Timeout=10$' "$KSL"       || fail "kscreenlockerrc: Timeout!=10 min (STIG 271065)"
-grep -qE '^LockOnResume=true' "$KSL" || fail "kscreenlockerrc: LockOnResume!=true (STIG 271075)"
-grep -qE '^Theme=Mokka' "$KSL"       && fail "kscreenlockerrc: Theme=Mokka inválido (Mokka não tem QML de lockscreen)"
+# ATENÇÃO — regressão de cobertura conhecida da migração KDE→COSMIC:
+# o bloqueio de ecrã KDE (STIG 271055/271065/271075) era imposto de forma
+# IMUTÁVEL via /etc/xdg/kscreenlockerrc ([Daemon][$i]). O COSMIC usa cosmic-idle
+# + cosmic-config (RON por chave, sem equivalente confirmado ao marcador de
+# imutabilidade "[$i]" do KDE) — o schema exato (nomes de chave para autolock/
+# timeout) ainda não foi verificado ao vivo numa sessão COSMIC real. Enquanto
+# isso não for confirmado e reimplementado aqui, esta política STIG NÃO está
+# a ser verificada nem imposta nesta imagem. Ver plano de migração.
 
 # Timeout de shell interativo (STIG 412035)
 grep -qE 'TMOUT=600' /etc/profile.d/tmout.sh \

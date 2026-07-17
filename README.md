@@ -1,8 +1,12 @@
-# Fedora KDE Secure Dev Image
+# Fedora COSMIC Secure Dev Image
 
-Custom Fedora bootc image (KDE Plasma on the minimal `base-atomic` base) for a secure development workstation.
+Custom Fedora bootc image (COSMIC desktop on the official `cosmic-atomic` base, themed with Catppuccin Mocha Mauve) for a secure development workstation.
 
-The image keeps the base OS focused on boot, security hardening, KDE integration, container workflow support, and hardware/security-key support. Development stacks and user applications should live in Flatpak, Toolbox, or user-scoped setup instead of being layered into the immutable base.
+> The container/registry name and tags (`fedora-kde-custom`) were kept as-is for
+> continuity even though the desktop moved from KDE Plasma to COSMIC — see the
+> migration notes in git history if that looks surprising.
+
+The image keeps the base OS focused on boot, security hardening, COSMIC integration, container workflow support, and hardware/security-key support. Development stacks and user applications should live in Flatpak, Toolbox, or user-scoped setup instead of being layered into the immutable base.
 
 ## Atomic Model
 
@@ -14,11 +18,11 @@ The image keeps the base OS focused on boot, security hardening, KDE integration
 
 ## Base OS Contents
 
-- Fedora `base-atomic` bootc base pinned by digest in `Containerfile`, with a minimal KDE Plasma install layered on top.
+- Fedora `cosmic-atomic` bootc base pinned by digest in `Containerfile` (official COSMIC desktop image, stable since Fedora 44).
 - SELinux enforcing configuration.
 - Firewalld, hardened sysctl settings, bootc kernel arguments, coredump restrictions, and module blacklists.
 - Podman, Podman Compose, and Docker-compatible Podman wrappers for container workflows.
-- KDE/Plasma defaults, theme assets, SDDM configuration, and desktop integration.
+- COSMIC defaults and Catppuccin Mocha Mauve theme assets (system-wide, via `/usr/share/cosmic/`), `greetd`/`cosmic-greeter` login, and desktop integration.
 - YubiKey/U2F packages and PAM support for security keys.
 - Small recovery and productivity CLI tools such as `git`, `curl`, `jq`, `ripgrep`, `fd`, `bat`, `eza`, and `neovim`.
 
@@ -74,7 +78,7 @@ Local disk-image builds use `bootc-image-builder` in a privileged container and 
 
 ## Supply Chain
 
-- CI verifies the real Fedora `base-atomic` base image signature, ignoring the `scratch` build-context stage.
+- CI verifies the real Fedora `cosmic-atomic` base image signature, ignoring the `scratch` build-context stage.
 - Published images are signed with keyless Cosign using GitHub Actions OIDC.
 - CI generates and publishes SBOM/provenance artifacts.
 - `bootc-image-builder` is pinned by digest for local and CI disk-image builds.
