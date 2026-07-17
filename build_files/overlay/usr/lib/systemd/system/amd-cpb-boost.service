@@ -1,15 +1,14 @@
 # Garante o Core Performance Boost (CPB) do CPU AMD activo em arranque.
-# Derivado dos profiles tuned do Bazzite (amd_pstate/cpb_boost=enabled), mas
-# implementado como oneshot condicional em vez de tuned: o sysfs cpb_boost só
-# existe em CPUs AMD com amd_pstate, e escrevê-lo via tuned numa máquina Intel
-# geraria ruído no journal. ConditionPathExists garante que em hardware Intel
-# (imagem é mista) a unit é simplesmente ignorada, sem warning.
+# Derivado dos profiles tuned do Bazzite. CPUs AMD expõem o controlo em
+# amd_pstate/cpb_boost quando usam amd_pstate, mas sistemas com acpi-cpufreq
+# usam o atributo global cpufreq/boost. ExecCondition limita ambos os caminhos
+# a AMD, sem tocar no Turbo Boost de máquinas Intel.
 #
 # Em workstation/dev o boost maximiza throughput de compilação. Já costuma vir
 # ligado por defeito; isto é seguro/insurance contra perfis ou BIOS que o desliguem.
 [Unit]
 Description=Enable AMD CPU Core Performance Boost (CPB)
-ConditionPathExists=/sys/devices/system/cpu/amd_pstate/cpb_boost
+ConditionPathExists=/sys/devices/system/cpu/cpufreq
 DefaultDependencies=no
 After=sysinit.target
 Before=multi-user.target
@@ -17,7 +16,8 @@ Before=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/bash -c 'echo 1 > /sys/devices/system/cpu/amd_pstate/cpb_boost'
+ExecCondition=/usr/bin/bash -c 'grep -qE "^vendor_id[[:space:]]*:.*AuthenticAMD$" /proc/cpuinfo && { [[ -w /sys/devices/system/cpu/amd_pstate/cpb_boost ]] || [[ -w /sys/devices/system/cpu/cpufreq/boost ]]; }'
+ExecStart=/usr/bin/bash -c 'if [[ -w /sys/devices/system/cpu/amd_pstate/cpb_boost ]]; then echo 1 > /sys/devices/system/cpu/amd_pstate/cpb_boost; elif [[ -w /sys/devices/system/cpu/cpufreq/boost ]]; then echo 1 > /sys/devices/system/cpu/cpufreq/boost; fi'
 
 [Install]
 WantedBy=multi-user.target

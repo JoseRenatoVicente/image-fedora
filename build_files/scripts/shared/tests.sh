@@ -339,9 +339,13 @@ fi
 echo "=== AMD CPB boost (oneshot condicional) ==="
 [[ -f /usr/lib/systemd/system/amd-cpb-boost.service ]] \
     || fail "amd-cpb-boost.service ausente"
-grep -q '^ConditionPathExists=/sys/devices/system/cpu/amd_pstate/cpb_boost$' \
+grep -q '^ConditionPathExists=/sys/devices/system/cpu/cpufreq$' \
     /usr/lib/systemd/system/amd-cpb-boost.service \
-    || fail "amd-cpb-boost.service sem ConditionPathExists (geraria ruído em Intel)"
+    || fail "amd-cpb-boost.service sem ConditionPathExists para cpufreq"
+grep -q 'AuthenticAMD' /usr/lib/systemd/system/amd-cpb-boost.service \
+    || fail "amd-cpb-boost.service sem guarda para hardware AMD"
+grep -q '/sys/devices/system/cpu/cpufreq/boost' /usr/lib/systemd/system/amd-cpb-boost.service \
+    || fail "amd-cpb-boost.service não suporta AMD com acpi-cpufreq"
 systemctl is-enabled amd-cpb-boost.service 2>/dev/null | grep -q "^enabled$" \
     || fail "amd-cpb-boost.service não habilitado"
 
@@ -590,7 +594,7 @@ HOMECF="/etc/tmpfiles.d/home.conf"
 grep -qE '^[Qq][[:space:]]+/var/home' "$HOMECF" || fail "tmpfiles home.conf: entrada /var/home ausente"
 grep -qE '^q[[:space:]]+/var/srv'     "$HOMECF" || fail "tmpfiles home.conf: entrada /var/srv ausente"
 
-# /etc/group deve ter grupos padrão do sistema (audio, disk, kvm, video, tty)
+# systemd-sysusers materializa os grupos padrão sem copiar os bancos altfiles.
 for grp in audio disk kvm video tty render input; do
     grep -q "^${grp}:" /etc/group || fail "/etc/group: grupo '${grp}' ausente (udev/tmpfiles falhariam no boot)"
 done

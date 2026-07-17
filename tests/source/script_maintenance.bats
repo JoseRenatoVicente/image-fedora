@@ -129,6 +129,12 @@ setup() {
         || { echo "expected /usr/bin/dnf removal before usr overlay copy"; return 1; }
 }
 
+@test "system accounts are materialized by sysusers without copying altfiles" {
+    assert_contains "$system_configure" 'systemd-sysusers'
+    assert_not_contains "$system_configure" 'done < /usr/lib/passwd'
+    assert_not_contains "$system_configure" 'done < /usr/lib/group'
+}
+
 @test "fedora-kinoite-plasmalogin-workaround does not exist (KDE-only, removed)" {
     assert_file_not_exists "$overlay/usr/lib/systemd/system/fedora-kinoite-plasmalogin-workaround.service"
     assert_file_not_exists "$overlay/usr/libexec/fedora-kinoite-plasmalogin-workaround"

@@ -42,6 +42,13 @@ setup() {
     assert_contains "${REPO_ROOT}/build_files/overlay/etc/xdg/autostart/geoclue-demo-agent.desktop" 'Hidden=true'
 }
 
+@test "AMD CPB boost supports both AMD CPU frequency drivers" {
+    local service="${REPO_ROOT}/build_files/overlay/usr/lib/systemd/system/amd-cpb-boost.service"
+    assert_contains "$service" 'AuthenticAMD'
+    assert_contains "$service" '/sys/devices/system/cpu/amd_pstate/cpb_boost'
+    assert_contains "$service" '/sys/devices/system/cpu/cpufreq/boost'
+}
+
 @test "orphaned session helpers are masked to /dev/null" {
     for unit in mpris-proxy.service obex.service; do
         local path="${REPO_ROOT}/build_files/overlay/etc/systemd/user/${unit}"

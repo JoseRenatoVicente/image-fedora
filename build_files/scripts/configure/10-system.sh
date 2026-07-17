@@ -45,31 +45,13 @@ for public_config_dir in \
     [[ -d "$public_config_dir" ]] && find "$public_config_dir" -type f -exec chmod 0644 {} +
 done
 
-# Popula /etc/group com os grupos padrão do sistema definidos em /usr/lib/group
-# (sysusers.d altfiles). No OSTree, /etc/group tem apenas as contas de serviço
-# criadas durante a build; os grupos de legacy Unix (audio, disk, kvm, tty, video,
-# render, input, lp, etc.) ficam em /usr/lib/group e são resolvidos pelo módulo NSS
-# "altfiles". Porém systemd-tmpfiles-setup-dev-early e systemd-udevd tentam resolver
-# grupos antes do stack NSS completo, gerando erros "Failed to resolve group".
-# A solução é garantir que esses grupos também existam em /etc/group.
-echo "Sincronizando grupos padrão de /usr/lib/group para /etc/group..."
-while IFS=: read -r name _ gid _; do
-    [[ -z "$name" || "$name" == \#* ]] && continue
-    grep -q "^${name}:" /etc/group 2>/dev/null || echo "${name}:x:${gid}:" >> /etc/group
-done < /usr/lib/group
-echo "Grupos em /etc/group após sync: $(wc -l < /etc/group)"
-
-# Popula /etc/passwd com os utilizadores padrão do sistema definidos em /usr/lib/passwd.
-# Análogo ao sync de grupos: utilizadores de serviço como tss (TPM2) são definidos
-# em sysusers.d e ficam em /usr/lib/passwd, mas não em /etc/passwd na build OSTree.
-# udev e tmpfiles-setup-dev-early falham ao resolver "Failed to resolve user 'tss'"
-# se /etc/passwd não tiver a entrada no momento do arranque.
-echo "Sincronizando utilizadores padrão de /usr/lib/passwd para /etc/passwd..."
-while IFS=: read -r name _ uid gid gecos home shell; do
-    [[ -z "$name" || "$name" == \#* ]] && continue
-    grep -q "^${name}:" /etc/passwd 2>/dev/null || echo "${name}:x:${uid}:${gid}:${gecos}:${home}:${shell}" >> /etc/passwd
-done < /usr/lib/passwd
-echo "Utilizadores em /etc/passwd após sync: $(wc -l < /etc/passwd)"
+# systemd-sysusers is the single authority for system accounts. Copying the
+# altfiles databases into /etc freezes their previous UID allocation; adding a
+# new account later can then make two services share an UID (for example,
+# dnsmasq and cosmic-greeter). Materialize the current sysusers definitions
+# only after all package transactions and overlays are in place.
+echo "Materializando contas de sistema com systemd-sysusers..."
+systemd-sysusers
 
 # Executables from the mirrored tree need explicit permission bits.
 chmod 755 /usr/bin/dnf
