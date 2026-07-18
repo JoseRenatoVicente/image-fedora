@@ -277,7 +277,10 @@ setup() {
     assert_contains "$kargs" 'init_on_free=1'
     assert_contains "$kargs" 'iommu.strict=1'
     assert_contains "$kargs" 'random.trust_bootloader=off'
-    assert_contains "$kargs" 'random.trust_cpu=off'
+    # trust_cpu=on é deliberado desde d1b0440 (melhorias de performance):
+    # credita RDRAND para entropia rápida no early boot. trust_bootloader
+    # continua off — é o vetor menos auditável dos dois.
+    assert_contains "$kargs" 'random.trust_cpu=on'
     assert_contains "$kargs" 'slab_nomerge'
     # slab_debug=FZ e page_poison=1 removidos por overhead — mantêm-se init_on_free
     # e slab_nomerge como defesas contra corrupção de heap.
