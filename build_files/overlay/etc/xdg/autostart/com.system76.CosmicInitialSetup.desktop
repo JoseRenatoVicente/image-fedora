@@ -1,0 +1,14 @@
+# Override do autostart do wizard de primeira configuração do COSMIC.
+# A imagem já pré-configura o desktop (tema/defaults em /usr/share/cosmic e
+# skel via 40-skel-cosmic.sh), então o wizard é redundante — e o processo
+# fica residente a sessão INTEIRA (~72 MiB Pss medidos), um custo real em
+# hardware com pouca RAM. Mesmo padrão do geoclue-demo-agent.desktop.
+[Desktop Entry]
+Type=Application
+Name=COSMIC Initial Setup
+Exec=cosmic-initial-setup
+NoDisplay=true
+Terminal=false
+StartupNotify=true
+StartupWMClass=com.system76.CosmicInitialSetup
+Hidden=true

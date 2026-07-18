@@ -2,12 +2,15 @@
 Description=Apply low-resource sysctl tuning on constrained hardware
 Documentation=man:systemd.unit(5)
 # 99-performance.conf (swappiness=180) é o perfil por defeito para
-# workstation/dev. Este profile alternativo (swappiness=60, cache_pressure
-# mais agressivo) só faz sentido em hardware com pouca RAM — por isso corre
+# workstation/dev. Este profile alternativo (vfs_cache_pressure mais
+# agressivo) só faz sentido em hardware com pouca RAM — por isso corre
 # condicionado em vez de ser um overlay incondicional em /etc/sysctl.d/
 # (que sobrepunha 99-performance.conf em TODAS as máquinas por ordem lexical).
+# O nome 99-zz-* garante que ordena DEPOIS de 99-performance.conf — o nome
+# antigo (100-*) ordenava antes ('1' < '9') e ficava inerte a partir do
+# segundo boot. O rm no ExecStart migra máquinas que ainda têm o nome antigo.
 ConditionMemory=<=6G
-ConditionPathExists=!/etc/sysctl.d/100-low-resource.conf
+ConditionPathExists=!/etc/sysctl.d/99-zz-low-resource.conf
 DefaultDependencies=no
 After=sysinit.target
 Before=multi-user.target
@@ -15,8 +18,9 @@ Before=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/install -Dm0644 /usr/share/image-fedora/low-resource/100-low-resource.conf /etc/sysctl.d/100-low-resource.conf
-ExecStart=/usr/lib/systemd/systemd-sysctl /etc/sysctl.d/100-low-resource.conf
+ExecStart=/usr/bin/rm -f /etc/sysctl.d/100-low-resource.conf
+ExecStart=/usr/bin/install -Dm0644 /usr/share/image-fedora/low-resource/99-zz-low-resource.conf /etc/sysctl.d/99-zz-low-resource.conf
+ExecStart=/usr/lib/systemd/systemd-sysctl /etc/sysctl.d/99-zz-low-resource.conf
 
 [Install]
 WantedBy=multi-user.target

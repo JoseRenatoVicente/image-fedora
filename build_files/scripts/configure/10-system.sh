@@ -133,7 +133,7 @@ setfattr -n user.component -v "image-config" \
     /etc/systemd/system/tuned.service.d/deferred.conf \
     /etc/systemd/system/tuned-ppd.service.d/no-block-multiuser.conf \
     /etc/sysctl.d/99-performance.conf \
-    /usr/share/image-fedora/low-resource/100-low-resource.conf \
+    /usr/share/image-fedora/low-resource/99-zz-low-resource.conf \
     /usr/lib/systemd/system/low-resource-tuning.service \
     /etc/systemd/zram-generator.conf \
     /usr/lib/systemd/system/zram-recompress.service \
@@ -141,6 +141,7 @@ setfattr -n user.component -v "image-config" \
     /usr/libexec/zram-recompress \
     /etc/systemd/system/user.slice.d/15-memory-high.conf \
     /etc/xdg/autostart/geoclue-demo-agent.desktop \
+    /etc/xdg/autostart/com.system76.CosmicInitialSetup.desktop \
     /usr/lib/bootc/kargs.d/20-performance.toml \
     /usr/lib/tmpfiles.d/thp-tuning.conf \
     /etc/systemd/system/user@.service.d/10-delegate.conf \

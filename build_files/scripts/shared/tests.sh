@@ -265,8 +265,20 @@ grep -q 'vm.max_map_count' /etc/sysctl.d/99-performance.conf \
     || fail "vm.max_map_count não configurado"
 grep -q 'compression-algorithm=zstd' /etc/systemd/zram-generator.conf \
     || fail "ZRAM não configurado com zstd"
-grep -q 'zram-size = min(ram / 4 + 1024, 4096)' /etc/systemd/zram-generator.conf \
-    || fail "ZRAM não limitado a min(ram / 4 + 1024, 4096)"
+grep -q 'zram-size = min(ram / 2 + 512, 4096)' /etc/systemd/zram-generator.conf \
+    || fail "ZRAM não limitado a min(ram / 2 + 512, 4096)"
+# Perfil low-resource: o nome TEM de ordenar depois de 99-performance.conf
+# (o antigo 100-* ordenava antes e ficava inerte a partir do segundo boot).
+[[ -f /usr/share/image-fedora/low-resource/99-zz-low-resource.conf ]] \
+    || fail "low-resource: template 99-zz-low-resource.conf ausente"
+[[ ! -e /usr/share/image-fedora/low-resource/100-low-resource.conf ]] \
+    || fail "low-resource: template antigo 100-low-resource.conf ainda presente (ordenação quebrada)"
+grep -q '99-zz-low-resource.conf' /usr/lib/systemd/system/low-resource-tuning.service \
+    || fail "low-resource-tuning.service não referencia 99-zz-low-resource.conf"
+grep -q 'rm -f /etc/sysctl.d/100-low-resource.conf' /usr/lib/systemd/system/low-resource-tuning.service \
+    || fail "low-resource-tuning.service não migra o ficheiro antigo 100-low-resource.conf"
+! grep -qE '^\s*vm\.swappiness' /usr/share/image-fedora/low-resource/99-zz-low-resource.conf \
+    || fail "low-resource: não deve sobrepor vm.swappiness (mantém 180 do 99-performance.conf)"
 # Recompressão em camadas (memória densa estilo macOS): helper executável +
 # regista algoritmo secundário denso + recomprime só páginas idle.
 [[ -x /usr/libexec/zram-recompress ]] \
@@ -280,6 +292,14 @@ grep -q '^MemoryHigh=' /etc/systemd/system/user.slice.d/15-memory-high.conf \
     || fail "user.slice: MemoryHigh (reclaim proativo) não configurado"
 grep -q '^Hidden=true$' /etc/xdg/autostart/geoclue-demo-agent.desktop \
     || fail "geoclue-demo-agent.desktop não está com Hidden=true"
+grep -q '^Hidden=true$' /etc/xdg/autostart/com.system76.CosmicInitialSetup.desktop \
+    || fail "CosmicInitialSetup.desktop não está com Hidden=true (wizard fica residente ~72 MiB/sessão)"
+for masked in switcheroo-control.service systemd-homed.service; do
+    [[ "$(systemctl is-enabled "$masked" 2>/dev/null)" == "masked" ]] \
+        || fail "$masked não está mascarado"
+done
+grep -q 'ELECTRON_OZONE_PLATFORM_HINT=auto' /etc/skel/.local/share/flatpak/overrides/com.visualstudio.code \
+    || fail "VS Code (skel): override sem ELECTRON_OZONE_PLATFORM_HINT=auto (Wayland nativo)"
 for unit in mpris-proxy.service obex.service; do
     [[ -L "/etc/systemd/user/${unit}" && "$(readlink "/etc/systemd/user/${unit}")" == "/dev/null" ]] \
         || fail "/etc/systemd/user/${unit} não está mascarado para /dev/null"
