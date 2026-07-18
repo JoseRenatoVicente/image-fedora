@@ -71,6 +71,11 @@ systemctl preset power-profiles-daemon.service 2>/dev/null || true
 #   ModemManager               — sem modem celular neste hardware (pacote removido)
 #   avahi-daemon(.socket)      — mDNS/zeroconf não usado no perfil seguro
 #   ctrl-alt-del.target        — bloqueia reboot físico via consola
+#   switcheroo-control         — proxy de GPU dupla; fora do perfil (drivers
+#                                NVIDIA excluídos, alvo é iGPU única)
+#   systemd-homed(-activate)   — sem home areas nesta imagem (users clássicos
+#                                via installer); mask evita a ativação D-Bus
+#                                que o disable sozinho não impede
 # plymouth-quit-wait NÃO é mascarado (preservar o splash Plymouth afinado).
 # Mascarar funciona mesmo para units de pacotes ausentes (symlink → /dev/null).
 systemctl mask \
@@ -99,7 +104,10 @@ systemctl mask \
     iscsid.socket \
     iscsiuio.service \
     iscsiuio.socket \
-    iscsi.service
+    iscsi.service \
+    switcheroo-control.service \
+    systemd-homed.service \
+    systemd-homed-activate.service
 systemctl mask --force ctrl-alt-del.target
 
 # NOTA: chmod 555 /etc/bluetooth NÃO fica aqui — ver 90-cleanup.sh. O

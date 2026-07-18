@@ -3,3 +3,10 @@ filesystems=host;
 
 [Session Bus Policy]
 org.freedesktop.Flatpak=talk
+
+[Environment]
+# Electron usa X11 (via Xwayland) por defeito. Com o hint=auto o VS Code
+# arranca em Wayland nativo quando a sessão é Wayland (COSMIC): rendering
+# mais nítido e ~60 MiB a menos (o Xwayland do compositor corre com
+# -terminate e morre sozinho quando o último cliente X sai).
+ELECTRON_OZONE_PLATFORM_HINT=auto
