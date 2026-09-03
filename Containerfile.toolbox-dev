@@ -4,7 +4,7 @@
 # Base: fedora-toolbox oficial, na mesma versão do base-atomic usado pela imagem
 # principal (ver Containerfile). Todo o toolchain vive aqui dentro — a base
 # imutável não carrega compiladores nem SDKs (ver build_files/scripts/configure/70-build-deps.sh).
-FROM registry.fedoraproject.org/fedora-toolbox:45
+FROM registry.fedoraproject.org/fedora-toolbox:46
 
 LABEL com.github.containers.toolbox="true"
 LABEL org.image-fedora.toolbox.role="dev"

@@ -4,7 +4,7 @@
 # Substitui o Homebrew usado hoje em build_files/overlay/usr/libexec/fedora-brew-setup:
 # as mesmas ferramentas (terraform, kubectl, flux, talosctl) mais helm/k9s/ansible/
 # awscli2 — só que pré-instaladas na imagem, sem depender de rede no first-boot.
-FROM registry.fedoraproject.org/fedora-toolbox:45
+FROM registry.fedoraproject.org/fedora-toolbox:46
 
 LABEL com.github.containers.toolbox="true"
 LABEL org.image-fedora.toolbox.role="infra"
